@@ -12,7 +12,20 @@
           "package_name": "com.example.zapac"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "50539803991-epftfkdm964asvh5t4tboafgk0sofdmj.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.zapac",
+            "certificate_hash": "22f3a7efa45cdafd29ec7b29aa188bc60dc97929"
+          }
+        },
+        {
+          "client_id": "50539803991-okkbsamgrvued3vprkjcf95c23ok68v8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAzwFKoTmX_nC8c0ylxkLiEScwOEpWyvXc"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "50539803991-okkbsamgrvued3vprkjcf95c23ok68v8.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "50539803991-8576p4ldmfno0a6auh2gsahbvmg8omr1.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.zapac"
+              }
+            }
+          ]
         }
       }
     }

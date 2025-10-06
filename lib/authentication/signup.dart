@@ -26,9 +26,11 @@ class _SignUpPageState extends State<SignUpPage> {
   Color _confirmHintColor = Colors.transparent;
   String? _generalError;
 
+  // Existing colors from the original login.dart and signup.dart
   final Color _blue = const Color(0xFF5072A7);
   final Color _green = const Color(0xFF6CA89A);
-  final Color _beige = const Color(0xFFF3EEE6);
+  final Color _white = const Color(0xFFF9F9F9);
+  final Color _beige = const Color (0xFFF3EEE6);
 
   @override
   void initState() {
@@ -181,15 +183,15 @@ class _SignUpPageState extends State<SignUpPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 15)),
-        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 14)),
+        const SizedBox(height: 2),
         TextField(
           controller: controller,
           obscureText: isPassword ? (controller == _passwordCtrl ? _obscurePassword : _obscureConfirm) : false,
           decoration: InputDecoration(
             filled: true,
             fillColor: _beige,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
               borderSide: BorderSide(color: borderColor, width: 1.2),
@@ -219,9 +221,9 @@ class _SignUpPageState extends State<SignUpPage> {
                 : null,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 2),
         SizedBox(
-          height: 18,
+          height: 12,
           child: Text(
             hintTextBelow ?? '',
             style: TextStyle(fontSize: 11.5, color: hintColorBelow),
@@ -236,6 +238,7 @@ class _SignUpPageState extends State<SignUpPage> {
     required String label,
     required Color bg,
     required Color iconColor,
+    required Color textColor,
     required VoidCallback onPressed,
     double width = 150,
   }) {
@@ -267,85 +270,110 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final spacing = screenHeight * 0.006;
+    
+    // Requested AppBar color, slightly darker blue than _blue
+    final appBarColor = const Color(0xFF4A6FA5);
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: ListView(
-        children: [
-          // top blue curved header
-          ClipPath(
-            clipper: _CurvedClipper(),
-            child: Container(
-              height: 220,
-              color: _blue,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset('assets/images/bus.png', height: 80),
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Column(
+      
+      // START: Merged AppBar structure
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(230), // Requested height
+        child: ClipRRect(
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(60),
+            bottomRight: Radius.circular(60),
+          ),
+          child: AppBar(
+            backgroundColor: appBarColor, // Requested color
+            toolbarHeight: 250, // Match PreferredSize height
+            automaticallyImplyLeading: false, 
+            title: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Use existing 'bus.png' asset
+                SizedBox(height: 20),
+                Image.asset('assets/Logo.png', height: 130),
+                const SizedBox(height: 15),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // SIGN UP (Selected - Bold and Underlined, from original code)
+                    Column(
                         children: [
                           const Text(
                             "Sign Up",
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                           ),
-                          Container(width: 48, height: 2, color: Colors.white, margin: const EdgeInsets.only(top: 6)),
+                          Container(width: 48, height: 1.5, color: Colors.white, margin: const EdgeInsets.only(top: 6)),
                         ],
                       ),
-                      const SizedBox(width: 28),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
-                        },
-                        child: Text(
-                          "Log In",
-                          style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 16),
+
+                    const SizedBox(width: 28),
+
+                    // LOG IN (Tappable, directs to LoginPage, from original code)
+                    GestureDetector(
+                      onTap: () {
+                        // This preserves the navigation logic from the first snippet.
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+                      },
+                      child: Text(
+                        "Log In",
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 16,
+                            fontWeight: FontWeight.normal
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
+        ),
+      ),
+      // END: Merged AppBar structure
 
-          const SizedBox(height: 18),
+      body: ListView(
+        children: [
+          // The header content is now in the appBar, so remove the redundant Sized Box
+          const SizedBox(height: 30),
           Center(
             child: Text(
               "Create an Account",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _green),
+              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: _green),
             ),
           ),
           const SizedBox(height: 18),
 
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 22),
+            padding: const EdgeInsets.symmetric(horizontal: 30),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _inputField(
-                  label: 'Email',
+                  label: ' Email',
                   controller: _emailCtrl,
                   isPassword: false,
                   hintTextBelow: _emailError,
                   hintColorBelow: _emailError != null ? Colors.red : Colors.transparent,
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 _inputField(
-                  label: 'Password',
+                  label: ' Password',
                   controller: _passwordCtrl,
                   isPassword: true,
                   hintTextBelow: _passwordHint,
                   hintColorBelow: _passwordHintColor,
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 _inputField(
-                  label: 'Confirm Password',
+                  label: ' Confirm Password',
                   controller: _confirmCtrl,
                   isPassword: true,
                   hintTextBelow: _confirmHint,
@@ -360,20 +388,23 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
 
                 const SizedBox(height: 6),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _onSignUp,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _green,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _onSignUp,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _green,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                        : const Text("Sign Up", style: TextStyle(color: Colors.black, fontSize: 16)),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                      : const Text("Sign Up", style: TextStyle(color: Colors.black, fontSize: 16)),
                 ),
 
-                SizedBox(height: spacing * 8),
+                SizedBox(height: spacing * 4),
                 _dividerWithText("or sign in with"),
                 const SizedBox(height: 18),
                 Row(
@@ -384,16 +415,18 @@ class _SignUpPageState extends State<SignUpPage> {
                       label: "Google",
                       bg: Colors.black,
                       iconColor: Colors.white,
+                      textColor: Colors.white,
                       onPressed: _onGoogle,
-                      width: MediaQuery.of(context).size.width * 0.55,
+                      width: MediaQuery.of(context).size.width * 0.45,
                     ),
                     _socialBtn(
                       icon: Icons.facebook,
                       label: "Facebook",
                       bg: Colors.white,
                       iconColor: Colors.blue,
+                      textColor: Colors.black,
                       onPressed: _onFacebook,
-                      width: MediaQuery.of(context).size.width * 0.25,
+                      width: MediaQuery.of(context).size.width * 0.40,
                     ),
                   ],
                 ),
@@ -403,23 +436,20 @@ class _SignUpPageState extends State<SignUpPage> {
             ),
           ),
         ],
+
+      ),
+      bottomNavigationBar: Container(
+        height: 75,
+        decoration: BoxDecoration(
+          color: Color(0xFF4A6FA5),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(60),
+            topRight: Radius.circular(60),
+          ),
+        ),
       ),
     );
   }
 }
 
-// same curved clipper used in login.dart so visuals match
-class _CurvedClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final Path path = Path();
-    path.lineTo(0, size.height - 60);
-    path.quadraticBezierTo(size.width / 2, size.height, size.width, size.height - 60);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
-}
+// NOTE: The _CurvedClipper class has been removed as the UI now uses ClipRRect.

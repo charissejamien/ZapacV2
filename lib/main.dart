@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:zapac/application/dashboard.dart';
 import 'authentication/login.dart';
 
 void main() async {
@@ -13,9 +14,15 @@ class ZapacApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: LoginPage(),
+      title: 'Zapac',
+      theme: ThemeData(primarySwatch: Colors.blue),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const LoginPage(),
+        '/dashboard': (context) => const DashboardPage(),
+      },
     );
   }
 }

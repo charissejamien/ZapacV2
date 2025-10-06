@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "50539803991",
+    "project_id": "zapac-3dc30",
+    "storage_bucket": "zapac-3dc30.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:50539803991:android:435ab8a2aec37742b0ba12",
+        "android_client_info": {
+          "package_name": "com.example.zapac"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzwFKoTmX_nC8c0ylxkLiEScwOEpWyvXc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

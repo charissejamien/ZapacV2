@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Zapac</string>
+    <string name="facebook_app_id">1469785710946441</string>
+    <string name="fb_login_protocol_scheme">f1469785710946441</string>
+</resources>

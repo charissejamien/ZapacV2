@@ -1,4 +1,3 @@
-// lib/signup.dart
 import 'package:flutter/material.dart';
 import 'login.dart';
 import 'authentication.dart';
@@ -18,6 +17,7 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
 
   String? _emailError;
   String? _passwordHint;
@@ -26,11 +26,12 @@ class _SignUpPageState extends State<SignUpPage> {
   Color _confirmHintColor = Colors.transparent;
   String? _generalError;
 
-  // Existing colors from the original login.dart and signup.dart
-  final Color _blue = const Color(0xFF5072A7);
   final Color _green = const Color(0xFF6CA89A);
-  final Color _white = const Color(0xFFF9F9F9);
   final Color _beige = const Color (0xFFF3EEE6);
+
+  static const Color _red = Colors.red;
+  static const double _borderWidth = 2.0;
+  static const Color _googleBgDark = Color.fromARGB(255, 24, 24, 24);
 
   @override
   void initState() {
@@ -54,7 +55,6 @@ class _SignUpPageState extends State<SignUpPage> {
       if (txt.isEmpty) {
         _emailError = null;
       } else {
-        // loose email check — change to stricter if you want
         final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
         _emailError = emailRegex.hasMatch(txt) ? null : 'Please enter a valid email address.';
       }
@@ -125,7 +125,6 @@ class _SignUpPageState extends State<SignUpPage> {
     try {
       final cred = await AuthService().signUpWithEmail(email, pw);
       if (cred != null && mounted) {
-        // Navigate to Login as in screenshot flow (or home)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginPage()),
@@ -138,9 +137,11 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  // Social handlers
   Future<void> _onGoogle() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isGoogleLoading = true;
+      _generalError = null;
+    });
     try {
       final user = await AuthService().signInWithGoogle();
       if (user != null && mounted) {
@@ -149,7 +150,7 @@ class _SignUpPageState extends State<SignUpPage> {
     } catch (e) {
       setState(() => _generalError = e.toString());
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -174,11 +175,38 @@ class _SignUpPageState extends State<SignUpPage> {
     String? hintTextBelow,
     Color hintColorBelow = Colors.transparent,
   }) {
-    final borderColor = (controller == _emailCtrl && _emailError != null)
-        ? Colors.red
-        : (isPassword && hintColorBelow == Colors.red)
-            ? Colors.red
-            : Colors.transparent;
+    Color borderColor;
+
+    if (controller == _emailCtrl) {
+      if (_emailError == null && controller.text.isNotEmpty) {
+          borderColor = _green;
+      } else {
+          borderColor = _emailError != null ? _red : Colors.transparent;
+      }
+    } else if (isPassword) {
+      if (hintColorBelow == _red) {
+          borderColor = _red;
+      } else if (hintColorBelow == Colors.green) {
+          borderColor = _green;
+      } else {
+          borderColor = Colors.transparent;
+      }
+    } else {
+      borderColor = Colors.transparent;
+    }
+
+    Color focusedBorderColor;
+
+    if (borderColor == Colors.transparent) {
+        focusedBorderColor = _red;
+    }
+    else if (borderColor == _red) {
+        focusedBorderColor = _red;
+    }
+    else {
+        focusedBorderColor = _green;
+    }
+
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,12 +222,14 @@ class _SignUpPageState extends State<SignUpPage> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: borderColor, width: 1.2),
+              borderSide: BorderSide(color: borderColor, width: _borderWidth),
             ),
+
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: borderColor == Colors.transparent ? _green : borderColor, width: 2.0),
+              borderSide: BorderSide(color: focusedBorderColor, width: _borderWidth),
             ),
+
             suffixIcon: isPassword
                 ? IconButton(
                     icon: Icon(
@@ -241,22 +271,53 @@ class _SignUpPageState extends State<SignUpPage> {
     required Color textColor,
     required VoidCallback onPressed,
     double width = 150,
+    bool isLoading = false,
+    bool isGoogle = false,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    Color finalBg;
+    Color finalIconColor;
+    Color finalTextColor;
+
+    if (isGoogle) {
+      finalBg = isDarkMode ? Theme.of(context).cardColor : _googleBgDark;
+      finalIconColor = Colors.white;
+      finalTextColor = Colors.white;
+    } else {
+      finalBg = isDarkMode ? Theme.of(context).cardColor : Colors.white;
+      finalIconColor = isDarkMode ? Colors.white : Colors.blue;
+      finalTextColor = isDarkMode ? Colors.white : Colors.black;
+    }
+
+    final buttonStyle = ElevatedButton.styleFrom(
+      backgroundColor: finalBg,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      elevation: 0,
+    ).copyWith(
+      backgroundColor: MaterialStateProperty.resolveWith<Color>((_) => finalBg),
+    );
+
+    final loadingIndicator = const SizedBox(
+      height: 18,
+      width: 18,
+      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+    );
+
     return SizedBox(
       width: width,
       child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, color: iconColor, size: 20),
-        label: Text(label, style: const TextStyle(fontSize: 14)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          elevation: 0,
-        ),
+        onPressed: isLoading ? null : onPressed,
+        icon: isLoading
+            ? loadingIndicator
+            : Icon(icon, color: finalIconColor, size: 20),
+        label: Text(label, style: TextStyle(fontSize: 14, color: finalTextColor)),
+        style: buttonStyle,
       ),
     );
   }
+
 
   Widget _dividerWithText(String text) {
     return Row(children: [
@@ -270,37 +331,33 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final spacing = screenHeight * 0.006;
-    
-    // Requested AppBar color, slightly darker blue than _blue
     final appBarColor = const Color(0xFF4A6FA5);
+    final bool disableEmailPassSignup = _isLoading || _isGoogleLoading;
+
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      
-      // START: Merged AppBar structure
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(230), // Requested height
+        preferredSize: const Size.fromHeight(230),
         child: ClipRRect(
           borderRadius: const BorderRadius.only(
             bottomLeft: Radius.circular(60),
             bottomRight: Radius.circular(60),
           ),
           child: AppBar(
-            backgroundColor: appBarColor, // Requested color
-            toolbarHeight: 250, // Match PreferredSize height
-            automaticallyImplyLeading: false, 
+            backgroundColor: appBarColor,
+            toolbarHeight: 250,
+            automaticallyImplyLeading: false,
             title: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Use existing 'bus.png' asset
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 Image.asset('assets/Logo.png', height: 130),
                 const SizedBox(height: 15),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // SIGN UP (Selected - Bold and Underlined, from original code)
                     Column(
                         children: [
                           const Text(
@@ -313,10 +370,8 @@ class _SignUpPageState extends State<SignUpPage> {
 
                     const SizedBox(width: 28),
 
-                    // LOG IN (Tappable, directs to LoginPage, from original code)
                     GestureDetector(
                       onTap: () {
-                        // This preserves the navigation logic from the first snippet.
                         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
                       },
                       child: Text(
@@ -335,11 +390,9 @@ class _SignUpPageState extends State<SignUpPage> {
           ),
         ),
       ),
-      // END: Merged AppBar structure
 
       body: ListView(
         children: [
-          // The header content is now in the appBar, so remove the redundant Sized Box
           const SizedBox(height: 30),
           Center(
             child: Text(
@@ -359,7 +412,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   controller: _emailCtrl,
                   isPassword: false,
                   hintTextBelow: _emailError,
-                  hintColorBelow: _emailError != null ? Colors.red : Colors.transparent,
+                  hintColorBelow: _emailError != null ? _red : Colors.transparent,
                 ),
 
                 const SizedBox(height: 10),
@@ -391,7 +444,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _onSignUp,
+                    onPressed: disableEmailPassSignup ? null : _onSignUp,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _green,
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -400,7 +453,7 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                     child: _isLoading
                         ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                        : const Text("Sign Up", style: TextStyle(color: Colors.black, fontSize: 16)),
+                        : const Text("Sign Up", style: TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.normal,)),
                   ),
                 ),
 
@@ -416,8 +469,10 @@ class _SignUpPageState extends State<SignUpPage> {
                       bg: Colors.black,
                       iconColor: Colors.white,
                       textColor: Colors.white,
-                      onPressed: _onGoogle,
-                      width: MediaQuery.of(context).size.width * 0.45,
+                      onPressed: _isGoogleLoading ? (){} : _onGoogle,
+                      width: MediaQuery.of(context).size.width * 0.42,
+                      isLoading: _isGoogleLoading,
+                      isGoogle: true,
                     ),
                     _socialBtn(
                       icon: Icons.facebook,
@@ -425,8 +480,10 @@ class _SignUpPageState extends State<SignUpPage> {
                       bg: Colors.white,
                       iconColor: Colors.blue,
                       textColor: Colors.black,
-                      onPressed: _onFacebook,
-                      width: MediaQuery.of(context).size.width * 0.40,
+                      onPressed: disableEmailPassSignup ? (){} : _onFacebook,
+                      width: MediaQuery.of(context).size.width * 0.42,
+                      isLoading: false,
+                      isGoogle: false,
                     ),
                   ],
                 ),
@@ -440,7 +497,7 @@ class _SignUpPageState extends State<SignUpPage> {
       ),
       bottomNavigationBar: Container(
         height: 75,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Color(0xFF4A6FA5),
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(60),
@@ -451,5 +508,3 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 }
-
-// NOTE: The _CurvedClipper class has been removed as the UI now uses ClipRRect.

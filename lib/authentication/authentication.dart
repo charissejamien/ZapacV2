@@ -113,7 +113,7 @@ class AuthService {
       case 'weak-password':
         return 'Password too weak.';
       default:
-        return e.message ?? 'Authentication failed.';
+        return 'Invalid email or password.';
     }
   }
 }

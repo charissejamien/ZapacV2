@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:zapac/injections/bottomNavBar.dart';
 import 'package:zapac/application/dashboard.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/authentication/login.dart';
-import 'package:zapac/main.dart'; // Needed for themeNotifier
+import 'package:zapac/main.dart';
 import 'profile.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -13,18 +14,33 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // User details (made const for optimization)
-  static const String _userEmail = 'charisjmn@gmail.com';
-  static const String _userName = 'Charisse Jamien T';
+  User? _currentUser;
+  String _initials = '';
+  String _displayName = 'New User';
+  String _userEmail = 'newzapacuser@example.com';
   static const String _userStatus = 'Daily Commuter';
-  static const String _userProfileImageUrl = 'https://plus.unsplash.com/premium_vector-1744196876628-cdd656d88ed3?q=80&w=880&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D?w=500&h=500&fit=crop';
-
   static const Color primaryColor = Color(0xFF4A6FA5);
   static const Color greenButtonColor = Color(0xFF6CA89A);
 
-  // Removed empty initState
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
 
-  // Helper method for the ListTile structure (optimized with local theme access)
+  void _loadUserData() {
+    _currentUser = FirebaseAuth.instance.currentUser;
+    _userEmail = _currentUser?.email ?? 'N/A';
+    _displayName = _currentUser?.displayName ?? _userEmail.split('@').first;
+    if (_displayName.isEmpty) {
+        _displayName = 'Welcome User';
+    }
+    if (_displayName.isNotEmpty) {
+      _initials = _displayName[0].toUpperCase();
+    }
+    if (mounted) setState(() {});
+  }
+
   Widget _buildSettingsTile({
     required String title,
     Widget? trailing,
@@ -45,14 +61,11 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
-  
-  // FIX: Extracted the responsive list section into a separate widget
+
   Widget _buildResponsiveSettingsList() {
-    // 1. Use ListenableBuilder to rebuild only the list when themeNotifier changes
     return ListenableBuilder(
       listenable: themeNotifier,
       builder: (context, child) {
-        // 2. Get the current dark mode status inside the builder
         final isDarkMode = themeNotifier.themeMode == ThemeMode.dark;
 
         return ListView(
@@ -61,10 +74,8 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildSettingsTile(
               title: 'Dark Mode',
               trailing: Switch(
-                // 3. The Switch value uses the live state of isDarkMode
                 value: isDarkMode,
                 onChanged: (value) {
-                  // This updates the global notifier, which triggers this builder to run again
                   themeNotifier.setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
                 },
                 activeColor: greenButtonColor,
@@ -78,14 +89,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               },
             ),
-            // Logout ListTile
             _buildSettingsTile(
               title: 'Logout',
               onTap: () {
-                // Ensure all routes are removed before pushing Login
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (Route<dynamic> route) => false, 
+                  (Route<dynamic> route) => false,
                 );
               },
               trailing: Icon(Icons.logout, color: Theme.of(context).iconTheme.color),
@@ -96,9 +105,32 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _buildProfileAvatar() {
+    return CircleAvatar(
+      radius: 40,
+      backgroundColor: Colors.white,
+      child: _currentUser?.photoURL != null
+          ? CircleAvatar(
+              radius: 38,
+              backgroundImage: NetworkImage(_currentUser!.photoURL!),
+            )
+          : CircleAvatar(
+              radius: 38,
+              backgroundColor: primaryColor,
+              child: Text(
+                _initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Optimized: Get Theme properties once at the start
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
 
@@ -112,7 +144,6 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
       body: Column(
         children: [
-          // Header section (user profile - static, outside the listener)
           Container(
             width: double.infinity,
             color: primaryColor,
@@ -124,18 +155,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
                 ),
                 const SizedBox(height: 15),
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.white,
-                  child: CircleAvatar(
-                    radius: 38,
-                    backgroundImage: NetworkImage(_userProfileImageUrl),
-                  ),
-                ),
+                _buildProfileAvatar(),
                 const SizedBox(height: 10),
-                const Text(
-                  _userName,
-                  style: TextStyle(
+                Text(
+                  _displayName,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -167,7 +191,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
-          // Settings options - uses the responsive ListenableBuilder widget
           Expanded(
             child: _buildResponsiveSettingsList(),
           ),
@@ -182,7 +205,6 @@ class _SettingsPageState extends State<SettingsPage> {
               MaterialPageRoute(builder: (context) => const DashboardPage()),
             );
           } else if (index == 1) {
-            // Placeholder navigation
           } else if (index == 3) {
               Navigator.push(
               context,

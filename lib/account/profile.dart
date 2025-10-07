@@ -1,15 +1,16 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-// import 'package:zapac/User.dart';
+import 'package:zapac/authentication/authentication.dart';
+import 'package:zapac/injections/bottomNavBar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/application/dashboard.dart';
 import 'package:zapac/authentication/login.dart';
-import 'package:zapac/main.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter/material.dart';
 
-// --- Brand Accent Colors ---
 const Color accentYellow = Color(0xFFF4BE6C);
 const Color accentGreen = Color(0xFF6CA89A);
+const Color primaryColor = Color(0xFF4A6FA5);
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -18,12 +19,20 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  // User? _currentUser;
+  User? _currentUser;
   bool _isLoading = true;
-  int _selectedIndex = 2; // Assuming Profile is index 2 in your BottomNavBar
+  int _selectedIndex = 2;
 
   File? _profileImageFile;
   final ImagePicker _imagePicker = ImagePicker();
+
+  String _displayName = 'Welcome User';
+  String _userEmail = 'N/A';
+  String _initials = '?';
+  String _userGender = 'Not provided';
+  String _userDOB = 'Not provided';
+  static const String _userStatus = 'Daily Commuter';
+
 
   @override
   void initState() {
@@ -31,17 +40,130 @@ class _ProfilePageState extends State<ProfilePage> {
     _initProfile();
   }
 
+  void _loadUserData() {
+    _currentUser = FirebaseAuth.instance.currentUser;
+
+    if (_currentUser == null) return;
+    _userEmail = _currentUser!.email ?? 'N/A';
+    String potentialDisplayName = _currentUser!.displayName ?? '';
+    if (potentialDisplayName.isEmpty && _currentUser!.email != null) {
+        potentialDisplayName = _userEmail.split('@').first;
+    }
+    _displayName = potentialDisplayName.isNotEmpty ? potentialDisplayName : 'Welcome User';
+    _initials = _displayName.isNotEmpty ? _displayName[0].toUpperCase() : '?';
+  }
+
   Future<void> _initProfile() async {
-    // _currentUser = AuthManager().currentUser;
+    _loadUserData();
+
     final prefs = await SharedPreferences.getInstance();
+
+    _userGender = prefs.getString('user_gender') ?? 'Not provided';
+    _userDOB = prefs.getString('user_dob') ?? 'Not provided';
+
     final savedPath = prefs.getString('profile_pic_path');
     if (savedPath != null && File(savedPath).existsSync()) {
       _profileImageFile = File(savedPath);
-    } else {
-      _profileImageFile = null; // fallback to NetworkImage or AssetImage
     }
+    else if (_currentUser?.photoURL != null) {
+      _profileImageFile = null;
+    }
+
     setState(() => _isLoading = false);
   }
+
+  Future<void> _showEditFullNameSheet(BuildContext context, ColorScheme colorScheme) async {
+    if (_currentUser == null) return;
+
+    final nameCtrl = TextEditingController(text: _displayName);
+    bool isSaving = false;
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx2, setSB) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(color: colorScheme.secondary, borderRadius: BorderRadius.circular(10)),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Edit Full Name",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colorScheme.onSurface)
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                      controller: nameCtrl,
+                      textCapitalization: TextCapitalization.words,
+                      enabled: !isSaving,
+                      decoration: InputDecoration(
+                          labelText: "Full Name",
+                          labelStyle: TextStyle(color: colorScheme.onSurface),
+                          border: const OutlineInputBorder(),
+                          fillColor: colorScheme.surfaceContainerHighest,
+                          filled: true,
+                      ),
+                      style: TextStyle(color: colorScheme.onSurface),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: isSaving ? colorScheme.surfaceContainerHighest : colorScheme.primary,
+                        minimumSize: const Size(double.infinity, 48)),
+                    onPressed: isSaving || nameCtrl.text.trim().isEmpty
+                        ? null
+                        : () async {
+                          setSB(() => isSaving = true);
+                          final newName = nameCtrl.text.trim();
+                                                    try {
+                              await _currentUser!.updateDisplayName(newName);
+
+                              await _currentUser!.reload();
+                              _loadUserData();
+                              if (context.mounted) {
+                                setState(() {});
+                                Navigator.of(sheetCtx).pop(newName);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Name updated successfully!'), backgroundColor: accentGreen),
+                                );
+                              }
+                          } catch (e) {
+                              if (context.mounted) {
+                                setSB(() => isSaving = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to update name. Try logging in again.'), backgroundColor: Colors.red),
+                                );
+                              }
+                          }
+                        },
+                    child: isSaving
+                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(colorScheme.onPrimary)))
+                        : Text("Save", style: TextStyle(color: colorScheme.onPrimary)),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    nameCtrl.dispose();
+  }
+
 
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
@@ -50,20 +172,8 @@ class _ProfilePageState extends State<ProfilePage> {
         context,
         MaterialPageRoute(builder: (_) => const DashboardPage()),
       );
+    } else if (index == 3) {
     }
-    // Handle other tabs as per your BottomNavBar setup
-    // Example:
-    // else if (index == 1) {
-    //   Navigator.pushReplacement(
-    //     context,
-    //     MaterialPageRoute(builder: (_) => const FavoriteRoutesPage()),
-    //   );
-    // } else if (index == 3) {
-    //   Navigator.pushReplacement(
-    //     context,
-    //     MaterialPageRoute(builder: (_) => const SettingsPage()),
-    //   );
-    // }
   }
 
   @override
@@ -79,13 +189,13 @@ class _ProfilePageState extends State<ProfilePage> {
         title: const Text('Profile', style: TextStyle(color: Colors.white)),
         centerTitle: true,
       ),
-      body: SafeArea( // SafeArea handles system intrusions
+      body: SafeArea(
         child: _buildBody(colorScheme)
       ),
-      // bottomNavigationBar: BottomNavBar(
-      //   selectedIndex: _selectedIndex,
-      //   onItemTapped: _onItemTapped,
-      // ),
+      bottomNavigationBar: BottomNavBar(
+        selectedIndex: _selectedIndex,
+        onItemTapped: _onItemTapped,
+      ),
     );
   }
 
@@ -94,28 +204,27 @@ class _ProfilePageState extends State<ProfilePage> {
       return Center(
           child: CircularProgressIndicator(color: colorScheme.onBackground));
     }
-    // if (_currentUser == null) {
-    //   return Center(
-    //     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    //       Text("User not logged in.",
-    //           style: TextStyle(color: colorScheme.onBackground)),
-    //       const SizedBox(height: 20),
-    //       ElevatedButton(
-    //         onPressed: () => Navigator.of(context)
-    //             .pushAndRemoveUntil(
-    //                 MaterialPageRoute(
-    //                     builder: (_) => const LoginPage()),
-    //                 (r) => false),
-    //         child: const Text("Go to Login"),
-    //       )
-    //     ]),
-    //   );
-    // }
+    if (_currentUser == null) {
+      return Center(
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text("User not logged in.",
+              style: TextStyle(color: colorScheme.onBackground)),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context)
+                .pushAndRemoveUntil(
+                    MaterialPageRoute(
+                        builder: (_) => const LoginPage()),
+                    (r) => false),
+            child: const Text("Go to Login"),
+          )
+        ]),
+      );
+    }
 
     return Column(
       children: [
-        _buildHeader(colorScheme), // This takes fixed vertical space
-        // Expanded ensures the remaining space is given to the ListView for scrolling
+        _buildHeader(colorScheme),
         Expanded(
           child: _buildInfoSection(colorScheme),
         ),
@@ -124,11 +233,26 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Widget _buildHeader(ColorScheme colorScheme) {
-    // ImageProvider<Object> avatar = _profileImageFile != null
-    //     ? FileImage(_profileImageFile!)
-    //     : (_currentUser!.profileImageUrl?.isNotEmpty == true
-    //         ? NetworkImage(_currentUser!.profileImageUrl!)
-    //         : const AssetImage('assets/logo.png'));
+    ImageProvider? avatarImage;
+    Widget avatarChild;
+
+    if (_profileImageFile != null) {
+        avatarImage = FileImage(_profileImageFile!);
+        avatarChild = const SizedBox.expand();
+    } else if (_currentUser?.photoURL?.isNotEmpty == true) {
+        avatarImage = NetworkImage(_currentUser!.photoURL!);
+        avatarChild = const SizedBox.expand();
+    } else {
+        avatarChild = Text(
+            _initials,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+            ),
+        );
+        avatarImage = null;
+    }
 
     return Container(
       width: double.infinity,
@@ -150,7 +274,6 @@ class _ProfilePageState extends State<ProfilePage> {
         constraints: const BoxConstraints(maxWidth: 500),
         child: Column(
           children: [
-            // Avatar with subtle border ring + floating edit icon
             GestureDetector(
               onTap: _onProfilePicTap,
               child: Stack(
@@ -162,11 +285,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     backgroundColor: colorScheme.onPrimary.withOpacity(0.15),
                     child: CircleAvatar(
                       radius: 38,
-                      backgroundColor: colorScheme.surface,
-                      // backgroundImage: avatar,
+                      backgroundColor: avatarImage != null ? colorScheme.surface : primaryColor,
+                      backgroundImage: avatarImage,
+                      child: avatarImage == null ? avatarChild : null,
                     ),
                   ),
-                  // Floating pencil
                   Positioned(
                     right: -2,
                     bottom: -2,
@@ -197,56 +320,43 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             const SizedBox(height: 10),
-            // Name
-            // Text(
-            //   _currentUser!.fullName,
-            //   textAlign: TextAlign.center,
-            //   maxLines: 1,
-            //   overflow: TextOverflow.ellipsis,
-            //   style: TextStyle(
-            //     color: colorScheme.onPrimary,
-            //     fontSize: 20,
-            //     fontWeight: FontWeight.w700,
-            //     letterSpacing: 0.2,
-            //   ),
-            // ),
-            const SizedBox(height: 4),
-            // Role / tagline
             Text(
-              'Daily Commuter',
+              _displayName,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: colorScheme.onPrimary.withOpacity(0.85),
+                color: colorScheme.onPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              _userStatus,
+              style: TextStyle(
+                color: Colors.white,
                 fontSize: 13,
               ),
             ),
             const SizedBox(height: 8),
-            // Email with edit
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Flexible(
-                //   child: Text(
-                //     _currentUser!.email,
-                //     style: TextStyle(
-                //       color: colorScheme.onPrimary.withOpacity(0.95),
-                //       fontSize: 13,
-                //     ),
-                //     overflow: TextOverflow.ellipsis,
-                //   ),
-                // ),
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () => _showEditEmailDialog(context, colorScheme),
-                  child: Icon(
-                    Icons.edit_outlined,
-                    color: colorScheme.onPrimary.withOpacity(0.95),
-                    size: 16,
+                Flexible(
+                  child: Text(
+                    _userEmail,
+                    style: TextStyle(
+                      color: colorScheme.onPrimary.withOpacity(0.95),
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            // NOTE: Removed the "Edit Profile" button entirely for a cleaner, more professional header.
           ],
         ),
       ),
@@ -256,12 +366,10 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildInfoSection(ColorScheme colorScheme) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
+      decoration: const BoxDecoration(
         borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(28)),
+            BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      // MODIFIED: Improved vertical/horizontal padding for info section
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: ListView(
         children: [
@@ -275,30 +383,29 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(height: 10),
-        //   _infoRow(
-        //     icon: Icons.person_outline,
-        //     label: 'Full name',
-        //     value: _currentUser!.fullName,
-        //     valueColor: colorScheme.onSurface,
-        //     onTap: () => _showEditFullNameSheet(context, colorScheme),
-        //   ),
-        // // Hook up to an editor when available
-        //   const SizedBox(height: 10),
-        //   _infoRow(
-        //     icon: Icons.transgender,
-        //     label: 'Gender',
-        //     value: _currentUser!.gender ?? 'Not provided',
-        //     valueColor: colorScheme.onSurface,
-        //     onTap: () => _showEditGenderSheet(context, colorScheme),
-        //   ),
-        //   const SizedBox(height: 10),
-        //   _infoRow(
-        //     icon: Icons.cake_outlined,
-        //     label: 'Date of Birth',
-        //     value: _currentUser!.dateOfBirth ?? 'Not provided',
-        //     valueColor: colorScheme.onSurface,
-        //     onTap: () => _showEditDOBDialog(context, colorScheme),
-        //   ),
+          _infoRow(
+            icon: Icons.person_outline,
+            label: 'Full name',
+            value: _displayName,
+            valueColor: colorScheme.onSurface,
+            onTap: () => _showEditFullNameSheet(context, colorScheme),
+          ),
+          const SizedBox(height: 10),
+          _infoRow(
+            icon: Icons.transgender,
+            label: 'Gender',
+            value: _userGender,
+            valueColor: colorScheme.onSurface,
+            onTap: () => _showEditGenderSheet(context, colorScheme),
+          ),
+          const SizedBox(height: 10),
+          _infoRow(
+            icon: Icons.cake_outlined,
+            label: 'Date of Birth',
+            value: _userDOB,
+            valueColor: colorScheme.onSurface,
+            onTap: () => _showEditDOBDialog(context, colorScheme),
+          ),
           const SizedBox(height: 10),
           _infoRow(
             icon: Icons.delete_outline,
@@ -441,15 +548,20 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Row(
                 children: [
-                  // CircleAvatar(
-                  //   radius: 22,
-                  //   backgroundColor: scheme.surfaceContainerHighest,
-                  //   backgroundImage: _profileImageFile != null
-                  //       ? FileImage(_profileImageFile!)
-                  //       : (_currentUser?.profileImageUrl?.isNotEmpty == true
-                  //           ? NetworkImage(_currentUser!.profileImageUrl!) as ImageProvider
-                  //           : const AssetImage('assets/logo.png')),
-                  // ),
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: scheme.surfaceContainerHighest,
+                    child: _profileImageFile != null
+                        ? CircleAvatar(radius: 22, backgroundImage: FileImage(_profileImageFile!))
+                        : (_currentUser?.photoURL?.isNotEmpty == true
+                            ? CircleAvatar(radius: 22, backgroundImage: NetworkImage(_currentUser!.photoURL!))
+                            : CircleAvatar(
+                                radius: 22,
+                                backgroundColor: primaryColor,
+                                child: Text(_initials, style: const TextStyle(color: Colors.white, fontSize: 20)),
+                              )
+                          ),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -460,7 +572,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ],
               ),
               const SizedBox(height: 14),
-              // Take a photo
               Material(
                 color: scheme.surface,
                 shape: RoundedRectangleBorder(
@@ -497,7 +608,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              // Choose from library
               Material(
                 color: scheme.surface,
                 shape: RoundedRectangleBorder(
@@ -547,7 +657,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              // if (_profileImageFile != null || (_currentUser?.profileImageUrl?.isNotEmpty == true))
+              if (_profileImageFile != null || (_currentUser?.photoURL?.isNotEmpty == true))
                 Material(
                   color: scheme.surface,
                   shape: RoundedRectangleBorder(
@@ -603,465 +713,6 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       },
     );
-  }
-
-  Widget _PhotoActionTile({
-    required IconData icon,
-    required String label,
-    required String description,
-    required Color iconColor,
-    required VoidCallback onTap,
-    bool destructive = false,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                padding: const EdgeInsets.all(10),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: destructive ? scheme.error : scheme.onSurface,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: scheme.onSurfaceVariant, size: 18),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-
-  Future<void> _showEditEmailDialog(BuildContext context, ColorScheme colorScheme) async {
-    // final emailCtrl = TextEditingController(text: _currentUser!.email);
-    final passCtrl = TextEditingController();
-    final emailFocus = FocusNode();
-    final passFocus = FocusNode();
-
-    bool showPass = false;
-    bool isLoading = false;
-
-    String? validateEmail(String value) {
-      final v = value.trim();
-      if (v.isEmpty) return 'Email is required';
-      final r = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-      if (!r.hasMatch(v)) return 'Enter a valid email';
-      return null;
-    }
-
-    String? validatePass(String value) {
-      final v = value;
-      if (v.isEmpty) return 'Password is required';
-      if (v.length < 6) return 'Minimum 6 characters';
-      return null;
-    }
-
-    bool canSubmitNow() =>
-        // validateEmail(emailCtrl.text) == null &&
-        validatePass(passCtrl.text) == null &&
-        !isLoading;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx2, setSB) {
-            final canSubmit = canSubmitNow();
-            return AlertDialog(
-              backgroundColor: colorScheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              titlePadding: const EdgeInsets.fromLTRB(24, 20, 8, 0),
-              contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              title: Row(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: accentGreen.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(Icons.alternate_email, size: 20, color: accentGreen),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Change your email',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    splashRadius: 20,
-                    onPressed: isLoading ? null : () => Navigator.of(ctx).pop(),
-                    icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'We’ll send a verification link to the new address. You’ll need to sign in again after this change.',
-                        style: TextStyle(fontSize: 12, height: 1.3, color: colorScheme.onSurfaceVariant),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // TextField(
-                    //   controller: emailCtrl,
-                    //   focusNode: emailFocus,
-                    //   keyboardType: TextInputType.emailAddress,
-                    //   textInputAction: TextInputAction.next,
-                    //   onSubmitted: (_) => passFocus.requestFocus(),
-                    //   onChanged: (_) => setSB(() {}),
-                    //   decoration: InputDecoration(
-                    //     prefixIcon: const Icon(Icons.mail_outline),
-                    //     labelText: 'New Email',
-                    //     hintText: 'name@example.com',
-                    //     errorText: emailCtrl.text.isEmpty ? null : validateEmail(emailCtrl.text),
-                    //     border: const OutlineInputBorder(),
-                    //     filled: true,
-                    //     fillColor: colorScheme.surfaceContainerHighest,
-                    //   ),
-                    //   style: TextStyle(color: colorScheme.onSurface),
-                    // ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: passCtrl,
-                      focusNode: passFocus,
-                      textInputAction: TextInputAction.done,
-                      obscureText: !showPass,
-                      onChanged: (_) => setSB(() {}),
-                      onSubmitted: (_) {
-                        if (canSubmit) FocusScope.of(ctx).unfocus();
-                      },
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        labelText: 'Password',
-                        helperText: 'Minimum 6 characters',
-                        errorText: passCtrl.text.isEmpty ? null : validatePass(passCtrl.text),
-                        border: const OutlineInputBorder(),
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest,
-                        suffixIcon: IconButton(
-                          onPressed: () => setSB(() => showPass = !showPass),
-                          icon: Icon(showPass ? Icons.visibility_off : Icons.visibility),
-                        ),
-                      ),
-                      style: TextStyle(color: colorScheme.onSurface),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isLoading ? null : () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancel'),
-                  style: TextButton.styleFrom(foregroundColor: colorScheme.onSurface),
-                ),
-                FilledButton(
-                  onPressed: canSubmit
-                      ? () async {
-                          setSB(() => isLoading = true);
-                          try {
-                            // final newEmail = emailCtrl.text.trim();
-                            final newPassword = passCtrl.text;
-                            // final updatedUser = User(
-                            //   email: newEmail,
-                            //   password: newPassword,
-                            //   firstName: _currentUser!.firstName,
-                            //   lastName: _currentUser!.lastName,
-                            //   middleName: _currentUser!.middleName,
-                            //   profileImageUrl: _currentUser!.profileImageUrl,
-                            //   type: _currentUser!.type,
-                            //   currentLocation: _currentUser!.currentLocation,
-                            //   gender: _currentUser!.gender,
-                            //   dateOfBirth: _currentUser!.dateOfBirth,
-                            // );
-                            // await AuthManager().updateUser(updatedUser);
-                            if (ctx.mounted) {
-                              // setState(() => _currentUser = updatedUser);
-                              Navigator.of(ctx).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Email updated. Please verify via the link we sent.'),
-                                  backgroundColor: accentGreen,
-                                ),
-                              );
-                            }
-                          } catch (_) {
-                            if (ctx.mounted) {
-                              setSB(() => isLoading = false);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Something went wrong. Please try again.'),
-                                  backgroundColor: Theme.of(context).colorScheme.error,
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: accentGreen,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(120, 44),
-                    disabledBackgroundColor: colorScheme.surfaceContainerHighest,
-                    disabledForegroundColor: colorScheme.onSurfaceVariant,
-                  ),
-                  child: isLoading
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
-                        )
-                      : const Text('Update email'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-  //   emailCtrl.dispose();
-  //   passCtrl.dispose();
-  //   emailFocus.dispose();
-  //   passFocus.dispose();
-  // }
-
-  // Future<void> _showEditFullNameSheet(
-  //         BuildContext context, ColorScheme colorScheme) async {
-  //   final firstCtrl =
-  //       TextEditingController(text: _currentUser!.firstName);
-  //   final middleCtrl =
-  //       TextEditingController(text: _currentUser!.middleName ?? '');
-  //   final lastCtrl =
-  //       TextEditingController(text: _currentUser!.lastName);
-
-    final result = await showModalBottomSheet<Map<String, String>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) => Padding(
-        padding: EdgeInsets.only(
-            bottom:
-                MediaQuery.of(sheetCtx).viewInsets.bottom),
-        child: Container(
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20)),
-          ),
-          padding:
-              const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                      color: colorScheme.secondary,
-                      borderRadius:
-                          BorderRadius.circular(10))),
-              const SizedBox(height: 16),
-              Text("Edit your data",
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: colorScheme.onSurface)),
-              const SizedBox(height: 16),
-              // TextField(
-              //     controller: firstCtrl,
-              //     decoration: InputDecoration(
-              //         labelText: "First name",
-              //         labelStyle: TextStyle(color: colorScheme.onSurface),
-              //         border: const OutlineInputBorder(),
-              //         fillColor: colorScheme.surfaceContainerHighest,
-              //         filled: true,
-              //     ),
-              //     style: TextStyle(color: colorScheme.onSurface),
-              // ),
-              // const SizedBox(height: 12),
-              // TextField(
-              //     controller: lastCtrl,
-              //     decoration: InputDecoration(
-              //         labelText: "Last name",
-              //         labelStyle: TextStyle(color: colorScheme.onSurface),
-              //         border: const OutlineInputBorder(),
-              //         fillColor: colorScheme.surfaceContainerHighest,
-              //         filled: true,
-              //     ),
-              //     style: TextStyle(color: colorScheme.onSurface),
-              // ),
-              // const SizedBox(height: 12),
-              // TextField(
-              //     controller: middleCtrl,
-              //     decoration: InputDecoration(
-              //         labelText: "Middle name",
-              //         labelStyle: TextStyle(color: colorScheme.onSurface),
-              //         border: const OutlineInputBorder(),
-              //         fillColor: colorScheme.surfaceContainerHighest,
-              //         filled: true,
-              //     ),
-              //     style: TextStyle(color: colorScheme.onSurface),
-              // ),
-              // const SizedBox(height: 24),
-              // ElevatedButton(
-              //   style: ElevatedButton.styleFrom(
-              //       backgroundColor: colorScheme.primary,
-              //       minimumSize:
-              //           const Size(double.infinity, 48)),
-              //   onPressed: () =>
-              //       Navigator.of(sheetCtx).pop({
-              //     'first': firstCtrl.text.trim(),
-              //     'middle': middleCtrl.text.trim(),
-              //     'last': lastCtrl.text.trim(),
-              //   }),
-              //   child: Text("OK",
-              //       style:
-              //           TextStyle(color: colorScheme.onPrimary)),
-              // ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (result != null && mounted) {
-      // setState(() {
-      //   _currentUser!
-      //     ..firstName = result['first']!
-      //     ..middleName = result['middle']
-      //     ..lastName = result['last']!;
-      // });
-      // await AuthManager().updateUser(_currentUser!);
-    }
-  }
-
-  Future<void> _showEditGenderSheet(BuildContext context, ColorScheme colorScheme) async {
-    // String? choice = _currentUser!.gender;
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetCtx) {
-        return StatefulBuilder(
-          builder: (ctx2, setSB) => Container(
-            decoration: BoxDecoration(
-              color: colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 40, height: 5, decoration: BoxDecoration(color: colorScheme.secondary, borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 16),
-              Text("Please specify your gender", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.onSurface)),
-              const SizedBox(height: 8),
-              // RadioListTile<String>(
-              //   title: Text("Male", style: TextStyle(color: colorScheme.onSurface)),
-              //   value: "Male",
-              //   groupValue: choice,
-              //   activeColor: colorScheme.primary,
-              //   onChanged: (v) => setSB(() => choice = v),
-              // ),
-              // RadioListTile<String>(
-              //   title: Text("Female", style: TextStyle(color: colorScheme.onSurface)),
-              //   value: "Female",
-              //   groupValue: choice,
-              //   activeColor: colorScheme.primary,
-              //   onChanged: (v) => setSB(() => choice = v),
-              // ),
-              const SizedBox(height: 24),
-              // ElevatedButton(
-              //   style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary, minimumSize: const Size(double.infinity, 48)),
-              //   onPressed: () => Navigator.of(sheetCtx).pop(choice),
-              //   child: Text("OK", style: TextStyle(color: colorScheme.onPrimary)),
-              // ),
-            ]),
-          ),
-        );
-      },
-    );
-
-    if (result != null && mounted) {
-      setState(() {
-        // _currentUser!.gender = result;
-      });
-      // await AuthManager().updateUser(_currentUser!);
-    }
-  }
-
-  Future<void> _showEditDOBDialog(BuildContext context, ColorScheme colorScheme) async {
-    // DateTime initial = DateTime.tryParse(_currentUser!.dateOfBirth ?? '') ?? DateTime(2000);
-    final picked = await showDatePicker(
-      context: context,
-      // initialDate: initial,
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) {
-        return Theme(
-          data: Theme.of(ctx).copyWith(
-            colorScheme: colorScheme,
-            // You might need to adjust other date picker specific colors here if necessary
-            // e.g., textTheme for header, etc.
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked != null && mounted) {
-      final dobStr = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-      // setState(() {
-      //   _currentUser!.dateOfBirth = dobStr;
-      // });
-      // await AuthManager().updateUser(_currentUser!);
-    }
   }
 
   Future<void> _confirmDeleteAccount(ColorScheme colorScheme) async {
@@ -1144,7 +795,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             if (ctx2.mounted) setSB(() => reason = v);
                           },
                           activeColor: accentGreen,
-                        )),
+                        )).toList(),
                     if (reason == 'Other') ...[
                       const SizedBox(height: 8),
                       TextField(
@@ -1200,11 +851,24 @@ class _ProfilePageState extends State<ProfilePage> {
                     minimumSize: const Size(140, 44),
                   ),
                   onPressed: canDelete
-                      ? () {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (_) => const LoginPage()),
-                            (_) => false,
-                          );
+                      ? () async {
+                          try {
+                            await _currentUser?.delete();
+                            await AuthService().signOut();
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (_) => const LoginPage()),
+                              (_) => false,
+                            );
+                            if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(content: Text("Account successfully deleted."), backgroundColor: accentGreen)
+                                );
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(content: Text("Deletion failed. Please log in again and try.")),
+                            );
+                          }
                         }
                       : null,
                   child: const Text('Delete account'),
@@ -1217,5 +881,93 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     otherCtrl.dispose();
+  }
+
+  Future<void> _showEditGenderSheet(BuildContext context, ColorScheme colorScheme) async {
+    String? choice = _userGender != 'Not provided' ? _userGender : null;
+    final prefs = await SharedPreferences.getInstance();
+
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx2, setSB) => Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 40, height: 5, decoration: BoxDecoration(color: colorScheme.secondary, borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 16),
+              Text("Please specify your gender", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.onSurface)),
+              const SizedBox(height: 8),
+              RadioListTile<String>(
+                title: Text("Male", style: TextStyle(color: colorScheme.onSurface)),
+                value: "Male",
+                groupValue: choice,
+                activeColor: colorScheme.primary,
+                onChanged: (v) => setSB(() => choice = v),
+              ),
+              RadioListTile<String>(
+                title: Text("Female", style: TextStyle(color: colorScheme.onSurface)),
+                value: "Female",
+                groupValue: choice,
+                activeColor: colorScheme.primary,
+                onChanged: (v) => setSB(() => choice = v),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: colorScheme.primary, minimumSize: const Size(double.infinity, 48)),
+                onPressed: () => Navigator.of(sheetCtx).pop(choice),
+                child: Text("OK", style: TextStyle(color: colorScheme.onPrimary)),
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _userGender = result ?? 'Not provided';
+      });
+      await prefs.setString('user_gender', _userGender);
+    }
+  }
+
+  Future<void> _showEditDOBDialog(BuildContext context, ColorScheme colorScheme) async {
+    DateTime initial = DateTime(2000);
+    if (_userDOB != 'Not provided') {
+        initial = DateTime.tryParse(_userDOB) ?? DateTime(2000);
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (ctx, child) {
+        return Theme(
+          data: Theme.of(ctx).copyWith(
+            colorScheme: colorScheme.copyWith(
+                primary: accentGreen,
+                onPrimary: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && mounted) {
+      final dobStr = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      setState(() {
+        _userDOB = dobStr;
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_dob', _userDOB);
+    }
   }
 }

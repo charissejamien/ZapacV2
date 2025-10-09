@@ -170,7 +170,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (index == 0) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DashboardPage()),
+        MaterialPageRoute(builder: (_) => const Dashboard()),
       );
     } else if (index == 3) {
     }

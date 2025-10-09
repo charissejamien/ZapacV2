@@ -46,7 +46,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
               if (ModalRoute.of(context)?.settings.name != '/') {
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const DashboardPage()),
+                  MaterialPageRoute(builder: (context) => const Dashboard()),
                 );
               }
             },

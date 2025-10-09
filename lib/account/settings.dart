@@ -202,7 +202,7 @@ class _SettingsPageState extends State<SettingsPage> {
           if (index == 0) {
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => const DashboardPage()),
+              MaterialPageRoute(builder: (context) => const Dashboard()),
             );
           } else if (index == 1) {
           } else if (index == 3) {

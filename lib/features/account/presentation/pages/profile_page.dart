@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zapac/authentication/authentication.dart';
-import 'package:zapac/injections/bottomNavBar.dart';
+import 'package:zapac/core/widgets/bottomNavBar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:zapac/application/dashboard.dart';
-import 'package:zapac/authentication/login.dart';
+import 'package:zapac/features/insights/presentation/pages/dashboard.dart';
+import 'package:zapac/features/auth/presentation/pages/login_page.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 

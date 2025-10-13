@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:zapac/authentication/authentication.dart';
-import 'package:zapac/account/settings.dart';
-import 'reset_password.dart';
-import 'signup.dart';
+import 'package:zapac/features/account/presentation/pages/settings_page.dart';
+import 'reset_password_page.dart';
+import 'signup_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

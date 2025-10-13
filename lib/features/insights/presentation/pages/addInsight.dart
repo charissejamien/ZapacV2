@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 // Note: User.dart and AuthManager.dart imports were removed as they are from the old project.
 // The user object below is mocked for structure coherence.
-import 'communityInsights.dart' show ChatMessage;
+import 'community_insights_page.dart' show ChatMessage;
 
 // Mock User structure for modal coherence (assuming you have a current user context)
 class MockUser {

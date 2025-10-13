@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 // Note: Assuming these external pages exist in your new project structure
 // import 'package:zapac/profile_page.dart'; 
 // import 'package:zapac/search_destination_page.dart'; 
-import 'package:zapac/account/profile.dart'; // Assuming this path
+import 'package:zapac/features/account/presentation/pages/profile_page.dart'; // Assuming this path
 
 class SearchBar extends StatefulWidget {
   final VoidCallback? onProfileTap;

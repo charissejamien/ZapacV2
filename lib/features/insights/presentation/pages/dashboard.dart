@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart' hide SearchBar;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
-import 'package:zapac/injections/bottomNavBar.dart'; // Assuming this path
-import 'package:zapac/account/settings.dart'; // Assuming this path
-import 'package:zapac/account/profile.dart'; // Assuming this path
+import 'package:zapac/core/widgets/bottomNavBar.dart'; // Assuming this path
+import 'package:zapac/features/account/presentation/pages/settings_page.dart'; // Assuming this path
+import 'package:zapac/features/account/presentation/pages/profile_page.dart'; // Assuming this path
 
 // Import the new file names
-import 'communityInsights.dart';
-import 'searchBar.dart';
-import 'floatingButton.dart';
+import 'community_insights_page.dart';
+import '../../../../core/widgets/searchBar.dart';
+import '../../../../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
-import 'mapUtils.dart';
+import '../../../../core/utils/map_utils.dart';
 
 // Placeholder for ChatMessage model (re-exported from communityInsights)
-import 'communityInsights.dart' show ChatMessage;
+import 'community_insights_page.dart' show ChatMessage;
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:zapac/application/dashboard.dart';
+import 'package:zapac/features/insights/presentation/pages/dashboard.dart';
 // import 'favorite_routes_page.dart';
-import 'package:zapac/account/settings.dart';
+import 'package:zapac/features/account/presentation/pages/settings_page.dart';
 
 class BottomNavBar extends StatefulWidget {
   final int selectedIndex;

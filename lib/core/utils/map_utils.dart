@@ -141,6 +141,8 @@ class MapUtils {
       return {};
     }
 
+    
+
     if (destinationLatLng == null) return {};
 
     // --- Permissions & Current Position Check ---
@@ -228,5 +230,25 @@ class MapUtils {
     } else {
       return {};
     }
+  }
+}
+
+Future<List<dynamic>> getPredictions(String input, String apiKey) async {
+  if (input.isEmpty) return [];
+
+  try {
+    final url =
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=country:ph';
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['predictions'];
+    } else {
+      print('Failed to load predictions: ${response.statusCode}');
+      return [];
+    }
+  } catch (e) {
+    print('Error getting predictions: $e');
+    return [];
   }
 }

@@ -30,7 +30,7 @@ Widget buildSearchViewUtil({
                   child: TextField(
                     controller: searchController,
                     autofocus: true,
-                    onChanged: (_) {}, // Handled externally
+                    onChanged: (_) {}, 
                     decoration: const InputDecoration.collapsed(
                       hintText: "Where to?",
                     ),
@@ -42,28 +42,30 @@ Widget buildSearchViewUtil({
           const Divider(height: 1),
           if (favoriteRoutes.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Wrap(
-                spacing: 8.0,
-                children: favoriteRoutes
-                    .map(
-                      (route) => ElevatedButton(
-                        onPressed: () => onRoute({'route': route}),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6CA89A),
-                          foregroundColor: Colors.white,
-                        ),
-                        child: Text(route.routeName),
-                      ),
-                    )
-                    .toList(),
-              ),
+              padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 8.0),
+              child: Text("Favorite Routes (${favoriteRoutes.length})", style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
-          if (favoriteRoutes.isNotEmpty) const Divider(height: 1),
           Expanded(
-            child: searchController.text.isEmpty
-                ? buildListUtil(recentLocations, Icons.history, onRoute)
-                : buildListUtil(predictions, Icons.location_on_outlined, onRoute),
+            child: ListView.builder(
+              itemCount: predictions.isNotEmpty ? predictions.length : recentLocations.length,
+              itemBuilder: (context, index) {
+                if (predictions.isNotEmpty) {
+                  final prediction = predictions[index];
+                  return ListTile(
+                    leading: const Icon(Icons.location_on),
+                    title: Text(prediction['description']),
+                    onTap: () => onRoute({'place': prediction}),
+                  );
+                } else {
+                  final recentLocation = recentLocations[index];
+                  return ListTile(
+                    leading: const Icon(Icons.history),
+                    title: Text(recentLocation['name'] as String),
+                    onTap: () => onRoute({'recent_location': recentLocation}),
+                  );
+                }
+              },
+            ),
           ),
         ],
       ),
@@ -71,30 +73,18 @@ Widget buildSearchViewUtil({
   );
 }
 
-Widget buildListUtil(List<dynamic> items, IconData icon, Function(Map<String, dynamic>) onRoute) {
-  return ListView.builder(
-    itemCount: items.length,
-    itemBuilder: (context, index) {
-      return ListTile(
-        leading: Icon(icon, color: Colors.grey),
-        title: Text(items[index]['description']),
-        onTap: () => onRoute({'place': items[index]}),
-      );
-    },
-  );
-}
-
-Widget buildRouteDetailsSheetUtil(Map<String, dynamic> routeInfo, VoidCallback onClear) {
-  return Positioned(
-    bottom: 0,
-    left: 0,
-    right: 0,
-    child: Card(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+Widget buildRouteInfoSheetUtil({
+  required Map<String, dynamic> routeInfo,
+  required VoidCallback onClear,
+}) {
+  return Container(
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    child: SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -5,7 +5,27 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:zapac/favorites/favorite_route.dart';
 import 'favoriteRouteData.dart';
-import 'dart:math' show max; // Import max for calculations, ceil for rounding if needed later
+import 'dart:async'; 
+
+final Future<List<dynamic>> Function(String, String) getPredictions = (String input, String apiKey) async {
+  if (input.isEmpty) return const [];
+  try {
+    const components = "country:ph";
+    final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=$components';
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['predictions'];
+    } else {
+      print('Failed to load predictions: ${response.statusCode}');
+      return const [];
+    }
+  } catch (e) {
+    print('Error getting predictions: $e');
+    return const [];
+  }
+};
+
 
 class AddNewRoutePage extends StatefulWidget {
   const AddNewRoutePage({super.key});
@@ -15,9 +35,9 @@ class AddNewRoutePage extends StatefulWidget {
 }
 
 class _AddNewRoutePageState extends State<AddNewRoutePage> {
-  static const String _darkMapStyle = '[{"elementType":"geometry","stylers":[{"color":"#1f1f1f"}]},{"elementType":"labels.icon","stylers":[{"visibility":"off"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#e0e0e0"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3a3a3a"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#273a2c"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c2c2c"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3d3d3d"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0e1b25"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#a0a0a0"}]}]';
+  static const String _darkMapStyle = '[{"elementType":"geometry","stylers":[{"color":"#1f1f1f"}]},{"elementType":"labels.icon","stylers":[{"visibility":"off"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#e0e0e0"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3a3a3a"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#273a2c"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c2c2c"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3d3d3d"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"transit.station.bus","stylers":[{"visibility":"off"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0e1b25"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#a0a0a0"}]}]';
 
-  final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc";
+  final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
 
   final GlobalKey _startFieldKey = GlobalKey();
   final GlobalKey _destinationFieldKey = GlobalKey();
@@ -33,10 +53,12 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
   Map<String, dynamic>? _destinationLocation;
   Map<String, dynamic>? _directionsResponse;
 
-  List<dynamic> _predictions = [];
+  List<dynamic> _predictions = const [];
   Rect? _activeFieldRect;
+  
+  Timer? _debounce; 
 
-  Set<Polyline> _polylines = {};
+  Set<Polyline> _polylines = const {};
   final Set<Marker> _markers = {};
   GoogleMapController? _mapController;
 
@@ -48,26 +70,34 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
   }
 
   void _onFocusChange() {
-    GlobalKey? activeKey;
-    if (_startFocusNode.hasFocus) {
-      activeKey = _startFieldKey;
-    } else if (_destinationFocusNode.hasFocus) {
-      activeKey = _destinationFieldKey;
-    }
-
-    if (activeKey != null) {
-      final renderBox = activeKey.currentContext?.findRenderObject() as RenderBox?;
-      if (renderBox != null) {
-        final offset = renderBox.localToGlobal(Offset.zero);
+    if (!_startFocusNode.hasFocus && !_destinationFocusNode.hasFocus) {
+      if (mounted) {
         setState(() {
-          _activeFieldRect = Rect.fromLTWH(
-            offset.dx,
-            offset.dy,
-            renderBox.size.width,
-            renderBox.size.height,
-          );
+          _predictions = const [];
+          _activeFieldRect = null;
         });
       }
+    }
+    
+    final GlobalKey? activeKey = _startFocusNode.hasFocus 
+        ? _startFieldKey 
+        : _destinationFocusNode.hasFocus ? _destinationFieldKey : null;
+
+    if (activeKey != null) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        final renderBox = activeKey.currentContext?.findRenderObject() as RenderBox?;
+        if (renderBox != null && mounted) {
+          final offset = renderBox.localToGlobal(Offset.zero);
+          setState(() {
+            _activeFieldRect = Rect.fromLTWH(
+              offset.dx,
+              offset.dy,
+              renderBox.size.width,
+              renderBox.size.height,
+            );
+          });
+        }
+      });
     }
   }
 
@@ -77,6 +107,11 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     _destinationFocusNode.removeListener(_onFocusChange);
     _startFocusNode.dispose();
     _destinationFocusNode.dispose();
+    _routeNameController.dispose();
+    _startLocationController.dispose();
+    _destinationController.dispose();
+    _mapController?.dispose();
+    _debounce?.cancel(); 
     super.dispose();
   }
 
@@ -86,88 +121,176 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     _mapController?.setMapStyle(isDark ? _darkMapStyle : null);
   }
 
-  Future<void> _getPredictions(String input) async {
+  void _debouncedGetPredictions(String input) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
     if (input.isEmpty) {
-      setState(() => _predictions = []);
+        if (mounted) setState(() => _predictions = const []);
+        return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+        final isStart = _startFocusNode.hasFocus;
+        final isDestination = _destinationFocusNode.hasFocus;
+        
+        if (input.isEmpty || (!isStart && !isDestination)) return;
+
+        try {
+            final List<dynamic> results = await getPredictions(input, apiKey); 
+            if (mounted) {
+              setState(() {
+                _predictions = results;
+              });
+            }
+        } catch (e) {
+            if (mounted) setState(() => _predictions = const []);
+        }
+    });
+  }
+  
+  Future<Map<String, dynamic>?> _getPlaceDetails(String placeId) async {
+    final String url = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey';
+    
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK') {
+           return data['result'];
+        }
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  }
+  
+  void _onPredictionSelected(Map<String, dynamic> prediction) async {
+    final bool isStart = _startFocusNode.hasFocus;
+    final bool isDestination = _destinationFocusNode.hasFocus;
+
+    setState(() {
+      _predictions = const [];
+      _activeFieldRect = null;
+    });
+    FocusScope.of(context).unfocus();
+    
+    final Map<String, dynamic>? placeDetails = await _getPlaceDetails(prediction['place_id']);
+
+    if (!mounted) return;
+
+    if (placeDetails == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load full place details. Try a different search.')),
+      );
       return;
     }
 
-    const location = "10.3157,123.8854";
-    const radius = "30000";
-    const strictBounds = "true";
-    const components = "country:ph";
+    final Map<String, dynamic> locationData = {
+      'place_id': prediction['place_id'],
+      'description': prediction['description'],
+      'latitude': placeDetails['geometry']['location']['lat'],
+      'longitude': placeDetails['geometry']['location']['lng'],
+    };
+    
+    if (isStart) {
+      _startLocationController.text = prediction['description'];
+      setState(() => _startLocation = locationData);
+    } else if (isDestination) {
+      _destinationController.text = prediction['description'];
+      setState(() => _destinationLocation = locationData);
+    }
 
-    String url =
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&location=$location&radius=$radius&strictbounds=$strictBounds&components=$components';
-
-    var response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200 && mounted) {
-      setState(() {
-        _predictions = json.decode(response.body)['predictions'];
-      });
-    } else {
-      throw Exception('Failed to load predictions');
+    if (_startLocation != null && _destinationLocation != null) {
+      _getRoute();
     }
   }
 
+
   Future<void> _getRoute() async {
-    if (_startLocation == null || _destinationLocation == null) return;
-    final startPlaceId = _startLocation!['place_id'];
-    final destinationPlaceId = _destinationLocation!['place_id'];
-    String url = 'https://maps.googleapis.com/maps/api/directions/json?origin=place_id:$startPlaceId&destination=place_id:$destinationPlaceId&key=$apiKey';
-    var response = await http.get(Uri.parse(url));
+    if (!mounted) return;
+    
+    if (_startLocation == null || _destinationLocation == null ||
+        _startLocation!['latitude'] == null || _destinationLocation!['latitude'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Missing complete geographic data for routing.')),
+      );
+      return;
+    }
+    
+    final String startLatLng = '${_startLocation!['latitude']},${_startLocation!['longitude']}';
+    final String endLatLng = '${_destinationLocation!['latitude']},${_destinationLocation!['longitude']}';
+    
+    final String url = 'https://maps.googleapis.com/maps/api/directions/json?origin=$startLatLng&destination=$endLatLng&key=$apiKey';
+    final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
-      var decoded = json.decode(response.body);
+      final decoded = json.decode(response.body);
+      if (decoded['routes'].isEmpty) {
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No route found between these locations.')),
+           );
+        }
+        return;
+      }
+      
       final routeData = decoded['routes'][0];
+      final leg = routeData['legs'][0];
+      final start = LatLng(leg['start_location']['lat'], leg['start_location']['lng']);
+      final end = LatLng(leg['end_location']['lat'], leg['end_location']['lng']);
       
       _markers.clear();
-      final leg = routeData['legs'][0];
-      final startLatLng = leg['start_location'];
-      final endLatLng = leg['end_location'];
-      
-      _markers.add(Marker(markerId: const MarkerId('start'), position: LatLng(startLatLng['lat'], startLatLng['lng'])));
-      _markers.add(Marker(markerId: const MarkerId('end'), position: LatLng(endLatLng['lat'], endLatLng['lng'])));
+      _markers.add(Marker(markerId: const MarkerId('start'), position: start, infoWindow: InfoWindow(title: 'Start: ${leg['start_address'].split(',').first}')));
+      _markers.add(Marker(markerId: const MarkerId('end'), position: end, infoWindow: InfoWindow(title: 'End: ${leg['end_address'].split(',').first}')));
 
-      List<PointLatLng> polylineCoordinates = PolylinePoints().decodePolyline(routeData['overview_polyline']['points']);
-      List<LatLng> latLngList = polylineCoordinates.map((point) => LatLng(point.latitude, point.longitude)).toList();
+      final PolylinePoints polylinePoints = PolylinePoints();
+      final List<PointLatLng> polylineCoordinates = polylinePoints.decodePolyline(routeData['overview_polyline']['points']);
+      final List<LatLng> latLngList = polylineCoordinates.map((point) => LatLng(point.latitude, point.longitude)).toList();
 
-      setState(() {
-        _directionsResponse = decoded;
-        _polylines = {
-          Polyline(
-            polylineId: const PolylineId('route'),
-            color: Theme.of(context).colorScheme.primary,
-            points: latLngList,
-            width: 5,
-          )
-        };
-      });
+      if (mounted) {
+        setState(() {
+          _directionsResponse = decoded;
+          _polylines = {
+            Polyline(
+              polylineId: const PolylineId('route'),
+              color: Theme.of(context).colorScheme.primary,
+              points: latLngList,
+              width: 5,
+            )
+          };
+        });
 
-      _mapController?.animateCamera(CameraUpdate.newLatLngBounds(_createBounds(latLngList), 100.0));
+        _mapController?.animateCamera(CameraUpdate.newLatLngBounds(_createBounds(latLngList), 100.0));
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to fetch route. Check API key and service enablement.')),
+        );
+      }
     }
   }
 
   String _calculateEstimatedFare(String distanceText) {
-    double distanceKm;
+    final double distanceKm;
     try {
-      distanceKm = double.parse(distanceText.replaceAll(' km', '').replaceAll(',', ''));
+      distanceKm = double.parse(distanceText.replaceAll(RegExp(r' km|\,'), ''));
     } catch (e) {
-      print('Error parsing distance: $e');
       return 'Fare N/A';
     }
 
-    double fare;
-    if (distanceKm <= 1.0) {
-      fare = distanceKm * 30;
+    final double fare;
+    if (distanceKm <= 4.0) {
+      fare = 15.0; 
     } else {
-      fare = 23.20 + (distanceKm * 9.12);
+      fare = 15.0 + ((distanceKm - 4.0) * 2.5);
     }
 
     return '₱${fare.toStringAsFixed(2)}';
   }
 
- void _saveRoute() {
+  void _saveRoute() {
     if (_routeNameController.text.isEmpty || _directionsResponse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a route name and show the route first.')),
@@ -183,14 +306,16 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
 
     final String calculatedFare = _calculateEstimatedFare(leg['distance']['text']);
 
+    final List<LatLng> polylinePoints = _polylines.isNotEmpty ? _polylines.first.points : const [];
+
     final newRoute = FavoriteRoute(
       routeName: _routeNameController.text,
       startAddress: leg['start_address'],
       endAddress: leg['end_address'],
       distance: leg['distance']['text'],
       duration: leg['duration']['text'],
-      polylinePoints: _polylines.first.points,
-      bounds: _createBounds(_polylines.first.points),
+      polylinePoints: polylinePoints, 
+      bounds: _createBounds(polylinePoints),
       latitude: endLocation['lat'],
       longitude: endLocation['lng'],
       startLatitude: startLocation['lat'],
@@ -198,6 +323,13 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
       polylineEncoded: routeData['overview_polyline']['points'],
       estimatedFare: calculatedFare,
     );
+
+    if (favoriteRoutes.any((r) => r.routeName == newRoute.routeName)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Route name already exists.')),
+      );
+      return;
+    }
 
     favoriteRoutes.add(newRoute);
 
@@ -209,10 +341,16 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
   }
 
   LatLngBounds _createBounds(List<LatLng> positions) {
-    final southwestLat = positions.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
-    final southwestLon = positions.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
-    final northeastLat = positions.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
-    final northeastLon = positions.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
+    if (positions.isEmpty) {
+      return LatLngBounds(
+        southwest: LatLng(10.3157, 123.8854),
+        northeast: LatLng(10.3157, 123.8854),
+      );
+    }
+    final double southwestLat = positions.map((p) => p.latitude).reduce((a, b) => a < b ? a : b);
+    final double southwestLon = positions.map((p) => p.longitude).reduce((a, b) => a < b ? a : b);
+    final double northeastLat = positions.map((p) => p.latitude).reduce((a, b) => a > b ? a : b);
+    final double northeastLon = positions.map((p) => p.longitude).reduce((a, b) => a > b ? a : b);
     return LatLngBounds(
       southwest: LatLng(southwestLat, southwestLon),
       northeast: LatLng(northeastLat, northeastLon),
@@ -234,41 +372,56 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
         borderRadius: BorderRadius.circular(15),
         borderSide: BorderSide.none,
       ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
     );
   }
-
+  
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final headerTextColor = isDark ? cs.onBackground : cs.primary;
+    
     return Scaffold(
       backgroundColor: cs.background,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios),
+          color: headerTextColor,
+          onPressed: () => Navigator.pop(context),
+        ),
+        backgroundColor: cs.background,
+        elevation: 0,
+        title: Text(
+          "Add New Route",
+          style: TextStyle(
+            fontSize: 20, 
+            fontWeight: FontWeight.bold, 
+            color: headerTextColor
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: GestureDetector(
         onTap: () {
           FocusScope.of(context).unfocus();
           setState(() {
-            _predictions = [];
+            _predictions = const [];
             _activeFieldRect = null;
           });
         },
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    "Add New Route",
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: headerTextColor),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
+                  
                   TextField(
                     controller: _routeNameController,
-                    decoration: _inputDecoration(context, 'Route Name'),
+                    decoration: _inputDecoration(context, 'Route Name (e.g., Downtown Loop)'),
                     style: TextStyle(color: cs.onSurface),
                   ),
                   const SizedBox(height: 15),
@@ -277,7 +430,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
                     child: TextField(
                       controller: _startLocationController,
                       focusNode: _startFocusNode,
-                      onChanged: _getPredictions,
+                      onChanged: _debouncedGetPredictions, 
                       decoration: _inputDecoration(context, 'Starting Location'),
                       style: TextStyle(color: cs.onSurface),
                     ),
@@ -288,7 +441,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
                     child: TextField(
                       controller: _destinationController,
                       focusNode: _destinationFocusNode,
-                      onChanged: _getPredictions,
+                      onChanged: _debouncedGetPredictions, 
                       decoration: _inputDecoration(context, 'Destination'),
                       style: TextStyle(color: cs.onSurface),
                     ),
@@ -296,12 +449,14 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
                   const SizedBox(height: 20),
                   Expanded(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: const BorderRadius.all(Radius.circular(15)),
                       child: GoogleMap(
                         onMapCreated: _onMapCreated,
                         initialCameraPosition: const CameraPosition(target: LatLng(10.3157, 123.8854), zoom: 12),
                         polylines: _polylines,
                         markers: _markers,
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: false,
                       ),
                     ),
                   ),
@@ -343,39 +498,27 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
             ),
             if (_predictions.isNotEmpty && _activeFieldRect != null)
               Positioned(
-                top: _activeFieldRect!.bottom,
-                left: _activeFieldRect!.left,
-                width: _activeFieldRect!.width,
+                top: _activeFieldRect!.bottom + 5, 
+                left: 20,
+                right: 20, 
                 child: Material(
                   color: theme.cardColor,
-                  elevation: 4.0,
+                  elevation: 6.0,
                   borderRadius: BorderRadius.circular(10),
                   child: LimitedBox(
-                    maxHeight: 200,
+                    maxHeight: 250,
                     child: ListView.builder(
                       padding: EdgeInsets.zero,
                       shrinkWrap: true,
                       itemCount: _predictions.length,
                       itemBuilder: (context, index) {
                         return ListTile(
+                          dense: true,
                           title: Text(
                             _predictions[index]['description'],
-                            style: TextStyle(color: cs.onSurface),
+                            style: TextStyle(color: cs.onSurface, fontSize: 14),
                           ),
-                          onTap: () {
-                            if (_startFocusNode.hasFocus) {
-                              _startLocationController.text = _predictions[index]['description'];
-                              _startLocation = _predictions[index];
-                            } else if (_destinationFocusNode.hasFocus) {
-                              _destinationController.text = _predictions[index]['description'];
-                              _destinationLocation = _predictions[index];
-                            }
-                            setState(() {
-                              _predictions = [];
-                              _activeFieldRect = null;
-                            });
-                            FocusScope.of(context).unfocus();
-                          },
+                          onTap: () => _onPredictionSelected(_predictions[index]),
                         );
                       },
                     ),

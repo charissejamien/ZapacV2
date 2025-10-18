@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:async'; // <--- ADDED for Timer
+import 'dart:async'; 
 import 'favoriteRouteData.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:zapac/core/utils/map_utils.dart'; // Ensure map_utils.dart has the showRoute modifications
-import 'package:google_maps_flutter/google_maps_flutter.dart'; // Import LatLng
+import 'package:zapac/core/utils/map_utils.dart'; 
+import 'package:google_maps_flutter/google_maps_flutter.dart'; 
 
 class SearchDestinationPage extends StatefulWidget {
   final String? initialSearchText;
@@ -18,204 +18,157 @@ class SearchDestinationPage extends StatefulWidget {
 class _SearchDestinationPageState extends State<SearchDestinationPage> {
   final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc";
   final TextEditingController _searchController = TextEditingController();
-  List<dynamic> _predictions = [];
-  Timer? _debounce; // <--- ADDED: Debounce timer instance
+  List<dynamic> _predictions = const [];
+  Timer? _debounce; 
 
-  // MODIFIED: _recentLocations now contains exact latitude and longitude
-  final List<Map<String, dynamic>> _recentLocations = [
-    // Using approximate coordinates in Cebu/Lapu-Lapu for demo purposes
-    {'name': 'House ni Gorgeous', 'latitude': 10.3100, 'longitude': 123.9150}, // Near Fuente Osmena
-    {'name': 'House sa Gwapa', 'latitude': 10.2900, 'longitude': 123.8900}, // Near Cebu City Sports Complex
-    {'name': 'House ni Pretty', 'latitude': 10.3250, 'longitude': 123.9000}, // Near IT Park
-    {'name': 'SM City Cebu', 'latitude': 10.3106, 'longitude': 123.9189},
-    {'name': 'House ni Lim', 'latitude': 10.3050, 'longitude': 123.9300}, // Somewhere in Lapu-Lapu
-    {'name': 'iAcademy Cebu', 'latitude': 10.3340, 'longitude': 123.9050},
-    {'name': 'Ayala Malls Central Bloc', 'latitude': 10.3168, 'longitude': 123.9056},
+  final List<Map<String, dynamic>> _recentLocations = const [
+    {'name': 'House ni Gorgeous', 'latitude': 10.3100, 'longitude': 123.9150}, 
+    {'name': 'House sa Gwapa', 'latitude': 10.2900, 'longitude': 123.8900}, 
+    {'name': 'Ayala Center Cebu', 'latitude': 10.3175, 'longitude': 123.9050}, 
   ];
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialSearchText != null) {
-      _searchController.text = widget.initialSearchText!;
-      // Use the new debounced function call here
-      _debouncedGetPredictions(widget.initialSearchText!); 
+    _searchController.text = widget.initialSearchText ?? '';
+    if (_searchController.text.isNotEmpty) {
+      _debouncedSearch(_searchController.text);
     }
   }
 
   @override
   void dispose() {
-    _debounce?.cancel(); // <--- ADDED: Cancel timer on dispose
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
-  
-  // NEW METHOD: Handle debouncing network calls
-  void _debouncedGetPredictions(String input) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
-    // Wait 500ms before triggering the search
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _getPredictions(input);
-    });
-  }
 
-  Future<void> _getPredictions(String input) async {
-    // We can now call MapUtils.getPredictions directly, assuming it's correctly exposed
-    // in map_utils.dart (as it was in the combined file snippet).
-    if (input.isEmpty) {
-      setState(() => _predictions = []);
+  Future<void> _debouncedSearch(String query) async {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    if (query.isEmpty) {
+      if (mounted) setState(() => _predictions = const []);
       return;
     }
-    
-    // NOTE: Instead of duplicating API logic, call the helper function from MapUtils
-    try {
-      final results = await getPredictions(input, apiKey); // Assuming getPredictions is available (it's globally scoped in map_utils.dart)
 
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      final List<dynamic> results = await _getPredictions(query);
       if (mounted) {
         setState(() => _predictions = results);
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Search failed. Check API Key/Network: $e')),
-        );
-        setState(() => _predictions = []);
+    });
+  }
+
+  Future<List<dynamic>> _getPredictions(String input) async {
+    if (input.isEmpty) return const [];
+    try {
+      const components = "country:ph";
+      final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=$components';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['predictions'];
+      } else {
+        print('Search failed: ${response.statusCode}');
+        return const [];
       }
+    } catch (e) {
+      print('Network error: $e');
+      return const [];
     }
   }
 
+  Future<Map<String, dynamic>?> _getPlaceDetails(String placeId) async {
+    final String url = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['result'];
+      }
+    } catch (e) {
+      return null;
+    }
+    return null;
+  }
+
+
+  void _onPredictionSelected(dynamic prediction) async {
+    final Map<String, dynamic>? placeDetails = await _getPlaceDetails(prediction['place_id']);
+
+    if (!mounted) return;
+
+    if (placeDetails == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load place details.')),
+      );
+      return;
+    }
+
+    Navigator.pop(context, {
+      'place': {
+        'place_id': prediction['place_id'],
+        'description': prediction['description'],
+        'latitude': placeDetails['geometry']['location']['lat'],
+        'longitude': placeDetails['geometry']['location']['lng'],
+      }
+    });
+  }
+
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFD9E0EA), // Same as Dashboard
       appBar: AppBar(
-        backgroundColor: const Color(0xFF6CA89A),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text(
-          'Search Destination',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            letterSpacing: 1.2,
+        title: TextField(
+          controller: _searchController,
+          autofocus: true,
+          onChanged: _debouncedSearch,
+          decoration: const InputDecoration(
+            hintText: 'Search for a destination...',
+            border: InputBorder.none,
           ),
         ),
-        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Container(
-              decoration: ShapeDecoration(
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(70),
-                ),
-                shadows: [
-                  BoxShadow(
-                    color: const Color(0xFF4A6FA5).withOpacity(0.2),
-                    blurRadius: 6.8,
-                    offset: const Offset(2, 5),
-                  ),
-                ],
-              ),
-              child: TextField(
-                controller: _searchController,
-                // MODIFIED: Use the debounced function
-                onChanged: _debouncedGetPredictions, 
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Where to?',
-                  hintStyle: const TextStyle(
-                    color: Colors.black54,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF6CA89A)),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ),
-          ),
-          // Favorite Routes Buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Wrap(
-              spacing: 8.0,
-              runSpacing: 4.0,
-              children: favoriteRoutes.map((route) {
-                return ElevatedButton(
-                  onPressed: () => Navigator.pop(context, {'route': route}),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6CA89A),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: Text(route.routeName, style: const TextStyle(color: Colors.white)),
-                );
-              }).toList(),
-            ),
-          ),
-          const Divider(height: 32, color: Color(0xFF6CA89A)),
-          // Predictions or Recent List
-          Expanded(
-            child: _searchController.text.isEmpty
-                ? _buildRecentList()
-                : _buildPredictionList(),
-          ),
-        ],
-      ),
+      body: _predictions.isNotEmpty
+          ? _buildPredictionList(cs)
+          : _buildRecentLocations(cs),
     );
   }
 
-  Widget _buildPredictionList() {
+  Widget _buildPredictionList(ColorScheme cs) {
     return ListView.builder(
       itemCount: _predictions.length,
       itemBuilder: (context, index) {
-        return Card(
-          color: Colors.white,
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          child: ListTile(
-            leading: const Icon(Icons.location_on_outlined, color: Color(0xFF6CA89A)),
-            title: Text(
-              _predictions[index]['description'],
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            onTap: () {
-              // This is for Google Places API predictions
-              Navigator.pop(context, {'place': _predictions[index]});
-            },
-          ),
+        final prediction = _predictions[index];
+        return ListTile(
+          leading: Icon(Icons.location_on, color: cs.secondary),
+          title: Text(prediction['structured_formatting']['main_text'], style: TextStyle(color: cs.onSurface)),
+          subtitle: Text(prediction['structured_formatting']['secondary_text'], style: TextStyle(color: cs.onSurface.withOpacity(0.6))),
+          onTap: () => _onPredictionSelected(prediction),
         );
       },
     );
   }
 
-  Widget _buildRecentList() {
+  Widget _buildRecentLocations(ColorScheme cs) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+        Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Text(
-            "Recent",
+            "Recent Locations",
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF4A6FA5),
+              color: cs.primary,
             ),
           ),
         ),
@@ -225,18 +178,17 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
             itemBuilder: (context, index) {
               final recentLocation = _recentLocations[index];
               return Card(
-                color: Colors.white,
+                color: cs.surface,
                 elevation: 1,
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 child: ListTile(
-                  leading: const Icon(Icons.history, color: Color(0xFF6CA89A)),
+                  leading: Icon(Icons.history, color: cs.secondary),
                   title: Text(
-                    recentLocation['name'] as String, // Use 'name' for display
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    recentLocation['name'] as String, 
+                    style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
                   ),
                   onTap: () {
-                    // MODIFIED: Pass the exact latitude and longitude for recent locations
                     Navigator.pop(context, {
                       'recent_location': {
                         'name': recentLocation['name'],

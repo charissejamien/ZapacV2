@@ -1,9 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'favorite_route.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'favoriteRoutes.dart';
+import 'favoriteRouteData.dart'; // <--- MISSING IMPORT ADDED HERE
 
 class RouteDetailPage extends StatefulWidget {
   final FavoriteRoute route;
@@ -17,7 +16,7 @@ class RouteDetailPage extends StatefulWidget {
 class _RouteDetailPageState extends State<RouteDetailPage> {
   late GoogleMapController _mapController;
   final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {};
+  Set<Polyline> _polylines = const {};
 
   LatLng _getCenter(LatLngBounds bounds) {
     return LatLng(
@@ -40,158 +39,46 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       infoWindow: InfoWindow(title: 'End', snippet: widget.route.endAddress),
     ));
 
-    _polylines.add(
+    _polylines = {
       Polyline(
         polylineId: const PolylineId('route'),
         color: const Color(0xFF4A6FA5),
         points: widget.route.polylinePoints,
         width: 5,
       )
-    );
+    };
   }
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    Future.delayed(const Duration(milliseconds: 150), () {
-      _mapController.animateCamera(CameraUpdate.newLatLngBounds(widget.route.bounds, 60));
-    });
+    _mapController.animateCamera(
+      CameraUpdate.newLatLngBounds(widget.route.bounds, 50.0),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final Brightness brightness = Theme.of(context).brightness;
-    final Color sheetBackgroundColor = brightness == Brightness.dark ? Colors.grey[850]! : Colors.white;
-    final Color textColor = brightness == Brightness.dark ? Colors.white : Colors.black;
-    final Color handleColor = brightness == Brightness.dark ? Colors.grey[700]! : Colors.grey[400]!;
-
-    return Scaffold(
-      appBar: AppBar(
-        // Use theme's AppBar background color
-        backgroundColor: const Color.fromARGB(255, 109, 168, 155), // Example color, adjust as needed
-        elevation: 0,
-        leading: BackButton(
-          color: Colors.white, // Keep white for contrast on dark grey or blue background
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        title: Text(
-          widget.route.routeName,
-          style: const TextStyle(
-            color: Colors.white // Keep white for contrast
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: _getCenter(widget.route.bounds),
-                zoom: 12,
-              ),
-              markers: _markers,
-              polylines: _polylines,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-            ),
-            DraggableScrollableSheet(
-              initialChildSize: 0.3,
-              minChildSize: 0.15,
-              maxChildSize: 0.6,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: sheetBackgroundColor,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: const Offset(0, -5),
-                      ),
-                    ],
-                  ),
-                  child: ListView(
-                    controller: scrollController,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: handleColor,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.route.routeName,
-                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
-                            ),
-                            const SizedBox(height: 10),
-                            const Divider(),
-                            const SizedBox(height: 10),
-                            _buildRouteInfoRow(
-                              icon: Icons.trip_origin,
-                              title: "From",
-                              content: widget.route.startAddress,
-                              textColor: textColor,
-                            ),
-                            const SizedBox(height: 15),
-                            _buildRouteInfoRow(
-                              icon: Icons.location_on,
-                              title: "To",
-                              content: widget.route.endAddress,
-                              textColor: textColor,
-                            ),
-                            const SizedBox(height: 15),
-                            const Divider(),
-                            const SizedBox(height: 10),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                _buildStatColumn("Distance", widget.route.distance, textColor),
-                                _buildStatColumn("Duration", widget.route.duration, textColor),
-                                _buildStatColumn("Estimated Fare", widget.route.estimatedFare, textColor),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            )
-          ],
-        ),
-      ),
+  void _deleteRoute() {
+    setState(() {
+      // 'favoriteRoutes' is now correctly recognized due to the import
+      favoriteRoutes.removeWhere((r) => r.routeName == widget.route.routeName);
+    });
+    Navigator.pop(context); 
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Route successfully deleted')),
     );
   }
 
   Widget _buildRouteInfoRow({required IconData icon, required String title, required String content, required Color textColor}) {
+    final Color secondaryColor = Theme.of(context).colorScheme.secondary;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: const Color(0xFF6CA89A), size: 28), // This icon color is still hardcoded
+        Icon(icon, color: secondaryColor, size: 28),
         const SizedBox(width: 15),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+              Text(title, style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
               Text(content, style: TextStyle(fontSize: 16, color: textColor)),
             ],
           ),
@@ -203,10 +90,82 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   Widget _buildStatColumn(String label, String value, Color textColor) {
     return Column(
       children: [
-        Text(label, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+        Text(label, style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
         const SizedBox(height: 5),
         Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final Color textColor = cs.onSurface;
+
+    return Scaffold(
+      backgroundColor: cs.background,
+      appBar: AppBar(
+        title: Text(widget.route.routeName, style: TextStyle(color: cs.onPrimary)),
+        backgroundColor: cs.primary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete),
+            color: cs.onPrimary,
+            onPressed: _deleteRoute,
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.4,
+              child: GoogleMap(
+                onMapCreated: _onMapCreated,
+                initialCameraPosition: CameraPosition(target: _getCenter(widget.route.bounds), zoom: 12),
+                markers: _markers,
+                polylines: _polylines,
+                myLocationButtonEnabled: false,
+                mapToolbarEnabled: false,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Card(
+                    color: cs.surface,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildRouteInfoRow(icon: Icons.my_location, title: "Start", content: widget.route.startAddress, textColor: textColor),
+                          const Divider(height: 30),
+                          _buildRouteInfoRow(icon: Icons.location_on, title: "Destination", content: widget.route.endAddress, textColor: textColor),
+                          const Divider(height: 30),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildStatColumn("Distance", widget.route.distance, textColor),
+                              _buildStatColumn("Duration", widget.route.duration, textColor),
+                              _buildStatColumn("Estimated Fare", widget.route.estimatedFare, textColor),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
     );
   }
 }

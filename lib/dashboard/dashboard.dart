@@ -2,15 +2,15 @@ import 'package:flutter/material.dart' hide SearchBar;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:zapac/core/widgets/bottomNavBar.dart'; // Assuming this path
-import 'package:zapac/features/account/presentation/pages/settings_page.dart'; // Assuming this path
-import 'package:zapac/features/account/presentation/pages/profile_page.dart'; // Assuming this path
+import 'package:zapac/settings/settings_page.dart'; // Assuming this path
+import 'package:zapac/settings/profile_page.dart'; // Assuming this path
 
 // Import the new file names
 import 'community_insights_page.dart';
-import '../../../../core/widgets/searchBar.dart';
-import '../../../../core/widgets/app_floating_button.dart';
+import '../core/widgets/searchBar.dart';
+import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
-import '../../../../core/utils/map_utils.dart';
+import '../core/utils/map_utils.dart';
 
 // Placeholder for ChatMessage model (re-exported from communityInsights)
 import 'community_insights_page.dart' show ChatMessage;
@@ -119,7 +119,7 @@ class _DashboardState extends State<Dashboard> {
     // NOTE: This requires a valid Google Maps API key defined in mapUtils.dart
     await MapUtils.showRoute(
       item: item,
-      apiKey: "YOUR_GOOGLE_MAPS_API_KEY", // Placeholder for actual key
+      apiKey: "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc", // Placeholder for actual key
       markers: _markers,
       polylines: _polylines,
       mapController: _mapController,

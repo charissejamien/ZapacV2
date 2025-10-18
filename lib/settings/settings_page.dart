@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:zapac/core/widgets/bottomNavBar.dart';
-import 'package:zapac/features/insights/presentation/pages/dashboard.dart';
+import 'package:zapac/dashboard/dashboard.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:zapac/features/auth/presentation/pages/login_page.dart';
+import 'package:zapac/authentication/login_page.dart';
 import 'package:zapac/app/main.dart';
 import 'profile_page.dart';
 

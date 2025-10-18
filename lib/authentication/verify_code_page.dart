@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'new_password.dart';
+import 'new_password_page.dart';
 
 class VerifyCodePage extends StatefulWidget {
   final String email;

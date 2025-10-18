@@ -1,19 +1,51 @@
 import 'package:flutter/material.dart' hide SearchBar;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
-import 'package:zapac/injections/bottomNavBar.dart'; // Assuming this path
-import 'package:zapac/account/settings.dart'; // Assuming this path
-import 'package:zapac/account/profile.dart'; // Assuming this path
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:zapac/core/widgets/bottomNavBar.dart';
+import 'package:zapac/settings/settings_page.dart';
+import 'package:zapac/settings/profile_page.dart';
 
 // Import the new file names
-import 'communityInsights.dart';
-import 'searchBar.dart';
-import 'floatingButton.dart';
+import 'community_insights_page.dart';
+import '../core/widgets/searchBar.dart';
+import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
-import 'mapUtils.dart';
+import '../core/utils/map_utils.dart';
 
 // Placeholder for ChatMessage model (re-exported from communityInsights)
-import 'communityInsights.dart' show ChatMessage;
+import 'community_insights_page.dart' show ChatMessage;
+
+// Sample data definition (MUST match ChatMessage structure)
+final List<ChatMessage> _initialSampleMessages = [
+  ChatMessage(
+    sender: 'Zole Laverne',
+    message: '"Ig 6PM juseyo, expect traffic sa Escariomida..."',
+    route: 'Escario',
+    timeAgo: '2 days ago',
+    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=500&fit=crop',
+    likes: 15,
+    isMostHelpful: true,
+  ),
+  ChatMessage(
+    sender: 'Kyline Alcantara', 
+    message: '"Kuyaw kaaio sa Carbon..."', 
+    route: 'Carbon', 
+    timeAgo: '9 days ago', 
+    imageUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop', 
+    likes: 22, 
+    dislikes: 2
+  ),
+  ChatMessage(
+    sender: 'Adopted Brother ni Mikha Lim', 
+    message: '"Ang plete kai tag 12 pesos..."', 
+    route: 'Lahug – Carbon', 
+    timeAgo: 'Just Now', 
+    imageUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&h=500&fit=crop', 
+    likes: 5
+  ),
+];
+
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -31,57 +63,97 @@ class _DashboardState extends State<Dashboard> {
 
   // UI State
   bool _isCommunityInsightExpanded = false;
-  int _selectedIndex = 0; // Index for BottomNavBar (Dashboard)
+  int _selectedIndex = 0;
   bool _isMapReady = false; 
 
-  // Chat Data (Dashboard owns the state)
-  final List<ChatMessage> _chatMessages = [
-    ChatMessage(
-      sender: 'Zole Laverne',
-      message: '"Ig 6PM juseyo, expect traffic sa Escariomida..."',
-      route: 'Escario',
-      timeAgo: '2 days ago',
-      imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=500&fit=crop',
-      likes: 15,
-      isMostHelpful: true,
-    ),
-    // ... other initial messages (abbreviated for brevity)
-    ChatMessage(sender: 'Kyline Alcantara', message: '"Kuyaw kaaio sa Carbon..."', route: 'Carbon', timeAgo: '9 days ago', imageUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop', likes: 22, dislikes: 2),
-    ChatMessage(sender: 'Adopted Brother ni Mikha Lim', message: '"Ang plete kai tag 12 pesos..."', route: 'Lahug – Carbon', timeAgo: 'Just Now', imageUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&h=500&fit=crop', likes: 5),
-  ];
+  // Firestore & Data State
+  List<ChatMessage> _liveChatMessages = [];
+  StreamSubscription? _chatSubscription;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
 
   @override
   void initState() {
     super.initState();
-    // Add initial marker for context (Cebu City)
+    _fetchAndListenToMessages(); // Start listening to Firestore
     MapUtils.addMarker(_markers, _initialCameraPosition, 'cebu_city_marker', 'Cebu City');
   }
+
+  @override
+  void dispose() {
+    // FIX: Cancel the stream subscription when the widget is disposed
+    _chatSubscription?.cancel(); 
+    super.dispose();
+  }
+
+  void _fetchAndListenToMessages() {
+    final insightsCollection = _firestore
+        .collection('public_data')
+        .doc('zapac_community')
+        .collection('comments');
+        
+    _chatSubscription = insightsCollection
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .listen((snapshot) {
+      // FIX: Only call setState if the widget is currently mounted
+      if (!mounted) return; 
+      
+      final List<ChatMessage> fetchedMessages = snapshot.docs.map((doc) {
+        return ChatMessage.fromFirestore(doc);
+      }).toList();
+
+      List<ChatMessage> combinedMessages = [];
+      
+      combinedMessages.addAll(_initialSampleMessages);
+      
+      for (var fetchedMsg in fetchedMessages) {
+        if (!_initialSampleMessages.any((sampleMsg) => 
+          sampleMsg.sender == fetchedMsg.sender && 
+          sampleMsg.message == fetchedMsg.message)) {
+          combinedMessages.add(fetchedMsg);
+        }
+      }
+      
+      combinedMessages.sort((a, b) {
+          final aTime = a.createdAt?.toDate().millisecondsSinceEpoch ?? 0;
+          final bTime = b.createdAt?.toDate().millisecondsSinceEpoch ?? 0;
+          return bTime.compareTo(aTime);
+      });
+      
+      setState(() {
+        _liveChatMessages = combinedMessages;
+      });
+
+    }, onError: (error) {
+      print("Error fetching community insights: $error");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load community feed.')),
+        );
+      }
+    });
+  }
+  
+  // ... (rest of the file content is unchanged but included for context)
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     _isMapReady = true;
-
-    // Load current location upon map creation
     _handleMyLocationPressed(); 
   }
 
-  // Handle Bottom Navigation Bar taps
   void _onItemTapped(int index) {
     if (!mounted) return;
     setState(() {
       _selectedIndex = index;
     });
 
-    // Example Navigation logic (needs real destination imports)
     if (index == 3) {
-      // Assuming index 3 is Settings
       Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage())); 
     } else if (index == 2) {
-      // Assuming index 2 is Profile
       Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); 
     }
-    // Index 0 is Dashboard (current page)
-    // Index 1 (Favorites) needs implementation
   }
 
   void _onCommunityInsightExpansionChanged(bool isExpanded) {
@@ -91,15 +163,10 @@ class _DashboardState extends State<Dashboard> {
     });
   }
 
-  // Callback for when a new insight is added from the modal
   void _addNewInsight(ChatMessage newInsight) {
-    if (!mounted) return;
-    setState(() {
-      _chatMessages.insert(0, newInsight);
-    });
+    print("Insight added, Firestore listener will refresh UI.");
   }
 
-  // Handle My Location button press (uses helper from mapUtils.dart)
   Future<void> _handleMyLocationPressed() async {
     if (!mounted || !_isMapReady) return;
 
@@ -112,14 +179,12 @@ class _DashboardState extends State<Dashboard> {
     if (mounted) setState(() {});
   }
 
-  // Handle place selection from search bar
   Future<void> _handlePlaceSelected(dynamic item) async {
     if (!mounted) return;
     
-    // NOTE: This requires a valid Google Maps API key defined in mapUtils.dart
     await MapUtils.showRoute(
       item: item,
-      apiKey: "YOUR_GOOGLE_MAPS_API_KEY", // Placeholder for actual key
+      apiKey: "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc",
       markers: _markers,
       polylines: _polylines,
       mapController: _mapController,
@@ -132,14 +197,13 @@ class _DashboardState extends State<Dashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // The FloatingActionButton is now positioned above the DraggableSheet area
       floatingActionButton: FloatingButton(
         isCommunityInsightExpanded: _isCommunityInsightExpanded,
         onAddInsightPressed: () {
           if (!mounted) return;
-          // Show the separate modal widget
           showAddInsightModal(
             context: context,
+            firestore: _firestore, // Pass the Firestore instance
             onInsightAdded: _addNewInsight,
           );
         },
@@ -172,7 +236,7 @@ class _DashboardState extends State<Dashboard> {
 
             // 2. Draggable Commenting Section (communityInsights.dart)
             CommentingSection(
-              chatMessages: _chatMessages,
+              chatMessages: _liveChatMessages, 
               onExpansionChanged: _onCommunityInsightExpansionChanged,
             ),
 

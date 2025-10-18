@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:zapac/application/dashboard.dart';
-// import 'favorite_routes_page.dart';
-import 'package:zapac/account/settings.dart';
+import 'package:zapac/dashboard/dashboard.dart';
+import 'package:zapac/favorites/favoriteRoutes.dart';
+import 'package:zapac/settings/settings_page.dart';
 
 class BottomNavBar extends StatefulWidget {
   final int selectedIndex;
@@ -60,11 +60,11 @@ class _BottomNavBarState extends State<BottomNavBar> {
           ),
           GestureDetector(
             onTap: () {
-              // widget.onItemTapped(1);
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(builder: (context) => const FavoriteRoutesPage()),
-              // );
+              widget.onItemTapped(1);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FavoriteRoutesPage()),
+              );
             },
             child: Icon(
               Icons.favorite,

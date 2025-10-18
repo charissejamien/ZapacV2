@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 // Note: Assuming these external pages exist in your new project structure
-// import 'package:zapac/profile_page.dart'; 
-// import 'package:zapac/search_destination_page.dart'; 
-import 'package:zapac/account/profile.dart'; // Assuming this path
+// Original imports were messy, updating to consistent relative path:
+import 'package:zapac/settings/profile_page.dart'; 
+import 'package:zapac/favorites/searchDestination.dart'; 
 
 class SearchBar extends StatefulWidget {
   final VoidCallback? onProfileTap;
@@ -24,37 +24,36 @@ class _SearchBarState extends State<SearchBar> {
   }
 
   void _openSearchPage() async {
-    // FIX: Placeholder for navigation to a dedicated search page (SearchDestinationPage)
-    // Since SearchDestinationPage definition wasn't provided, we mock the result handling.
-    
-    // Simulate navigation/result acquisition:
-    final result = null; 
-
-    // final result = await Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) =>
-    //         const SearchDestinationPage(initialSearchText: ''),
-    //   ),
-    // );
+    // FIX: This code is now UNCOMMENTED and performs navigation.
+    // It passes the current search text (if any) and expects a result back.
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            SearchDestinationPage(initialSearchText: _searchController.text),
+      ),
+    );
 
     if (result != null && widget.onPlaceSelected != null) {
       _handleSearchResult(result);
       widget.onPlaceSelected!(result);
     } else {
-        // Mock scenario if no search page is defined yet
-        ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text('Search functionality coming soon.')),
-        );
+        // We no longer need the mock Snackbar since navigation is enabled.
     }
   }
 
   void _handleSearchResult(Map<String, dynamic> result) {
     if (result.containsKey('place')) {
+      // Result from Google Places Autocomplete prediction
       _searchController.text = result['place']['description'];
     } else if (result.containsKey('route')) {
-      // Assuming 'route' item has a 'routeName' property
+      // Result from a favorited route button on SearchDestinationPage
       _searchController.text = result['route']['routeName'] ?? 'Selected Route';
+    } else if (result.containsKey('recent_location')) {
+      // Result from a recent location selection
+      _searchController.text = result['recent_location']['name'] ?? 'Selected Location';
+    } else {
+       _searchController.clear();
     }
   }
 
@@ -90,6 +89,7 @@ class _SearchBarState extends State<SearchBar> {
                   child: TextField(
                     controller: _searchController,
                     readOnly: true,
+                    // FIX: This now calls the method that pushes the SearchDestinationPage
                     onTap: _openSearchPage,
                     decoration: const InputDecoration(
                       hintText: 'Where to?',
@@ -114,7 +114,7 @@ class _SearchBarState extends State<SearchBar> {
               widget.onProfileTap?.call();
               Navigator.push(
                 context,
-                // Navigate to the correct ProfilePage path
+                // Assuming this path is correct based on your existing structure
                 MaterialPageRoute(builder: (context) => const ProfilePage()), 
               );
             },

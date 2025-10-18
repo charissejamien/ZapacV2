@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:zapac/authentication/authentication.dart';
-import 'package:zapac/account/settings.dart';
-import 'reset_password.dart';
-import 'signup.dart';
+import 'package:zapac/dashboard/dashboard.dart';
+import 'reset_password_page.dart';
+import 'signup_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -45,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard()));
       }
     } catch (e) {
       String message = e.toString().replaceFirst('Exception: ', '');
@@ -87,7 +87,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const SettingsPage()),
+          MaterialPageRoute(builder: (context) => const Dashboard()),
         );
       }
     } catch (e) {

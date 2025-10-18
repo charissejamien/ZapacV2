@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 
-// --- ChatMessage Model (Restored and Kept Here) ---
+// --- ChatMessage Model (Updated for Firestore) ---
 class ChatMessage {
+  // Added optional ID for Firebase document reference
+  final String? id; 
   final String sender;
   final String message;
   final String route;
@@ -12,8 +15,12 @@ class ChatMessage {
   bool isLiked;
   bool isDisliked;
   bool isMostHelpful;
+  
+  // New: Added createdAt timestamp for sorting
+  final Timestamp? createdAt; 
 
   ChatMessage({
+    this.id, // Now nullable for new posts, mandatory for fetched posts
     required this.sender,
     required this.message,
     required this.route,
@@ -24,14 +31,50 @@ class ChatMessage {
     this.isLiked = false,
     this.isDisliked = false,
     this.isMostHelpful = false,
+    this.createdAt, // Added
   });
+
+  // Factory constructor to create a ChatMessage from a Firestore Document
+  factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return ChatMessage(
+      id: doc.id,
+      sender: data['sender'] ?? 'Anonymous',
+      message: data['message'] ?? 'No message',
+      route: data['route'] ?? 'Unknown Route',
+      // In a real app, 'timeAgo' should be calculated from 'createdAt'
+      timeAgo: data['timeAgo'] ?? 'N/A', 
+      imageUrl: data['imageUrl'] ?? 'https://placehold.co/50x50/cccccc/000000?text=User',
+      likes: data['likes'] ?? 0,
+      dislikes: data['dislikes'] ?? 0,
+      isLiked: data['isLiked'] ?? false,
+      isDisliked: data['isDisliked'] ?? false,
+      isMostHelpful: data['isMostHelpful'] ?? false,
+      createdAt: data['createdAt'] as Timestamp?,
+    );
+  }
+
+  // Method to convert ChatMessage to a format ready for Firestore upload
+  Map<String, dynamic> toFirestore() {
+    return {
+      'sender': sender,
+      'message': message,
+      'route': route,
+      'timeAgo': 'Just now', // Placeholder value
+      'imageUrl': imageUrl,
+      'likes': 0, // Always start new posts at 0
+      'dislikes': 0,
+      'isLiked': false,
+      'isDisliked': false,
+      'isMostHelpful': false,
+      'createdAt': FieldValue.serverTimestamp(), // Firestore sets the timestamp
+    };
+  }
 }
 
 class CommentingSection extends StatefulWidget {
   final ValueSetter<bool>? onExpansionChanged;
-  // Dashboard passes the full list of messages
   final List<ChatMessage> chatMessages; 
-  // No need for onNewInsightAdded here, as the modal is separate.
 
   const CommentingSection({
     super.key,
@@ -45,7 +88,7 @@ class CommentingSection extends StatefulWidget {
 
 class _CommentingSectionState extends State<CommentingSection> {
   final DraggableScrollableController _sheetController = DraggableScrollableController();
-  final TextEditingController _commentController = TextEditingController(); // Can be removed later if not used
+  final TextEditingController _commentController = TextEditingController();
   
   bool _isSheetFullyExpanded = false;
   String _selectedFilter = 'All';
@@ -64,7 +107,6 @@ class _CommentingSectionState extends State<CommentingSection> {
           _isSheetFullyExpanded = isExpandedNow;
         });
       }
-      // Notify parent (Dashboard) of the sheet size change
       widget.onExpansionChanged?.call(_isSheetFullyExpanded); 
     }
   }
@@ -86,6 +128,7 @@ class _CommentingSectionState extends State<CommentingSection> {
           message.isDisliked = false;
           message.dislikes -= 1;
         }
+        // TODO: Implement Firestore update for likes/dislikes
       });
     }
   }
@@ -100,15 +143,13 @@ class _CommentingSectionState extends State<CommentingSection> {
           message.isLiked = false;
           message.likes -= 1;
         }
+        // TODO: Implement Firestore update for likes/dislikes
       });
     }
   }
 
-  // Filtered messages list logic
   List<ChatMessage> get _filteredMessages {
     if (_selectedFilter == 'All') {
-      // Return a sorted list based on likes/helpfulness if needed, 
-      // but keeping original order for structure coherence.
       return widget.chatMessages;
     }
 
@@ -144,7 +185,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     
-    // Extracted styles and used const where possible
     const iconSize = 20.0;
     final dividerColor = Theme.of(context).dividerColor;
     
@@ -192,10 +232,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                               ),
                             ),
                           ),
-                        // Action menu (Report/Delete)
                         GestureDetector(
                           onTapDown: (details) async {
-                            // Menu logic remains the same (implementation moved to Dashboard or helper if needed)
                             ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Menu functionality (Report/Delete) is active.')),
                             );
@@ -280,7 +318,6 @@ class _CommentingSectionState extends State<CommentingSection> {
 
   Widget _buildFilterChip(String label) {
     final bool isSelected = _selectedFilter == label;
-    // Removed isDark check inside chip building as it's not strictly necessary if colors are primary/secondary
     return ChoiceChip(
       label: Text(
         label,

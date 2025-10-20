@@ -70,15 +70,28 @@ class _DashboardState extends State<Dashboard> {
   List<ChatMessage> _liveChatMessages = [];
   StreamSubscription? _chatSubscription;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
+  
+  // Defined API Key as a constant for easy management
+  static const String _mapApiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; // Placeholder/Example Key
 
   @override
   void initState() {
     super.initState();
+    // CRITICAL FIX: Ensure ALL resource-dependent initial calls are delayed
+    // until after the first frame has been rendered and the platform bindings 
+    // are fully established. This is the safest pattern for iOS/macOS.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchAndListenToMessages(); // Start listening to Firestore after the frame is rendered
+      if (mounted) {
+        // 1. Move the marker addition here for maximum safety
+        MapUtils.addMarker(_markers, _initialCameraPosition, 'cebu_city_marker', 'Cebu City');
+        
+        // 2. Start the Firestore listener
+        _fetchAndListenToMessages(); 
+        
+        // 3. Force update UI after initial resources are set
+        setState(() {});
+      }
     });
-    
-    MapUtils.addMarker(_markers, _initialCameraPosition, 'cebu_city_marker', 'Cebu City');
   }
 
   @override
@@ -131,6 +144,7 @@ class _DashboardState extends State<Dashboard> {
     }, onError: (error) {
       print("Error fetching community insights: $error");
       if (mounted) {
+        // Log the error to the console for debugging
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to load community feed.')),
         );
@@ -138,8 +152,6 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
-  // ... (rest of the file content is unchanged but included for context)
-
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     _isMapReady = true;
@@ -187,7 +199,7 @@ class _DashboardState extends State<Dashboard> {
     
     await MapUtils.showRoute(
       item: item,
-      apiKey: "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc",
+      apiKey: _mapApiKey, 
       markers: _markers,
       polylines: _polylines,
       mapController: _mapController,

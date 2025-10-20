@@ -74,7 +74,10 @@ class _DashboardState extends State<Dashboard> {
   @override
   void initState() {
     super.initState();
-    _fetchAndListenToMessages(); // Start listening to Firestore
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchAndListenToMessages(); // Start listening to Firestore after the frame is rendered
+    });
+    
     MapUtils.addMarker(_markers, _initialCameraPosition, 'cebu_city_marker', 'Cebu City');
   }
 

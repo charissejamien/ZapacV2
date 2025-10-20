@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_page.dart';
 import 'authentication.dart';
+import 'package:zapac/core/widgets/authheader.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -327,6 +328,17 @@ class _SignUpPageState extends State<SignUpPage> {
     ]);
   }
 
+ void _navigateToLogin() {
+  Navigator.pushReplacement(
+    context, 
+    PageRouteBuilder(
+      pageBuilder: (context, animation1, animation2_) => const LoginPage(),
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    )
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -337,58 +349,9 @@ class _SignUpPageState extends State<SignUpPage> {
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(230),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(60),
-            bottomRight: Radius.circular(60),
-          ),
-          child: AppBar(
-            backgroundColor: appBarColor,
-            toolbarHeight: 250,
-            automaticallyImplyLeading: false,
-            title: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
-                Image.asset('assets/Logo.png', height: 130),
-                const SizedBox(height: 15),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Column(
-                        children: [
-                          const Text(
-                            "Sign Up",
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          Container(width: 48, height: 1.5, color: Colors.white, margin: const EdgeInsets.only(top: 6)),
-                        ],
-                      ),
-
-                    const SizedBox(width: 28),
-
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
-                      },
-                      child: Text(
-                        "Log In",
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
-                            fontSize: 16,
-                            fontWeight: FontWeight.normal
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
+      appBar: AuthHeader(
+        isSignUp: true,
+        onSwitchTap: _navigateToLogin,
       ),
 
       body: ListView(

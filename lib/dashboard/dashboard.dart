@@ -255,10 +255,24 @@ class _DashboardState extends State<Dashboard> {
 
                  right: 16,
 
-              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.56,
+              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.08,
               bottom: _isCommunityInsightExpanded ? 20 : null,
+
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 800),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return FadeTransition(
+                    opacity: animation, 
+                    child: child);
+                },
+
+              child: Column(
+                key: ValueKey<bool>(_isCommunityInsightExpanded),
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
            
-              child: FloatingButton(
+             FloatingButton(
                 isCommunityInsightExpanded: _isCommunityInsightExpanded,
                 onAddInsightPressed: () {
                   if (!mounted) return;
@@ -270,7 +284,10 @@ class _DashboardState extends State<Dashboard> {
                 },
                 onMyLocationPressed: _handleMyLocationPressed, 
                 ),
-        )
+          ],
+              ),
+            ),
+            ),
         ],
         ),
       ),

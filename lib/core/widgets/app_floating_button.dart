@@ -14,6 +14,7 @@ class FloatingButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    
     // Determine the color based on theme
     final backgroundColor = Theme.of(context).brightness == Brightness.dark
         ? const Color(0xFF4E7D71)
@@ -23,12 +24,28 @@ class FloatingButton extends StatelessWidget {
       onPressed: isCommunityInsightExpanded
           ? onAddInsightPressed
           : onMyLocationPressed,
+
       backgroundColor: backgroundColor,
-      heroTag: isCommunityInsightExpanded ? 'addInsightBtn' : 'myLocationBtn',
-      child: Icon(
+      heroTag: 'dynamicFabTag' ,
+
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+
+        transitionBuilder:(Widget child, Animation<double> animation) {
+          return FadeTransition(
+            opacity: animation, 
+            child: ScaleTransition(scale: animation, child: child),);
+        },
+
+        child: Icon(  
+
         isCommunityInsightExpanded ? Icons.add : Icons.my_location,
+        
+        key: ValueKey<bool>(isCommunityInsightExpanded),
+
         color: Colors.white,
         size: isCommunityInsightExpanded ? 30 : 24,
+      ),
       ),
     );
   }

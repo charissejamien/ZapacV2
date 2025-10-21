@@ -212,20 +212,6 @@ class _DashboardState extends State<Dashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingButton(
-        isCommunityInsightExpanded: _isCommunityInsightExpanded,
-        onAddInsightPressed: () {
-          if (!mounted) return;
-          showAddInsightModal(
-            context: context,
-            firestore: _firestore, // Pass the Firestore instance
-            onInsightAdded: _addNewInsight,
-          );
-        },
-        onMyLocationPressed: _handleMyLocationPressed,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-
       bottomNavigationBar: BottomNavBar(
         selectedIndex: _selectedIndex,
         onItemTapped: _onItemTapped,
@@ -262,7 +248,30 @@ class _DashboardState extends State<Dashboard> {
               right: 16,
               child: SearchBar(onPlaceSelected: _handlePlaceSelected),
             ),
-          ],
+
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+
+                 right: 16,
+
+              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.56,
+              bottom: _isCommunityInsightExpanded ? 20 : null,
+           
+              child: FloatingButton(
+                isCommunityInsightExpanded: _isCommunityInsightExpanded,
+                onAddInsightPressed: () {
+                  if (!mounted) return;
+                  showAddInsightModal(
+                    context: context,
+                    firestore: _firestore, // Pass the Firestore instance
+                    onInsightAdded: _addNewInsight,
+                  );
+                },
+                onMyLocationPressed: _handleMyLocationPressed, 
+                ),
+        )
+        ],
         ),
       ),
     );

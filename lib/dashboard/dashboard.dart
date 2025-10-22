@@ -2,7 +2,7 @@ import 'package:flutter/material.dart' hide SearchBar;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/core/widgets/bottomNavBar.dart';
 import 'package:zapac/settings/settings_page.dart';
 import 'package:zapac/settings/profile_page.dart';
@@ -17,36 +17,39 @@ import '../core/utils/map_utils.dart';
 // Placeholder for ChatMessage model (re-exported from communityInsights)
 import 'community_insights_page.dart' show ChatMessage;
 
-// Sample data definition (MUST match ChatMessage structure)
+// Sample data definition (UPDATED: Using createdAt Timestamp instead of timeAgo)
 final List<ChatMessage> _initialSampleMessages = [
   ChatMessage(
     sender: 'Zole Laverne',
     message: '"Ig 6PM juseyo, expect traffic sa Escariomida..."',
     route: 'Escario',
-    timeAgo: '2 days ago',
     imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=500&fit=crop',
     likes: 15,
     isMostHelpful: true,
-    id: 'sample_1', // Assign IDs to samples for consistency, though they won't be in Firestore
+    id: 'sample_1', 
+    // Calculate a Timestamp representing 2 days ago
+    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))), 
   ),
   ChatMessage(
     sender: 'Kyline Alcantara', 
     message: '"Kuyaw kaaio sa Carbon..."', 
     route: 'Carbon', 
-    timeAgo: '9 days ago', 
     imageUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop', 
     likes: 22, 
     dislikes: 2,
     id: 'sample_2',
+    // Calculate a Timestamp representing 9 days ago
+    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 9))),
   ),
   ChatMessage(
     sender: 'Adopted Brother ni Mikha Lim', 
     message: '"Ang plete kai tag 12 pesos..."', 
     route: 'Lahug – Carbon', 
-    timeAgo: 'Just Now', 
     imageUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&h=500&fit=crop', 
     likes: 5,
     id: 'sample_3',
+    // Calculate a Timestamp representing 5 minutes ago
+    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(minutes: 5))), 
   ),
 ];
 
@@ -74,10 +77,11 @@ class _DashboardState extends State<Dashboard> {
   List<ChatMessage> _liveChatMessages = [];
   StreamSubscription? _chatSubscription;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
-  final FirebaseAuth _auth = FirebaseAuth.instance; // Instance of FirebaseAuth
+  final FirebaseAuth _auth = FirebaseAuth.instance; 
   
   // NEW: Store the current user ID
   String? _currentUserId;
+  StreamSubscription? _authStateSubscription;
 
   // Defined API Key as a constant for easy management
   static const String _mapApiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; // Placeholder/Example Key
@@ -88,6 +92,15 @@ class _DashboardState extends State<Dashboard> {
     // Get user ID immediately (can be null if not logged in)
     _currentUserId = _auth.currentUser?.uid;
     
+    // Listen for auth state changes to update the user ID dynamically
+    _authStateSubscription = _auth.authStateChanges().listen((User? user) {
+      if (mounted) {
+        setState(() {
+          _currentUserId = user?.uid;
+        });
+      }
+    });
+
     // CRITICAL FIX: Ensure ALL resource-dependent initial calls are delayed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -105,8 +118,9 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void dispose() {
-    // FIX: Cancel the stream subscription when the widget is disposed
+    // FIX: Cancel both stream subscriptions when the widget is disposed
     _chatSubscription?.cancel(); 
+    _authStateSubscription?.cancel();
     super.dispose();
   }
 

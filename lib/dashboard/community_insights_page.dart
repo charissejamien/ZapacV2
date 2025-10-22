@@ -2,8 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart'; 
 
+// 1. TIME AGO UTILITY FUNCTION
+String timeAgoSinceDate(Timestamp? timestamp) {
+  // Handles null timestamps from samples or delayed Firebase writes
+  if (timestamp == null) {
+    return 'N/A'; 
+  }
+  
+  final DateTime now = DateTime.now();
+  final DateTime date = timestamp.toDate();
+  final Duration diff = now.difference(date);
+
+  if (diff.inSeconds < 60) {
+    return 'Just now';
+  } else if (diff.inMinutes < 60) {
+    return '${diff.inMinutes} mins ago';
+  } else if (diff.inHours < 24) {
+    return '${diff.inHours} hours ago';
+  } else if (diff.inDays < 7) {
+    return '${diff.inDays} days ago';
+  } else if (diff.inDays < 30) {
+    final weeks = (diff.inDays / 7).floor();
+    return '$weeks weeks ago';
+  } else if (diff.inDays < 365) {
+    final months = (diff.inDays / 30).floor();
+    return '$months months ago';
+  } else {
+    final years = (diff.inDays / 365).floor();
+    return '$years years ago';
+  }
+}
+
 // --- UserInteraction Model (Constant) ---
-// This is kept constant so it can be used as a default value in ChatMessage.
 @immutable 
 class UserInteraction {
   final bool isLiked;
@@ -29,7 +59,7 @@ class ChatMessage {
   final String sender;
   final String message;
   final String route;
-  final String timeAgo;
+  // Removed timeAgo
   final String imageUrl;
   int likes;
   int dislikes;
@@ -45,7 +75,6 @@ class ChatMessage {
     required this.sender,
     required this.message,
     required this.route,
-    required this.timeAgo,
     required this.imageUrl,
     this.likes = 0,
     this.dislikes = 0,
@@ -61,12 +90,11 @@ class ChatMessage {
       sender: data['sender'] ?? 'Anonymous',
       message: data['message'] ?? 'No message',
       route: data['route'] ?? 'Unknown Route',
-      timeAgo: data['timeAgo'] ?? 'N/A', 
       imageUrl: data['imageUrl'] ?? 'https://placehold.co/50x50/cccccc/000000?text=User',
       likes: data['likes'] ?? 0,
       dislikes: data['dislikes'] ?? 0,
       isMostHelpful: data['isMostHelpful'] ?? false,
-      createdAt: data['createdAt'] as Timestamp?,
+      createdAt: data['createdAt'] as Timestamp?, 
     );
   }
 
@@ -75,7 +103,6 @@ class ChatMessage {
       'sender': sender,
       'message': message,
       'route': route,
-      'timeAgo': 'Just now', 
       'imageUrl': imageUrl,
       'likes': 0, 
       'dislikes': 0,
@@ -90,10 +117,9 @@ class CommentingSection extends StatefulWidget {
   final List<ChatMessage> chatMessages; 
   final String? currentUserId; 
   
-  // Initialize lazily to avoid the constructor error, or just use the field directly
   final FirebaseFirestore firestore = FirebaseFirestore.instance; 
 
-  // FIX: Removed 'const' keyword here!
+  // FIX: Removed 'const' keyword
   CommentingSection({
     super.key,
     this.onExpansionChanged,
@@ -287,6 +313,9 @@ class _CommentingSectionState extends State<CommentingSection> {
     final dividerColor = Theme.of(context).dividerColor;
     
     final interaction = _userInteractions[message.id] ?? message.userInteraction;
+    
+    // NEW: Calculate time ago dynamically
+    final timeDisplay = timeAgoSinceDate(message.createdAt);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -354,8 +383,9 @@ class _CommentingSectionState extends State<CommentingSection> {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    // NEW: Display the calculated time
                     Text(
-                      'Route: ${message.route}  |  ${message.timeAgo}',
+                      'Route: ${message.route}  |  $timeDisplay',
                       style: TextStyle(
                         color: textTheme.bodySmall?.color,
                         fontSize: 12,
@@ -454,13 +484,11 @@ class _CommentingSectionState extends State<CommentingSection> {
     // Inject the fetched user interaction state into the message objects for rendering
     final List<ChatMessage> currentMessages = widget.chatMessages.map((msg) {
         if (msg.id != null && _userInteractions.containsKey(msg.id)) {
-          // Return a new ChatMessage instance with the user's interaction status injected
           return ChatMessage(
             id: msg.id,
             sender: msg.sender,
             message: msg.message,
             route: msg.route,
-            timeAgo: msg.timeAgo,
             imageUrl: msg.imageUrl,
             likes: msg.likes,
             dislikes: msg.dislikes,

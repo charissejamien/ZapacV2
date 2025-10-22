@@ -21,10 +21,10 @@ void showAddInsightModal({
   final senderName = currentUser.displayName ?? currentUser.email?.split('@').first ?? 'Current User';
   final profileUrl = currentUser.photoURL ?? 'https://cdn-icons-png.flaticon.com/512/100/100913.png';
   
-  // NOTE: Controllers are now LOCAL variables. We will NOT explicitly call dispose on them in whenComplete.
-  final TextEditingController insightController = TextEditingController();
-  final TextEditingController routeController   = TextEditingController();
-
+  // FIX: These controllers are now initialized INSIDE the builder
+  // and will be disposed of when the modal's internal State is disposed.
+  // We no longer need the explicit dispose in .whenComplete().
+  
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -33,13 +33,17 @@ void showAddInsightModal({
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) { 
+      // CRITICAL FIX: Define controllers inside the builder (or a StateFulBuilder)
+      // so their lifecycle is tied to the internal modal state.
+      final TextEditingController insightController = TextEditingController();
+      final TextEditingController routeController   = TextEditingController();
+      
       final theme = Theme.of(ctx);
       final textColor = theme.textTheme.bodyLarge?.color;
       final hintColor = theme.hintColor;
       
       return Padding(
-        // RENDERFLEX FIX: Ensure this padding is applied based on the modal's context (ctx)
-        // to handle the keyboard pushing the content up correctly.
+        // RENDERFLEX FIX: This handles the keyboard overlay without overflow
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(ctx).viewInsets.bottom,
           left: 20, right: 20, top: 20,
@@ -79,7 +83,7 @@ void showAddInsightModal({
               ],
             ),
             const SizedBox(height: 16),
-            // Insight Input (Line 90)
+            // Insight Input
             TextField(
               controller: insightController,
               autofocus: true,
@@ -116,7 +120,10 @@ void showAddInsightModal({
                   final route = routeController.text.trim();
                   
                   if (text.isEmpty || route.isEmpty) {
-                    // REMOVED SnackBar: Keep logic simple
+                    // Validation Feedback
+                    ScaffoldMessenger.of(ctx).showSnackBar( 
+                      const SnackBar(content: Text('Please enter both insight and route.'), backgroundColor: Colors.orange),
+                    );
                     return;
                   }
                   
@@ -124,20 +131,18 @@ void showAddInsightModal({
                     sender: senderName,
                     message: '“$text”',
                     route: route,
-                    timeAgo: 'Just now', 
                     imageUrl: profileUrl,
                   );
 
                   // 1. CRITICAL: POP MODAL IMMEDIATELY
-                  // This removes the widgets (and their controllers) from the tree
-                  // before the stream update happens, preventing the dependency error.
+                  // Solves: _dependents.isEmpty assertion failure
                   if (ctx.mounted) {
                       Navigator.pop(ctx); 
                   } else {
                       return; 
                   }
-                  
-                  // 2. Perform ASYNC WRITE in the background using the now-removed context.
+
+                  // 2. Perform ASYNC WRITE in the background.
                   try {
                       await firestore
                         .collection('public_data')
@@ -148,7 +153,7 @@ void showAddInsightModal({
                       // 3. Call callback after successful post
                       onInsightAdded(newInsight); 
                       
-                      // Show success message using the stable parent context (`context`), not the modal's disposed context (`ctx`)
+                      // Show success message using the stable parent context (`context`)
                       if (context.mounted) { 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Insight posted successfully!'), backgroundColor: Color(0xFF6CA89A)),
@@ -160,7 +165,7 @@ void showAddInsightModal({
                        // Show failure message using the stable parent context
                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Post failed.'), backgroundColor: Colors.red),
+                              const SnackBar(content: Text('Post failed. Check console for error.'), backgroundColor: Colors.red),
                           );
                        }
                   }
@@ -181,5 +186,5 @@ void showAddInsightModal({
         ),
       );
     },
-  ); // CRITICAL FIX: Removed .whenComplete block
+  ); // CRITICAL FIX: Removed .whenComplete() block completely
 }

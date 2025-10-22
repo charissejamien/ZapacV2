@@ -73,7 +73,7 @@ class _DashboardState extends State<Dashboard> {
   
   // Defined API Key as a constant for easy management
   // static const String _mapApiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; // Placeholder/Example Key
-  static const String _mapApiKey = "AlzaSyCWHublkxuYaWfT68qUWGY305L9NB82JA8"; // Actual Key sa IOS
+  static const String _mapApiKey = "AIzaSyCWHublkXuYaWfT68qUwGY3o5L9NB82JA8"; // Actual Key sa IOS
 
   @override
   void initState() {

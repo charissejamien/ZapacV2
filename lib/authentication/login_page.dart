@@ -3,6 +3,7 @@ import 'package:zapac/authentication/authentication.dart';
 import 'package:zapac/dashboard/dashboard.dart';
 import 'reset_password_page.dart';
 import 'signup_page.dart';
+import 'package:zapac/core/widgets/authheader.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -102,6 +103,17 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+   void _navigateToSignUp() {
+  Navigator.pushReplacement(
+    context, 
+    PageRouteBuilder(
+      pageBuilder: (context, animation1, animation2_) => const SignUpPage(),
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+    )
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -118,69 +130,12 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
 
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(230),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            bottomLeft: Radius.circular(60),
-            bottomRight: Radius.circular(60),
-          ),
-          child: AppBar(
-            backgroundColor: appBarColor,
-            toolbarHeight: 250,
-            automaticallyImplyLeading: false,
-            title: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(height: 20),
-                Image.asset('assets/Logo.png', height: 130),
-                const SizedBox(height: 15),
+     // INSERT THIS:
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(builder: (context) => const SignUpPage()),
-                        );
-                      },
-                      child: Text(
-                        "Sign Up",
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
-                            fontWeight: FontWeight.normal,
-                            fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 28),
-
-                    Column(
-                      children: [
-                        const Text(
-                          "Log In",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Container(
-                          width: 48,
-                          height: 2,
-                          color: Colors.white,
-                          margin: const EdgeInsets.only(top: 6),
-                        )
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
+      appBar: 
+      AuthHeader(
+        isSignUp: false,
+        onSwitchTap: _navigateToSignUp,
       ),
 
       body: ListView(

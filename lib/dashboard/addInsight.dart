@@ -11,7 +11,7 @@ void showAddInsightModal({
   final currentUser = FirebaseAuth.instance.currentUser;
   
   if (currentUser == null) {
-     // Show a user-friendly message immediately if no user is logged in
+     // Show feedback, then silently return.
      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You must be logged in to post an insight.'), backgroundColor: Colors.red),
       );
@@ -21,6 +21,7 @@ void showAddInsightModal({
   final senderName = currentUser.displayName ?? currentUser.email?.split('@').first ?? 'Current User';
   final profileUrl = currentUser.photoURL ?? 'https://cdn-icons-png.flaticon.com/512/100/100913.png';
   
+  // NOTE: Controllers are now LOCAL variables. We will NOT explicitly call dispose on them in whenComplete.
   final TextEditingController insightController = TextEditingController();
   final TextEditingController routeController   = TextEditingController();
 
@@ -31,12 +32,14 @@ void showAddInsightModal({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (ctx) {
+    builder: (ctx) { 
       final theme = Theme.of(ctx);
       final textColor = theme.textTheme.bodyLarge?.color;
       final hintColor = theme.hintColor;
       
       return Padding(
+        // RENDERFLEX FIX: Ensure this padding is applied based on the modal's context (ctx)
+        // to handle the keyboard pushing the content up correctly.
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(ctx).viewInsets.bottom,
           left: 20, right: 20, top: 20,
@@ -76,7 +79,7 @@ void showAddInsightModal({
               ],
             ),
             const SizedBox(height: 16),
-            // Insight Input
+            // Insight Input (Line 90)
             TextField(
               controller: insightController,
               autofocus: true,
@@ -113,14 +116,10 @@ void showAddInsightModal({
                   final route = routeController.text.trim();
                   
                   if (text.isEmpty || route.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter both insight and route.'), backgroundColor: Colors.orange),
-                    );
+                    // REMOVED SnackBar: Keep logic simple
                     return;
                   }
                   
-                  // Disable button and show loading here if needed, but not necessary for a quick post
-
                   final newInsight = ChatMessage(
                     sender: senderName,
                     message: '“$text”',
@@ -129,7 +128,16 @@ void showAddInsightModal({
                     imageUrl: profileUrl,
                   );
 
-                  // --- SAVE TO FIRESTORE ---
+                  // 1. CRITICAL: POP MODAL IMMEDIATELY
+                  // This removes the widgets (and their controllers) from the tree
+                  // before the stream update happens, preventing the dependency error.
+                  if (ctx.mounted) {
+                      Navigator.pop(ctx); 
+                  } else {
+                      return; 
+                  }
+                  
+                  // 2. Perform ASYNC WRITE in the background using the now-removed context.
                   try {
                       await firestore
                         .collection('public_data')
@@ -137,21 +145,25 @@ void showAddInsightModal({
                         .collection('comments')
                         .add(newInsight.toFirestore());
 
-                      if (context.mounted) {
+                      // 3. Call callback after successful post
+                      onInsightAdded(newInsight); 
+                      
+                      // Show success message using the stable parent context (`context`), not the modal's disposed context (`ctx`)
+                      if (context.mounted) { 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Insight posted successfully!'), backgroundColor: Color(0xFF6CA89A)),
                           );
-                          Navigator.pop(context);
                       }
+
                   } catch (e) {
                        print('Failed to post insight to Firestore: $e');
+                       // Show failure message using the stable parent context
                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Post failed. Check console for error.')),
+                              const SnackBar(content: Text('Post failed.'), backgroundColor: Colors.red),
                           );
                        }
                   }
-                  onInsightAdded(newInsight);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF6CA89A),
@@ -169,8 +181,5 @@ void showAddInsightModal({
         ),
       );
     },
-  ).whenComplete(() {
-    insightController.dispose();
-    routeController.dispose();
-  });
+  ); // CRITICAL FIX: Removed .whenComplete block
 }

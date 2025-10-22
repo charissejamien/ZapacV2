@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide SearchBar;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 import 'package:zapac/core/widgets/bottomNavBar.dart';
 import 'package:zapac/settings/settings_page.dart';
 import 'package:zapac/settings/profile_page.dart';
@@ -26,6 +27,7 @@ final List<ChatMessage> _initialSampleMessages = [
     imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=500&fit=crop',
     likes: 15,
     isMostHelpful: true,
+    id: 'sample_1', // Assign IDs to samples for consistency, though they won't be in Firestore
   ),
   ChatMessage(
     sender: 'Kyline Alcantara', 
@@ -34,7 +36,8 @@ final List<ChatMessage> _initialSampleMessages = [
     timeAgo: '9 days ago', 
     imageUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop', 
     likes: 22, 
-    dislikes: 2
+    dislikes: 2,
+    id: 'sample_2',
   ),
   ChatMessage(
     sender: 'Adopted Brother ni Mikha Lim', 
@@ -42,7 +45,8 @@ final List<ChatMessage> _initialSampleMessages = [
     route: 'Lahug – Carbon', 
     timeAgo: 'Just Now', 
     imageUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&h=500&fit=crop', 
-    likes: 5
+    likes: 5,
+    id: 'sample_3',
   ),
 ];
 
@@ -70,16 +74,21 @@ class _DashboardState extends State<Dashboard> {
   List<ChatMessage> _liveChatMessages = [];
   StreamSubscription? _chatSubscription;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
+  final FirebaseAuth _auth = FirebaseAuth.instance; // Instance of FirebaseAuth
   
+  // NEW: Store the current user ID
+  String? _currentUserId;
+
   // Defined API Key as a constant for easy management
   static const String _mapApiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; // Placeholder/Example Key
 
   @override
   void initState() {
     super.initState();
+    // Get user ID immediately (can be null if not logged in)
+    _currentUserId = _auth.currentUser?.uid;
+    
     // CRITICAL FIX: Ensure ALL resource-dependent initial calls are delayed
-    // until after the first frame has been rendered and the platform bindings 
-    // are fully established. This is the safest pattern for iOS/macOS.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         // 1. Move the marker addition here for maximum safety
@@ -121,19 +130,22 @@ class _DashboardState extends State<Dashboard> {
 
       List<ChatMessage> combinedMessages = [];
       
-      combinedMessages.addAll(_initialSampleMessages);
+      // Filter out duplicate sample messages from being shown if a real message matches
+      List<ChatMessage> filteredSampleMessages = _initialSampleMessages.where((sample) {
+          return !fetchedMessages.any((fetched) => 
+            fetched.sender == sample.sender && 
+            fetched.message == sample.message
+          );
+      }).toList();
       
-      for (var fetchedMsg in fetchedMessages) {
-        if (!_initialSampleMessages.any((sampleMsg) => 
-          sampleMsg.sender == fetchedMsg.sender && 
-          sampleMsg.message == fetchedMsg.message)) {
-          combinedMessages.add(fetchedMsg);
-        }
-      }
+      combinedMessages.addAll(filteredSampleMessages);
+      combinedMessages.addAll(fetchedMessages);
       
+      // Sort combined list by createdAt timestamp
       combinedMessages.sort((a, b) {
           final aTime = a.createdAt?.toDate().millisecondsSinceEpoch ?? 0;
           final bTime = b.createdAt?.toDate().millisecondsSinceEpoch ?? 0;
+          // Sample messages (which have a null createdAt) will go to the end if bTime is non-null
           return bTime.compareTo(aTime);
       });
       
@@ -239,6 +251,7 @@ class _DashboardState extends State<Dashboard> {
             CommentingSection(
               chatMessages: _liveChatMessages, 
               onExpansionChanged: _onCommunityInsightExpansionChanged,
+              currentUserId: _currentUserId, // PASS THE CURRENT USER ID HERE
             ),
 
             // 3. Floating Search Bar (searchBar.dart)
@@ -275,7 +288,17 @@ class _DashboardState extends State<Dashboard> {
              FloatingButton(
                 isCommunityInsightExpanded: _isCommunityInsightExpanded,
                 onAddInsightPressed: () {
+                  // Get the current user ID right before showing the modal
+                  final currentUserId = _auth.currentUser?.uid;
                   if (!mounted) return;
+
+                  if (currentUserId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please sign in to post an insight.'), backgroundColor: Colors.red),
+                    );
+                    return;
+                  }
+
                   showAddInsightModal(
                     context: context,
                     firestore: _firestore, // Pass the Firestore instance

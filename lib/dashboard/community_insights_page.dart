@@ -1,9 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:firebase_auth/firebase_auth.dart'; 
 
-// --- ChatMessage Model (Updated for Firestore) ---
+// --- UserInteraction Model (Constant) ---
+// This is kept constant so it can be used as a default value in ChatMessage.
+@immutable 
+class UserInteraction {
+  final bool isLiked;
+  final bool isDisliked;
+
+  const UserInteraction({this.isLiked = false, this.isDisliked = false});
+
+  factory UserInteraction.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>?;
+    if (data == null) {
+      return const UserInteraction(); 
+    }
+    return UserInteraction(
+      isLiked: data['isLiked'] ?? false,
+      isDisliked: data['isDisliked'] ?? false,
+    );
+  }
+}
+
+// --- ChatMessage Model ---
 class ChatMessage {
-  // Added optional ID for Firebase document reference
   final String? id; 
   final String sender;
   final String message;
@@ -12,15 +33,15 @@ class ChatMessage {
   final String imageUrl;
   int likes;
   int dislikes;
-  bool isLiked;
-  bool isDisliked;
+  
+  UserInteraction userInteraction; 
+  
   bool isMostHelpful;
   
-  // New: Added createdAt timestamp for sorting
   final Timestamp? createdAt; 
 
   ChatMessage({
-    this.id, // Now nullable for new posts, mandatory for fetched posts
+    this.id, 
     required this.sender,
     required this.message,
     required this.route,
@@ -28,13 +49,11 @@ class ChatMessage {
     required this.imageUrl,
     this.likes = 0,
     this.dislikes = 0,
-    this.isLiked = false,
-    this.isDisliked = false,
+    this.userInteraction = const UserInteraction(), 
     this.isMostHelpful = false,
-    this.createdAt, // Added
+    this.createdAt, 
   });
 
-  // Factory constructor to create a ChatMessage from a Firestore Document
   factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return ChatMessage(
@@ -42,32 +61,26 @@ class ChatMessage {
       sender: data['sender'] ?? 'Anonymous',
       message: data['message'] ?? 'No message',
       route: data['route'] ?? 'Unknown Route',
-      // In a real app, 'timeAgo' should be calculated from 'createdAt'
       timeAgo: data['timeAgo'] ?? 'N/A', 
       imageUrl: data['imageUrl'] ?? 'https://placehold.co/50x50/cccccc/000000?text=User',
       likes: data['likes'] ?? 0,
       dislikes: data['dislikes'] ?? 0,
-      isLiked: data['isLiked'] ?? false,
-      isDisliked: data['isDisliked'] ?? false,
       isMostHelpful: data['isMostHelpful'] ?? false,
       createdAt: data['createdAt'] as Timestamp?,
     );
   }
 
-  // Method to convert ChatMessage to a format ready for Firestore upload
   Map<String, dynamic> toFirestore() {
     return {
       'sender': sender,
       'message': message,
       'route': route,
-      'timeAgo': 'Just now', // Placeholder value
+      'timeAgo': 'Just now', 
       'imageUrl': imageUrl,
-      'likes': 0, // Always start new posts at 0
+      'likes': 0, 
       'dislikes': 0,
-      'isLiked': false,
-      'isDisliked': false,
       'isMostHelpful': false,
-      'createdAt': FieldValue.serverTimestamp(), // Firestore sets the timestamp
+      'createdAt': FieldValue.serverTimestamp(), 
     };
   }
 }
@@ -75,11 +88,17 @@ class ChatMessage {
 class CommentingSection extends StatefulWidget {
   final ValueSetter<bool>? onExpansionChanged;
   final List<ChatMessage> chatMessages; 
+  final String? currentUserId; 
+  
+  // Initialize lazily to avoid the constructor error, or just use the field directly
+  final FirebaseFirestore firestore = FirebaseFirestore.instance; 
 
-  const CommentingSection({
+  // FIX: Removed 'const' keyword here!
+  CommentingSection({
     super.key,
     this.onExpansionChanged,
     required this.chatMessages,
+    this.currentUserId, 
   });
 
   @override
@@ -93,10 +112,51 @@ class _CommentingSectionState extends State<CommentingSection> {
   bool _isSheetFullyExpanded = false;
   String _selectedFilter = 'All';
 
+  Map<String, UserInteraction> _userInteractions = {};
+
   @override
   void initState() {
     super.initState();
     _sheetController.addListener(_handleExpansionChange);
+    if (widget.currentUserId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchUserInteractions();
+      });
+    }
+  }
+
+  void _fetchUserInteractions() async {
+    if (widget.currentUserId == null || widget.chatMessages.isEmpty || !mounted) return;
+
+    final messagesWithIds = widget.chatMessages.where((msg) => msg.id != null).map((msg) => msg.id!).toSet();
+    if (messagesWithIds.isEmpty) return;
+
+    final newInteractions = <String, UserInteraction>{};
+
+    for (final messageId in messagesWithIds) {
+      try {
+        final doc = await widget.firestore
+            .collection('public_data')
+            .doc('zapac_community')
+            .collection('comments')
+            .doc(messageId)
+            .collection('votes')
+            .doc(widget.currentUserId!)
+            .get();
+        
+        if (doc.exists) {
+          newInteractions[messageId] = UserInteraction.fromFirestore(doc);
+        }
+      } catch (e) {
+        print("Error fetching interaction for $messageId: $e");
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _userInteractions = newInteractions;
+      });
+    }
   }
 
   void _handleExpansionChange() {
@@ -112,82 +172,122 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
   @override
+  void didUpdateWidget(covariant CommentingSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.chatMessages.length != oldWidget.chatMessages.length || widget.currentUserId != oldWidget.currentUserId) {
+      _fetchUserInteractions();
+    }
+  }
+
+  @override
   void dispose() {
     _sheetController.dispose();
     _commentController.dispose();
     super.dispose();
   }
 
-  void _toggleLike(int index) {
-    if (mounted) {
-      setState(() {
-        final message = _filteredMessages[index];
-        message.isLiked = !message.isLiked;
-        message.likes += message.isLiked ? 1 : -1;
-        if (message.isLiked && message.isDisliked) {
-          message.isDisliked = false;
-          message.dislikes -= 1;
-        }
-        // TODO: Implement Firestore update for likes/dislikes
-      });
+  Future<void> _handleVote(ChatMessage message, bool isLiking) async {
+    if (widget.currentUserId == null || message.id == null || !mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to vote.'), backgroundColor: Colors.red),
+      );
+      return;
     }
-  }
-
-  void _toggleDislike(int index) {
-    if (mounted) {
-      setState(() {
-        final message = _filteredMessages[index];
-        message.isDisliked = !message.isDisliked;
-        message.dislikes += message.isDisliked ? 1 : -1;
-        if (message.isDisliked && message.isLiked) {
-          message.isLiked = false;
-          message.likes -= 1;
-        }
-        // TODO: Implement Firestore update for likes/dislikes
-      });
-    }
-  }
-
-  List<ChatMessage> get _filteredMessages {
-    if (_selectedFilter == 'All') {
-      return widget.chatMessages;
-    }
-
-    final filterLower = _selectedFilter.toLowerCase();
     
-    return widget.chatMessages.where((message) {
-      final messageLower = message.message.toLowerCase();
+    final messageId = message.id!;
+    final userId = widget.currentUserId!;
 
-      switch (filterLower) {
-        case 'warning':
-          return messageLower.contains('traffic') ||
-                 messageLower.contains('danger') ||
-                 messageLower.contains('kuyaw') || 
-                 messageLower.contains('beware');
-        case 'shortcuts':
-          return messageLower.contains('shortcut') ||
-                 messageLower.contains('cut through') ||
-                 messageLower.contains('faster route');
-        case 'fare tips':
-          return messageLower.contains('plete') || 
-                 messageLower.contains('fare') ||
-                 messageLower.contains('pesos');
-        case 'driver reviews':
-          return messageLower.contains('driver') ||
-                 messageLower.contains('kuya driver');
-        default:
-          return true;
+    final messageRef = widget.firestore
+        .collection('public_data')
+        .doc('zapac_community')
+        .collection('comments')
+        .doc(messageId);
+        
+    final voteRef = messageRef.collection('votes').doc(userId);
+    
+    final currentInteraction = _userInteractions[messageId] ?? const UserInteraction();
+    
+    int likeChange = 0;
+    int dislikeChange = 0;
+    bool newIsLiked = currentInteraction.isLiked;
+    bool newIsDisliked = currentInteraction.isDisliked;
+
+    if (isLiking) {
+      if (currentInteraction.isLiked) { 
+        likeChange = -1;
+        newIsLiked = false;
+      } else { 
+        likeChange = 1;
+        newIsLiked = true;
+        if (currentInteraction.isDisliked) { 
+          dislikeChange = -1;
+          newIsDisliked = false;
+        }
       }
-    }).toList();
+    } else { 
+      if (currentInteraction.isDisliked) { 
+        dislikeChange = -1;
+        newIsDisliked = false;
+      } else { 
+        dislikeChange = 1;
+        newIsDisliked = true;
+        if (currentInteraction.isLiked) { 
+          likeChange = -1;
+          newIsLiked = false;
+        }
+      }
+    }
+    
+    final batch = widget.firestore.batch();
+    
+    // 1. Update the global counters atomically
+    if (likeChange != 0 || dislikeChange != 0) {
+      batch.update(messageRef, {
+        'likes': FieldValue.increment(likeChange),
+        'dislikes': FieldValue.increment(dislikeChange),
+      });
+    }
+
+    // 2. Set the user's vote status
+    batch.set(voteRef, {
+      'isLiked': newIsLiked,
+      'isDisliked': newIsDisliked,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+
+    try {
+      await batch.commit();
+      
+      // 3. OPTIMISTIC UI UPDATE
+      if (mounted) {
+        setState(() {
+          _userInteractions[messageId] = UserInteraction(
+            isLiked: newIsLiked, 
+            isDisliked: newIsDisliked
+          );
+        });
+      }
+      
+    } catch (e) {
+      print("Error committing vote: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update vote. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
-  Widget _buildInsightCard(ChatMessage message, int index) {
+
+  Widget _buildInsightCard(ChatMessage message) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     
     const iconSize = 20.0;
     final dividerColor = Theme.of(context).dividerColor;
     
+    final interaction = _userInteractions[message.id] ?? message.userInteraction;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
@@ -274,17 +374,17 @@ class _CommentingSectionState extends State<CommentingSection> {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: () => _toggleLike(index),
+                  onTap: () => _handleVote(message, true), // Handle Like
                   child: Row(
                     children: [
                       Icon(
-                        message.isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
-                        color: message.isLiked ? Colors.blue : dividerColor,
+                        interaction.isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
+                        color: interaction.isLiked ? Colors.blue : dividerColor,
                         size: iconSize,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        message.likes.toString(),
+                        message.likes.toString(), // Display global count from Firestore
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
                       ),
                     ],
@@ -292,17 +392,17 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
                 const SizedBox(width: 24),
                 InkWell(
-                  onTap: () => _toggleDislike(index),
+                  onTap: () => _handleVote(message, false), // Handle Dislike
                   child: Row(
                     children: [
                       Icon(
-                        message.isDisliked ? Icons.thumb_down : Icons.thumb_down_alt_outlined,
-                        color: message.isDisliked ? Colors.red : dividerColor,
+                        interaction.isDisliked ? Icons.thumb_down : Icons.thumb_down_alt_outlined,
+                        color: interaction.isDisliked ? Colors.red : dividerColor,
                         size: iconSize,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        message.dislikes.toString(),
+                        message.dislikes.toString(), // Display global count from Firestore
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
                       ),
                     ],
@@ -350,7 +450,57 @@ class _CommentingSectionState extends State<CommentingSection> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final List<ChatMessage> currentMessages = _filteredMessages; 
+    
+    // Inject the fetched user interaction state into the message objects for rendering
+    final List<ChatMessage> currentMessages = widget.chatMessages.map((msg) {
+        if (msg.id != null && _userInteractions.containsKey(msg.id)) {
+          // Return a new ChatMessage instance with the user's interaction status injected
+          return ChatMessage(
+            id: msg.id,
+            sender: msg.sender,
+            message: msg.message,
+            route: msg.route,
+            timeAgo: msg.timeAgo,
+            imageUrl: msg.imageUrl,
+            likes: msg.likes,
+            dislikes: msg.dislikes,
+            isMostHelpful: msg.isMostHelpful,
+            createdAt: msg.createdAt,
+            userInteraction: _userInteractions[msg.id]!,
+          );
+        }
+        return msg;
+    }).toList(); 
+
+    // Filter messages after injecting user interaction state
+    final filteredMessages = currentMessages.where((message) {
+      if (_selectedFilter == 'All') return true;
+
+      final filterLower = _selectedFilter.toLowerCase();
+      final messageLower = message.message.toLowerCase();
+
+      switch (filterLower) {
+        case 'warning':
+          return messageLower.contains('traffic') ||
+                 messageLower.contains('danger') ||
+                 messageLower.contains('kuyaw') || 
+                 messageLower.contains('beware');
+        case 'shortcuts':
+          return messageLower.contains('shortcut') ||
+                 messageLower.contains('cut through') ||
+                 messageLower.contains('faster route');
+        case 'fare tips':
+          return messageLower.contains('plete') || 
+                 messageLower.contains('fare') ||
+                 messageLower.contains('pesos');
+        case 'driver reviews':
+          return messageLower.contains('driver') ||
+                 messageLower.contains('kuya driver');
+        default:
+          return true;
+      }
+    }).toList();
+
 
     return DraggableScrollableSheet(
       controller: _sheetController,
@@ -435,9 +585,9 @@ class _CommentingSectionState extends State<CommentingSection> {
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,
-                  itemCount: currentMessages.length,
+                  itemCount: filteredMessages.length,
                   itemBuilder: (context, index) {
-                    return _buildInsightCard(currentMessages[index], index);
+                    return _buildInsightCard(filteredMessages[index]); // Pass the updated message
                   },
                 ),
               ),

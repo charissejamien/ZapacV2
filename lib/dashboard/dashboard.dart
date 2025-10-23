@@ -12,6 +12,7 @@ import '../core/widgets/searchBar.dart';
 import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart';
+import 'dart:io' show Platform;
 
 // Placeholder for ChatMessage model (re-exported from communityInsights)
 import 'community_insights_page.dart' show ChatMessage;
@@ -71,8 +72,15 @@ class _DashboardState extends State<Dashboard> {
   StreamSubscription? _chatSubscription;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
   
-  // Defined API Key as a constant for easy management
-  static const String _mapApiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; // Placeholder/Example Key
+// Defined API Key as a constant for easy management
+  String _getMapApiKey() {
+    if (Platform.isIOS) {
+      // This key MUST match the one in AppDelegate.swift
+      return "AIzaSyCWHublkXuYaWfT68qUwGY3o5L9NB82JA8";
+    }
+    // Default to Android for all other platforms (Android/Web/Desktop)
+    return "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
+  }
 
   @override
   void initState() {
@@ -199,7 +207,7 @@ class _DashboardState extends State<Dashboard> {
     
     await MapUtils.showRoute(
       item: item,
-      apiKey: _mapApiKey, 
+      apiKey: _getMapApiKey(), 
       markers: _markers,
       polylines: _polylines,
       mapController: _mapController,

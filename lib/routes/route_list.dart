@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 class RouteListPage extends StatefulWidget {
-  // ...existing code...
   final Map<String, dynamic>? destination;
-  final Map<String, dynamic>? origin; // optional, if you want to pass origin too
+  final Map<String, dynamic>? origin;
 
   const RouteListPage({Key? key, this.destination, this.origin}) : super(key: key);
 
@@ -12,7 +11,7 @@ class RouteListPage extends StatefulWidget {
 }
 
 class _RouteListPageState extends State<RouteListPage> {
-  // sample model
+  // sample model - replace with real route data when available
   final List<RouteOption> options = List.generate(
     5,
     (i) => RouteOption(
@@ -27,6 +26,13 @@ class _RouteListPageState extends State<RouteListPage> {
   SortBy _sortBy = SortBy.time;
 
   @override
+  void initState() {
+    super.initState();
+    // debug: remove in production
+    // print('RouteListPage destination: ${widget.destination}');
+  }
+
+  @override
   Widget build(BuildContext context) {
     final destLabel = widget.destination != null
         ? (widget.destination!['description'] ?? widget.destination!['name'] ?? 'Destination')
@@ -37,7 +43,7 @@ class _RouteListPageState extends State<RouteListPage> {
         : 'Filinvest Cyberzone Cebu Tower one';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF3C3F42), // dark outer area like screenshot
+      backgroundColor: const Color(0xFF3C3F42),
       body: SafeArea(
         child: Column(
           children: [
@@ -57,19 +63,16 @@ class _RouteListPageState extends State<RouteListPage> {
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
-                  // use passed labels
-                  _HeaderChips(
-                    originLabel: originLabel,
-                    destLabel: destLabel,
-                  ),
+                  _HeaderChips(originLabel: originLabel, destLabel: destLabel),
                   const SizedBox(height: 12),
                   _SortRow(
                     sortBy: _sortBy,
                     onChanged: (s) => setState(() => _sortBy = s),
                   ),
                   const SizedBox(height: 8),
+                  // route list area
                   SizedBox(
-                    height: 420, // limit area for list in the white card
+                    height: MediaQuery.of(context).size.height * 0.60,
                     child: ListView.separated(
                       itemCount: options.length,
                       separatorBuilder: (_, __) => const Divider(height: 1),
@@ -82,9 +85,12 @@ class _RouteListPageState extends State<RouteListPage> {
                 ],
               ),
             ),
+            // optional: a small spacer so content doesn't touch bottom of screen
+            const SizedBox(height: 8),
           ],
         ),
       ),
+      // NOTE: do not include bottomNavigationBar here — you said you have a shared component
     );
   }
 }
@@ -163,7 +169,7 @@ class RouteOption {
   final String arrive;
   final int durationMinutes;
   final int totalFare;
-  final List<String> legs; // simple labels like 'walk','jeep','bus'
+  final List<String> legs;
 
   RouteOption({
     required this.depart,
@@ -182,7 +188,7 @@ class _RouteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        // navigate to details or do action
+        // TODO: navigate to route details
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
@@ -204,7 +210,7 @@ class _RouteCard extends StatelessWidget {
                     children: [
                       for (var leg in option.legs) ...[
                         _iconForLeg(leg),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                       ],
                     ],
                   ),
@@ -216,8 +222,7 @@ class _RouteCard extends StatelessWidget {
               children: [
                 Text(
                   '${option.durationMinutes} mins',
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 6),
                 Text('Total Fare: ${option.totalFare} php',

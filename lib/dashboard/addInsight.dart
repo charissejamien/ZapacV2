@@ -3,6 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'community_insights_page.dart' show ChatMessage;
 
+// Utility function to capitalize the first letter of a string
+String capitalizeFirstLetter(String s) {
+  if (s.isEmpty) {
+    return s;
+  }
+  return s[0].toUpperCase() + s.substring(1);
+}
+
 void showAddInsightModal({
   required BuildContext context,
   required ValueSetter<ChatMessage> onInsightAdded,
@@ -20,10 +28,7 @@ void showAddInsightModal({
 
   final senderName = currentUser.displayName ?? currentUser.email?.split('@').first ?? 'Current User';
   final profileUrl = currentUser.photoURL ?? 'https://cdn-icons-png.flaticon.com/512/100/100913.png';
-  
-  // FIX: These controllers are now initialized INSIDE the builder
-  // and will be disposed of when the modal's internal State is disposed.
-  // We no longer need the explicit dispose in .whenComplete().
+  final senderUid = currentUser.uid;
   
   showModalBottomSheet(
     context: context,
@@ -33,8 +38,7 @@ void showAddInsightModal({
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (ctx) { 
-      // CRITICAL FIX: Define controllers inside the builder (or a StateFulBuilder)
-      // so their lifecycle is tied to the internal modal state.
+      // CRITICAL FIX: Define controllers inside the builder 
       final TextEditingController insightController = TextEditingController();
       final TextEditingController routeController   = TextEditingController();
       
@@ -116,8 +120,8 @@ void showAddInsightModal({
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () async {
-                  final text = insightController.text.trim();
-                  final route = routeController.text.trim();
+                  String text = insightController.text.trim();
+                  String route = routeController.text.trim();
                   
                   if (text.isEmpty || route.isEmpty) {
                     // Validation Feedback
@@ -127,20 +131,46 @@ void showAddInsightModal({
                     return;
                   }
                   
+                  // Apply capitalization for insight and route as requested
+                  text = capitalizeFirstLetter(text);
+                  route = capitalizeFirstLetter(route);
+                  
                   final newInsight = ChatMessage(
                     sender: senderName,
                     message: '“$text”',
                     route: route,
                     imageUrl: profileUrl,
+                    senderUid: senderUid, // SAVE THE UID
                   );
 
                   // 1. CRITICAL: POP MODAL IMMEDIATELY
-                  // Solves: _dependents.isEmpty assertion failure
                   if (ctx.mounted) {
                       Navigator.pop(ctx); 
                   } else {
                       return; 
                   }
+                  
+                  // --- Loading Overlay Implementation ---
+                  final loadingContext = context; 
+                  
+                  // Show the full-screen loading overlay in the parent context
+                  showGeneralDialog(
+                      context: loadingContext,
+                      barrierDismissible: false,
+                      transitionDuration: const Duration(milliseconds: 150),
+                      // Faded black overlay
+                      barrierColor: Colors.black.withOpacity(0.7),
+                      pageBuilder: (context, a1, a2) {
+                          return Center(
+                              child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
+                                  backgroundColor: Theme.of(context).colorScheme.primary,
+                              ),
+                          );
+                      },
+                  );
+                  // ------------------------------------------
+
 
                   // 2. Perform ASYNC WRITE in the background.
                   try {
@@ -150,18 +180,22 @@ void showAddInsightModal({
                         .collection('comments')
                         .add(newInsight.toFirestore());
 
+                      // Success: Hide the loading overlay
+                      if (loadingContext.mounted) {
+                          Navigator.of(loadingContext).pop();
+                      }
+
                       // 3. Call callback after successful post
                       onInsightAdded(newInsight); 
                       
-                      // Show success message using the stable parent context (`context`)
-                      if (context.mounted) { 
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Insight posted successfully!'), backgroundColor: Color(0xFF6CA89A)),
-                          );
-                      }
-
                   } catch (e) {
                        print('Failed to post insight to Firestore: $e');
+                       
+                       // Error: Hide the loading overlay before showing the error SnackBar
+                       if (loadingContext.mounted) {
+                           Navigator.of(loadingContext).pop();
+                       }
+
                        // Show failure message using the stable parent context
                        if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(

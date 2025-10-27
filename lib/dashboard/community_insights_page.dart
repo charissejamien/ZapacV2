@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
-import 'package:firebase_auth/firebase_auth.dart'; 
 
-// 1. TIME AGO UTILITY FUNCTION
 String timeAgoSinceDate(Timestamp? timestamp) {
   // Handles null timestamps from samples or delayed Firebase writes
   if (timestamp == null) {
@@ -16,20 +14,23 @@ String timeAgoSinceDate(Timestamp? timestamp) {
   if (diff.inSeconds < 60) {
     return 'Just now';
   } else if (diff.inMinutes < 60) {
-    return '${diff.inMinutes} mins ago';
+    final minutes = diff.inMinutes;
+    return '$minutes min${minutes == 1 ? '' : 's'} ago';
   } else if (diff.inHours < 24) {
-    return '${diff.inHours} hours ago';
+    final hours = diff.inHours;
+    return '$hours hour${hours == 1 ? '' : 's'} ago';
   } else if (diff.inDays < 7) {
-    return '${diff.inDays} days ago';
+    final days = diff.inDays;
+    return '$days day${days == 1 ? '' : 's'} ago';
   } else if (diff.inDays < 30) {
     final weeks = (diff.inDays / 7).floor();
-    return '$weeks weeks ago';
+    return '$weeks week${weeks == 1 ? '' : 's'} ago';
   } else if (diff.inDays < 365) {
     final months = (diff.inDays / 30).floor();
-    return '$months months ago';
+    return '$months month${months == 1 ? '' : 's'} ago';
   } else {
     final years = (diff.inDays / 365).floor();
-    return '$years years ago';
+    return '$years year${years == 1 ? '' : 's'} ago';
   }
 }
 
@@ -59,8 +60,8 @@ class ChatMessage {
   final String sender;
   final String message;
   final String route;
-  // Removed timeAgo
   final String imageUrl;
+  final String? senderUid; // <-- RETAINED FOR SECURITY/DELETE/REPORTING
   int likes;
   int dislikes;
   
@@ -76,6 +77,7 @@ class ChatMessage {
     required this.message,
     required this.route,
     required this.imageUrl,
+    this.senderUid, // <-- RETAINED
     this.likes = 0,
     this.dislikes = 0,
     this.userInteraction = const UserInteraction(), 
@@ -91,6 +93,7 @@ class ChatMessage {
       message: data['message'] ?? 'No message',
       route: data['route'] ?? 'Unknown Route',
       imageUrl: data['imageUrl'] ?? 'https://placehold.co/50x50/cccccc/000000?text=User',
+      senderUid: data['senderUid'] as String?, // <-- RETAINED
       likes: data['likes'] ?? 0,
       dislikes: data['dislikes'] ?? 0,
       isMostHelpful: data['isMostHelpful'] ?? false,
@@ -104,6 +107,7 @@ class ChatMessage {
       'message': message,
       'route': route,
       'imageUrl': imageUrl,
+      'senderUid': senderUid, // <-- RETAINED
       'likes': 0, 
       'dislikes': 0,
       'isMostHelpful': false,
@@ -303,6 +307,203 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
     }
   }
+  
+  // Function to handle reporting a message (with modal confirmation)
+  Future<void> _handleReport(ChatMessage message) async {
+    if (widget.currentUserId == null || message.id == null || !mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to report a comment.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final messageId = message.id!;
+    final userId = widget.currentUserId!;
+
+    // Reference to the specific report by the user on this comment
+    final reportRef = widget.firestore
+        .collection('public_data')
+        .doc('zapac_community')
+        .collection('comments')
+        .doc(messageId)
+        .collection('reports')
+        .doc(userId); // Use the user's ID to prevent duplicate reports
+
+    try {
+      // 1. Record the report
+      await reportRef.set({
+        'reporterUid': userId,
+        'timestamp': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      // 2. Atomically increment a 'reportCount' on the main comment document
+      final messageRef = widget.firestore
+          .collection('public_data')
+          .doc('zapac_community')
+          .collection('comments')
+          .doc(messageId);
+          
+      // Ensure 'reportCount' exists on the document or is created as 1
+      await messageRef.set({'reportCount': FieldValue.increment(1)}, SetOptions(merge: true));
+      
+      if (mounted) {
+        // Prominent Dialog for success confirmation
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.background,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              // Reduced bottom padding of the content section
+              contentPadding: const EdgeInsets.only(top: 20, left: 24, right: 24, bottom: 8), 
+              // Reduced padding around the actions section
+              actionsPadding: const EdgeInsets.only(right: 15, bottom: 5), 
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.orange,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Comment Reported',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onBackground,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'We will review this insight shortly.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('OK', style: TextStyle(color: Colors.blue)),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      print("Error reporting message $messageId: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to report comment. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+
+  // Function to handle message deletion
+  Future<void> _deleteMessage(ChatMessage message) async {
+    // SECURE AUTHORIZATION CHECK
+    if (widget.currentUserId == null || message.senderUid == null || message.id == null || !mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot delete: Missing user or message ID.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (widget.currentUserId != message.senderUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can only delete your own insights.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    
+    // 2. Confirmation Dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Deletion'),
+          // MODIFIED: Use custom contentPadding to reduce gap above buttons
+          contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 5.0),
+          content: const Text('Are you sure you want to delete this insight? This action cannot be undone.'),
+          // MODIFIED: Use custom actionsPadding to INCREASE gap below buttons
+          actionsPadding: const EdgeInsets.only(right: 15.0, bottom: 12.0),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    // --- Loading Overlay Implementation ---
+    final loadingContext = context; 
+    
+    // Show the full-screen loading overlay
+    showGeneralDialog(
+        context: loadingContext,
+        barrierDismissible: false,
+        transitionDuration: const Duration(milliseconds: 150),
+        // Faded black overlay
+        barrierColor: Colors.black.withOpacity(0.7),
+        pageBuilder: (context, a1, a2) {
+            return Center(
+                child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                ),
+            );
+        },
+    );
+    // ------------------------------------------
+
+    // 3. Perform Deletion
+    try {
+      final messageRef = widget.firestore
+          .collection('public_data')
+          .doc('zapac_community')
+          .collection('comments')
+          .doc(message.id!);
+
+      await messageRef.delete();
+      
+      // Success: Hide the loading overlay
+      if (loadingContext.mounted) {
+          Navigator.of(loadingContext).pop();
+      }
+
+    } catch (e) {
+      print("Error deleting message ${message.id}: $e");
+      
+      // Error: Hide the loading overlay before showing the error SnackBar
+      if (loadingContext.mounted) {
+          Navigator.of(loadingContext).pop();
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete insight.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
 
   Widget _buildInsightCard(ChatMessage message) {
@@ -316,6 +517,13 @@ class _CommentingSectionState extends State<CommentingSection> {
     
     // NEW: Calculate time ago dynamically
     final timeDisplay = timeAgoSinceDate(message.createdAt);
+    
+    // SECURE AUTHORIZATION CHECK: Check if the logged-in user's UID matches the message's saved UID
+    final bool isCurrentUserSender = 
+        widget.currentUserId != null && 
+        message.senderUid != null &&
+        widget.currentUserId == message.senderUid;
+
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -361,13 +569,30 @@ class _CommentingSectionState extends State<CommentingSection> {
                               ),
                             ),
                           ),
-                        GestureDetector(
-                          onTapDown: (details) async {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Menu functionality (Report/Delete) is active.')),
-                            );
+                        // REPLACED: GestureDetector with PopupMenuButton
+                        PopupMenuButton<String>(
+                          onSelected: (String result) {
+                            if (result == 'delete' && message.id != null) {
+                              _deleteMessage(message);
+                            } else if (result == 'report' && message.id != null) {
+                                // MODIFIED: Call the new report handler
+                                _handleReport(message);
+                            }
                           },
-                          child: Icon(
+                          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                            // Allow all users to report
+                            const PopupMenuItem<String>(
+                              value: 'report',
+                              child: Text('Report'),
+                            ),
+                            // Only show Delete if the current user is the sender
+                            if (isCurrentUserSender)
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Text('Delete', style: TextStyle(color: Colors.red)),
+                              ),
+                          ],
+                          icon: Icon(
                             Icons.more_horiz,
                             color: dividerColor,
                           ),
@@ -490,6 +715,7 @@ class _CommentingSectionState extends State<CommentingSection> {
             message: msg.message,
             route: msg.route,
             imageUrl: msg.imageUrl,
+            senderUid: msg.senderUid, 
             likes: msg.likes,
             dislikes: msg.dislikes,
             isMostHelpful: msg.isMostHelpful,
@@ -504,29 +730,66 @@ class _CommentingSectionState extends State<CommentingSection> {
     final filteredMessages = currentMessages.where((message) {
       if (_selectedFilter == 'All') return true;
 
-      final filterLower = _selectedFilter.toLowerCase();
       final messageLower = message.message.toLowerCase();
 
-      switch (filterLower) {
-        case 'warning':
+      // START NEW FILTERING LOGIC
+      switch (_selectedFilter) {
+        case 'Warning':
           return messageLower.contains('traffic') ||
+                 messageLower.contains('accident') ||
                  messageLower.contains('danger') ||
-                 messageLower.contains('kuyaw') || 
-                 messageLower.contains('beware');
-        case 'shortcuts':
+                 messageLower.contains('slow') ||
+                 messageLower.contains('kuyaw') ||
+                 messageLower.contains('trapik') ||
+                 messageLower.contains('aksidente') ||
+                 messageLower.contains('hinay') ||
+                 messageLower.contains('slide') ||
+                 messageLower.contains('slippery') ||
+                 messageLower.contains('baha') ||
+                 messageLower.contains('flood') ||
+                 messageLower.contains('landslide') ||
+                 messageLower.contains('atang') ||
+                 messageLower.contains('kidnap') ||
+                 messageLower.contains('holdup') ||
+                 messageLower.contains('tulis') ||
+                 messageLower.contains('manulis') ||
+                 messageLower.contains('ngitngit') ||
+                 messageLower.contains('dark') ||
+                 messageLower.contains('snatch') ||
+                 messageLower.contains('hole') ||
+                 messageLower.contains('buslot') ||
+                 messageLower.contains('lubak') ||
+                 messageLower.contains('bangga');
+                 
+        case 'Shortcuts':
           return messageLower.contains('shortcut') ||
-                 messageLower.contains('cut through') ||
-                 messageLower.contains('faster route');
-        case 'fare tips':
-          return messageLower.contains('plete') || 
-                 messageLower.contains('fare') ||
-                 messageLower.contains('pesos');
-        case 'driver reviews':
+                 messageLower.contains('faster') ||
+                 messageLower.contains('route') ||
+                 messageLower.contains('quick') ||
+                 messageLower.contains('lusot') ||
+                 messageLower.contains('dali');
+                 
+        case 'Fare Tips':
+          return messageLower.contains('fare') ||
+                 messageLower.contains('price') ||
+                 messageLower.contains('cost') ||
+                 messageLower.contains('plete') ||
+                 messageLower.contains('sukli') ||
+                 messageLower.contains('tagpila') ||
+                 messageLower.contains('bayad');
+                 
+        case 'Driver Reviews':
           return messageLower.contains('driver') ||
-                 messageLower.contains('kuya driver');
+                 messageLower.contains('reckless') ||
+                 messageLower.contains('rude') ||
+                 messageLower.contains('kind') ||
+                 messageLower.contains('buotan') ||
+                 messageLower.contains('barato');
+                 
         default:
           return true;
       }
+      // END NEW FILTERING LOGIC
     }).toList();
 
 

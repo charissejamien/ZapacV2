@@ -14,47 +14,7 @@ import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart';
 import 'dart:io' show Platform;
-
-// Placeholder for ChatMessage model (re-exported from communityInsights)
 import 'community_insights_page.dart' show ChatMessage;
-
-// Sample data definition (UPDATED: Using createdAt Timestamp instead of timeAgo)
-final List<ChatMessage> _initialSampleMessages = [
-  ChatMessage(
-    sender: 'Zole Laverne',
-    message: '"Ig 6PM juseyo, expect traffic sa Escariomida..."',
-    route: 'Escario',
-    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=500&fit=crop',
-    likes: 15,
-    isMostHelpful: true,
-    id: 'sample_1', 
-    // Calculate a Timestamp representing 2 days ago
-    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))), 
-  ),
-  ChatMessage(
-    sender: 'Kyline Alcantara', 
-    message: '"Kuyaw kaaio sa Carbon..."', 
-    route: 'Carbon', 
-    imageUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop', 
-    likes: 22, 
-    dislikes: 2,
-    id: 'sample_2',
-    // Calculate a Timestamp representing 9 days ago
-    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 9))),
-  ),
-  ChatMessage(
-    sender: 'Adopted Brother ni Mikha Lim', 
-    message: '"Ang plete kai tag 12 pesos..."', 
-    route: 'Lahug – Carbon', 
-    imageUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&h=500&fit=crop', 
-    likes: 5,
-    id: 'sample_3',
-    // Calculate a Timestamp representing 5 minutes ago
-    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(minutes: 5))), 
-  ),
-];
-
-
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
@@ -153,16 +113,6 @@ class _DashboardState extends State<Dashboard> {
       }).toList();
 
       List<ChatMessage> combinedMessages = [];
-      
-      // Filter out duplicate sample messages from being shown if a real message matches
-      List<ChatMessage> filteredSampleMessages = _initialSampleMessages.where((sample) {
-          return !fetchedMessages.any((fetched) => 
-            fetched.sender == sample.sender && 
-            fetched.message == sample.message
-          );
-      }).toList();
-      
-      combinedMessages.addAll(filteredSampleMessages);
       combinedMessages.addAll(fetchedMessages);
       
       // Sort combined list by createdAt timestamp

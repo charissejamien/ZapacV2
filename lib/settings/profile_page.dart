@@ -7,6 +7,7 @@ import 'package:zapac/dashboard/dashboard.dart';
 import 'package:zapac/authentication/login_page.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // REQUIRED
 
 const Color accentYellow = Color(0xFFF4BE6C);
 const Color accentGreen = Color(0xFF6CA89A);
@@ -72,6 +73,35 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isLoading = false);
   }
 
+  // REINFORCED: Function to update profile picture and name across all user comments
+  Future<void> _updateUserComments({required String newDisplayName, required String newPhotoUrl}) async {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser?.uid == null) return;
+
+      final firestore = FirebaseFirestore.instance;
+      final batch = firestore.batch();
+      
+      // Query for all comments made by the current user
+      final querySnapshot = await firestore
+          .collection('public_data') 
+          .doc('zapac_community')
+          .collection('comments')
+          .where('senderUid', isEqualTo: currentUser!.uid)
+          .get();
+
+      for (var doc in querySnapshot.docs) {
+        batch.update(doc.reference, {
+          'imageUrl': newPhotoUrl, // This will be the Firebase URL or an empty string ('')
+          'sender': newDisplayName, 
+        });
+      }
+
+      // Commit all updates
+      await batch.commit();
+      print("Firestore Batch Update complete. ${querySnapshot.docs.length} comments updated.");
+  }
+
+
   Future<void> _showEditFullNameSheet(BuildContext context, ColorScheme colorScheme) async {
     if (_currentUser == null) return;
 
@@ -134,11 +164,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
                               await _currentUser!.reload();
                               _loadUserData();
+                              
+                              // CRITICAL: Call batch update here for photo and name sync
+                              // We use the photoURL from Firebase, which is the source for networked images, 
+                              // or empty string if null, which is the signal for initials avatar.
+                              await _updateUserComments(
+                                  newDisplayName: newName, 
+                                  newPhotoUrl: _currentUser!.photoURL ?? ''
+                              ); 
+
                               if (context.mounted) {
                                 setState(() {});
                                 Navigator.of(sheetCtx).pop(newName);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Name updated successfully!'), backgroundColor: accentGreen),
+                                  const SnackBar(content: Text('Name and comments updated successfully!'), backgroundColor: accentGreen),
                                 );
                               }
                           } catch (e) {
@@ -193,7 +232,7 @@ class _ProfilePageState extends State<ProfilePage> {
         child: _buildBody(colorScheme)
       ),
       bottomNavigationBar: BottomNavBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: 2,
         onItemTapped: _onItemTapped,
       ),
     );
@@ -236,13 +275,18 @@ class _ProfilePageState extends State<ProfilePage> {
     ImageProvider? avatarImage;
     Widget avatarChild;
 
+    // 1. Check local file path
     if (_profileImageFile != null) {
         avatarImage = FileImage(_profileImageFile!);
         avatarChild = const SizedBox.expand();
-    } else if (_currentUser?.photoURL?.isNotEmpty == true) {
+    } 
+    // 2. Check Firebase/Network URL
+    else if (_currentUser?.photoURL?.isNotEmpty == true) {
         avatarImage = NetworkImage(_currentUser!.photoURL!);
         avatarChild = const SizedBox.expand();
-    } else {
+    } 
+    // 3. Fallback to Initials Avatar (First Letter)
+    else {
         avatarChild = Text(
             _initials,
             style: const TextStyle(
@@ -285,7 +329,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     backgroundColor: colorScheme.onPrimary.withOpacity(0.15),
                     child: CircleAvatar(
                       radius: 38,
-                      backgroundColor: avatarImage != null ? colorScheme.surface : primaryColor,
+                      // Set fallback color for initials avatar
+                      backgroundColor: avatarImage != null ? colorScheme.surface : primaryColor, 
                       backgroundImage: avatarImage,
                       child: avatarImage == null ? avatarChild : null,
                     ),
@@ -627,9 +672,21 @@ class _ProfilePageState extends State<ProfilePage> {
                       if (context.mounted) {
                         setState(() => _profileImageFile = file);
                         await prefs.setString('profile_pic_path', file.path);
+                        
+                        // CRITICAL: Call batch update here for photo sync
+                        // When a local file is used, the public facing imageUrl is the Firebase photoURL
+                        // which, if they just uploaded via Firebase auth, might be present.
+                        final currentUser = FirebaseAuth.instance.currentUser;
+                        if (currentUser != null) {
+                            await _updateUserComments(
+                                newDisplayName: _displayName,
+                                newPhotoUrl: currentUser.photoURL ?? ''
+                            );
+                        }
+
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: const Text('Profile photo updated'), backgroundColor: accentGreen),
+                          SnackBar(content: const Text('Profile photo and comments updated!'), backgroundColor: accentGreen),
                         );
                       }
                     }
@@ -667,12 +724,25 @@ class _ProfilePageState extends State<ProfilePage> {
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () async {
+                      // REMOVE LOCAL FILE PATH AND CLEAR UI STATE
                       setState(() => _profileImageFile = null);
                       await prefs.remove('profile_pic_path');
+                      
+                      // CRITICAL: Call batch update here for photo sync
+                      final currentUser = FirebaseAuth.instance.currentUser;
+                      if (currentUser != null) {
+                          // Pass empty string for photoURL to ensure the 'imageUrl' field in comments is set to '', 
+                          // triggering the initials avatar display on the dashboard.
+                          await _updateUserComments(
+                              newDisplayName: _displayName,
+                              newPhotoUrl: currentUser.photoURL ?? '' // Use Firebase URL if it exists, otherwise empty string
+                          );
+                      }
+                      
                       if (context.mounted) {
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: const Text('Profile photo removed'), backgroundColor: scheme.error),
+                          SnackBar(content: const Text('Profile photo and comments updated!'), backgroundColor: scheme.error),
                         );
                       }
                     },
@@ -788,7 +858,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     ...reasons.map((r) => RadioListTile<String>(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
-                          title: Text(r, style: TextStyle(fontSize: 13, color: colorScheme.onSurface)),
+                          title: Text(r, style: TextStyle(color: colorScheme.onSurface, fontSize: 13)),
                           value: r,
                           groupValue: reason,
                           onChanged: (v) {
@@ -957,7 +1027,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 onPrimary: Colors.white,
             ),
           ),
-          child: child!,
+          child: child!
         );
       },
     );

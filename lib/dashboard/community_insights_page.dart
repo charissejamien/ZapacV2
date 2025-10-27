@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
-import 'package:firebase_auth/firebase_auth.dart'; 
 
-// 1. TIME AGO UTILITY FUNCTION
 String timeAgoSinceDate(Timestamp? timestamp) {
-  // Handles null timestamps from samples or delayed Firebase writes
   if (timestamp == null) {
     return 'N/A'; 
   }
@@ -16,24 +13,26 @@ String timeAgoSinceDate(Timestamp? timestamp) {
   if (diff.inSeconds < 60) {
     return 'Just now';
   } else if (diff.inMinutes < 60) {
-    return '${diff.inMinutes} mins ago';
+    final minutes = diff.inMinutes;
+    return '$minutes min${minutes == 1 ? '' : 's'} ago';
   } else if (diff.inHours < 24) {
-    return '${diff.inHours} hours ago';
+    final hours = diff.inHours;
+    return '$hours hour${hours == 1 ? '' : 's'} ago';
   } else if (diff.inDays < 7) {
-    return '${diff.inDays} days ago';
+    final days = diff.inDays;
+    return '$days day${days == 1 ? '' : 's'} ago';
   } else if (diff.inDays < 30) {
     final weeks = (diff.inDays / 7).floor();
-    return '$weeks weeks ago';
+    return '$weeks week${weeks == 1 ? '' : 's'} ago';
   } else if (diff.inDays < 365) {
     final months = (diff.inDays / 30).floor();
-    return '$months months ago';
+    return '$months month${months == 1 ? '' : 's'} ago';
   } else {
     final years = (diff.inDays / 365).floor();
-    return '$years years ago';
+    return '$years year${years == 1 ? '' : 's'} ago';
   }
 }
 
-// --- UserInteraction Model (Constant) ---
 @immutable 
 class UserInteraction {
   final bool isLiked;
@@ -53,21 +52,19 @@ class UserInteraction {
   }
 }
 
-// --- ChatMessage Model ---
 class ChatMessage {
   final String? id; 
   final String sender;
   final String message;
   final String route;
-  // Removed timeAgo
   final String imageUrl;
+  final String? senderUid; 
   int likes;
   int dislikes;
   
   UserInteraction userInteraction; 
   
-  bool isMostHelpful;
-  
+  final bool isMostHelpful;
   final Timestamp? createdAt; 
 
   ChatMessage({
@@ -76,6 +73,7 @@ class ChatMessage {
     required this.message,
     required this.route,
     required this.imageUrl,
+    this.senderUid, 
     this.likes = 0,
     this.dislikes = 0,
     this.userInteraction = const UserInteraction(), 
@@ -90,7 +88,8 @@ class ChatMessage {
       sender: data['sender'] ?? 'Anonymous',
       message: data['message'] ?? 'No message',
       route: data['route'] ?? 'Unknown Route',
-      imageUrl: data['imageUrl'] ?? 'https://placehold.co/50x50/cccccc/000000?text=User',
+      imageUrl: data['imageUrl'] ?? '',
+      senderUid: data['senderUid'] as String?, 
       likes: data['likes'] ?? 0,
       dislikes: data['dislikes'] ?? 0,
       isMostHelpful: data['isMostHelpful'] ?? false,
@@ -104,6 +103,7 @@ class ChatMessage {
       'message': message,
       'route': route,
       'imageUrl': imageUrl,
+      'senderUid': senderUid, 
       'likes': 0, 
       'dislikes': 0,
       'isMostHelpful': false,
@@ -119,7 +119,6 @@ class CommentingSection extends StatefulWidget {
   
   final FirebaseFirestore firestore = FirebaseFirestore.instance; 
 
-  // FIX: Removed 'const' keyword
   CommentingSection({
     super.key,
     this.onExpansionChanged,
@@ -133,7 +132,6 @@ class CommentingSection extends StatefulWidget {
 
 class _CommentingSectionState extends State<CommentingSection> {
   final DraggableScrollableController _sheetController = DraggableScrollableController();
-  final TextEditingController _commentController = TextEditingController();
   
   bool _isSheetFullyExpanded = false;
   String _selectedFilter = 'All';
@@ -208,7 +206,6 @@ class _CommentingSectionState extends State<CommentingSection> {
   @override
   void dispose() {
     _sheetController.dispose();
-    _commentController.dispose();
     super.dispose();
   }
 
@@ -266,7 +263,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     
     final batch = widget.firestore.batch();
     
-    // 1. Update the global counters atomically
     if (likeChange != 0 || dislikeChange != 0) {
       batch.update(messageRef, {
         'likes': FieldValue.increment(likeChange),
@@ -274,7 +270,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       });
     }
 
-    // 2. Set the user's vote status
     batch.set(voteRef, {
       'isLiked': newIsLiked,
       'isDisliked': newIsDisliked,
@@ -284,7 +279,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     try {
       await batch.commit();
       
-      // 3. OPTIMISTIC UI UPDATE
       if (mounted) {
         setState(() {
           _userInteractions[messageId] = UserInteraction(
@@ -303,6 +297,183 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
     }
   }
+  
+  Future<void> _handleReport(ChatMessage message) async {
+    if (widget.currentUserId == null || message.id == null || !mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to report a comment.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final messageId = message.id!;
+    final userId = widget.currentUserId!;
+
+    final reportRef = widget.firestore
+        .collection('public_data')
+        .doc('zapac_community')
+        .collection('comments')
+        .doc(messageId)
+        .collection('reports')
+        .doc(userId);
+
+    try {
+      await reportRef.set({
+        'reporterUid': userId,
+        'timestamp': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      final messageRef = widget.firestore
+          .collection('public_data')
+          .doc('zapac_community')
+          .collection('comments')
+          .doc(messageId);
+          
+      await messageRef.set({'reportCount': FieldValue.increment(1)}, SetOptions(merge: true));
+      
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.background,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              contentPadding: const EdgeInsets.only(top: 20, left: 24, right: 24, bottom: 8), 
+              actionsPadding: const EdgeInsets.only(right: 15, bottom: 5), 
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.orange,
+                    size: 40,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Comment Reported',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Theme.of(context).colorScheme.onBackground,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    'We will review this insight shortly.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('OK', style: TextStyle(color: Colors.blue)),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      }
+    } catch (e) {
+      print("Error reporting message $messageId: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to report comment. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+
+  Future<void> _deleteMessage(ChatMessage message) async {
+    if (widget.currentUserId == null || message.senderUid == null || message.id == null || !mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot delete: Missing user or message ID.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (widget.currentUserId != message.senderUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can only delete your own insights.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Deletion'),
+          contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 5.0),
+          content: const Text('Are you sure you want to delete this insight? This action cannot be undone.'),
+          actionsPadding: const EdgeInsets.only(right: 15.0, bottom: 12.0),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final loadingContext = context; 
+    
+    showGeneralDialog(
+        context: loadingContext,
+        barrierDismissible: false,
+        transitionDuration: const Duration(milliseconds: 150),
+        barrierColor: Colors.black.withOpacity(0.7),
+        pageBuilder: (context, a1, a2) {
+            return Center(
+                child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).colorScheme.onPrimary),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                ),
+            );
+        },
+    );
+
+    try {
+      final messageRef = widget.firestore
+          .collection('public_data')
+          .doc('zapac_community')
+          .collection('comments')
+          .doc(message.id!);
+
+      await messageRef.delete();
+      
+      if (loadingContext.mounted) {
+          Navigator.of(loadingContext).pop();
+      }
+
+    } catch (e) {
+      print("Error deleting message ${message.id}: $e");
+      
+      if (loadingContext.mounted) {
+          Navigator.of(loadingContext).pop();
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete insight.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
 
   Widget _buildInsightCard(ChatMessage message) {
@@ -313,9 +484,16 @@ class _CommentingSectionState extends State<CommentingSection> {
     final dividerColor = Theme.of(context).dividerColor;
     
     final interaction = _userInteractions[message.id] ?? message.userInteraction;
-    
-    // NEW: Calculate time ago dynamically
     final timeDisplay = timeAgoSinceDate(message.createdAt);
+    
+    final bool isCurrentUserSender = 
+        widget.currentUserId != null && 
+        message.senderUid != null &&
+        widget.currentUserId == message.senderUid;
+
+    final bool hasImageUrl = message.imageUrl.isNotEmpty;
+    final String initials = message.sender.isNotEmpty ? message.sender[0].toUpperCase() : '?';
+
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
@@ -327,7 +505,16 @@ class _CommentingSectionState extends State<CommentingSection> {
             children: [
               CircleAvatar(
                 radius: 25,
-                backgroundImage: NetworkImage(message.imageUrl),
+                backgroundColor: hasImageUrl ? Colors.transparent : colorScheme.primary, 
+                backgroundImage: hasImageUrl
+                    ? NetworkImage(message.imageUrl) as ImageProvider<Object>?
+                    : null,
+                child: hasImageUrl
+                    ? null
+                    : Text(
+                        initials,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -361,13 +548,26 @@ class _CommentingSectionState extends State<CommentingSection> {
                               ),
                             ),
                           ),
-                        GestureDetector(
-                          onTapDown: (details) async {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Menu functionality (Report/Delete) is active.')),
-                            );
+                        PopupMenuButton<String>(
+                          onSelected: (String result) {
+                            if (result == 'delete' && message.id != null) {
+                              _deleteMessage(message);
+                            } else if (result == 'report' && message.id != null) {
+                                _handleReport(message);
+                            }
                           },
-                          child: Icon(
+                          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                            const PopupMenuItem<String>(
+                              value: 'report',
+                              child: Text('Report'),
+                            ),
+                            if (isCurrentUserSender)
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Text('Delete', style: TextStyle(color: Colors.red)),
+                              ),
+                          ],
+                          icon: Icon(
                             Icons.more_horiz,
                             color: dividerColor,
                           ),
@@ -383,7 +583,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // NEW: Display the calculated time
                     Text(
                       'Route: ${message.route}  |  $timeDisplay',
                       style: TextStyle(
@@ -397,14 +596,13 @@ class _CommentingSectionState extends State<CommentingSection> {
             ],
           ),
           const SizedBox(height: 12),
-          // Like/Dislike Buttons
           Padding(
             padding: const EdgeInsets.only(left: 61),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: () => _handleVote(message, true), // Handle Like
+                  onTap: () => _handleVote(message, true),
                   child: Row(
                     children: [
                       Icon(
@@ -414,7 +612,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        message.likes.toString(), // Display global count from Firestore
+                        message.likes.toString(),
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
                       ),
                     ],
@@ -422,7 +620,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
                 const SizedBox(width: 24),
                 InkWell(
-                  onTap: () => _handleVote(message, false), // Handle Dislike
+                  onTap: () => _handleVote(message, false),
                   child: Row(
                     children: [
                       Icon(
@@ -432,7 +630,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        message.dislikes.toString(), // Display global count from Firestore
+                        message.dislikes.toString(),
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
                       ),
                     ],
@@ -481,7 +679,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // Inject the fetched user interaction state into the message objects for rendering
     final List<ChatMessage> currentMessages = widget.chatMessages.map((msg) {
         if (msg.id != null && _userInteractions.containsKey(msg.id)) {
           return ChatMessage(
@@ -490,6 +687,7 @@ class _CommentingSectionState extends State<CommentingSection> {
             message: msg.message,
             route: msg.route,
             imageUrl: msg.imageUrl,
+            senderUid: msg.senderUid, 
             likes: msg.likes,
             dislikes: msg.dislikes,
             isMostHelpful: msg.isMostHelpful,
@@ -500,30 +698,64 @@ class _CommentingSectionState extends State<CommentingSection> {
         return msg;
     }).toList(); 
 
-    // Filter messages after injecting user interaction state
     final filteredMessages = currentMessages.where((message) {
       if (_selectedFilter == 'All') return true;
 
-      final filterLower = _selectedFilter.toLowerCase();
       final messageLower = message.message.toLowerCase();
 
-      switch (filterLower) {
-        case 'warning':
+      switch (_selectedFilter) {
+        case 'Warning':
           return messageLower.contains('traffic') ||
+                 messageLower.contains('accident') ||
                  messageLower.contains('danger') ||
-                 messageLower.contains('kuyaw') || 
-                 messageLower.contains('beware');
-        case 'shortcuts':
+                 messageLower.contains('slow') ||
+                 messageLower.contains('kuyaw') ||
+                 messageLower.contains('trapik') ||
+                 messageLower.contains('aksidente') ||
+                 messageLower.contains('hinay') ||
+                 messageLower.contains('slide') ||
+                 messageLower.contains('slippery') ||
+                 messageLower.contains('baha') ||
+                 messageLower.contains('flood') ||
+                 messageLower.contains('landslide') ||
+                 messageLower.contains('atang') ||
+                 messageLower.contains('kidnap') ||
+                 messageLower.contains('holdup') ||
+                 messageLower.contains('tulis') ||
+                 messageLower.contains('manulis') ||
+                 messageLower.contains('ngitngit') ||
+                 messageLower.contains('dark') ||
+                 messageLower.contains('snatch') ||
+                 messageLower.contains('hole') ||
+                 messageLower.contains('buslot') ||
+                 messageLower.contains('lubak') ||
+                 messageLower.contains('bangga');
+                 
+        case 'Shortcuts':
           return messageLower.contains('shortcut') ||
-                 messageLower.contains('cut through') ||
-                 messageLower.contains('faster route');
-        case 'fare tips':
-          return messageLower.contains('plete') || 
-                 messageLower.contains('fare') ||
-                 messageLower.contains('pesos');
-        case 'driver reviews':
+                 messageLower.contains('faster') ||
+                 messageLower.contains('route') ||
+                 messageLower.contains('quick') ||
+                 messageLower.contains('lusot') ||
+                 messageLower.contains('dali');
+                 
+        case 'Fare Tips':
+          return messageLower.contains('fare') ||
+                 messageLower.contains('price') ||
+                 messageLower.contains('cost') ||
+                 messageLower.contains('plete') ||
+                 messageLower.contains('sukli') ||
+                 messageLower.contains('tagpila') ||
+                 messageLower.contains('bayad');
+                 
+        case 'Driver Reviews':
           return messageLower.contains('driver') ||
-                 messageLower.contains('kuya driver');
+                 messageLower.contains('reckless') ||
+                 messageLower.contains('rude') ||
+                 messageLower.contains('kind') ||
+                 messageLower.contains('buotan') ||
+                 messageLower.contains('barato');
+                 
         default:
           return true;
       }
@@ -553,7 +785,6 @@ class _CommentingSectionState extends State<CommentingSection> {
           ),
           child: Column(
             children: [
-              // Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -587,7 +818,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                   ),
                 ),
               ),
-              // Filter Chips
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: SingleChildScrollView(
@@ -609,13 +839,12 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
               ),
               Divider(height: 1, color: Theme.of(context).dividerColor),
-              // Comments List
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,
                   itemCount: filteredMessages.length,
                   itemBuilder: (context, index) {
-                    return _buildInsightCard(filteredMessages[index]); // Pass the updated message
+                    return _buildInsightCard(filteredMessages[index]);
                   },
                 ),
               ),

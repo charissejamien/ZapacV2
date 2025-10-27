@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:zapac/core/utils/map_utils.dart'; 
 import 'package:google_maps_flutter/google_maps_flutter.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:firebase_auth/firebase_auth.dart'; 
 import '../routes/route_list.dart'; // <-- added import
 
 class SearchDestinationPage extends StatefulWidget {
@@ -22,11 +24,11 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
   List<dynamic> _predictions = const [];
   Timer? _debounce; 
 
-  final List<Map<String, dynamic>> _recentLocations = const [
-    {'name': 'House ni Gorgeous', 'latitude': 10.3100, 'longitude': 123.9150}, 
-    {'name': 'House sa Gwapa', 'latitude': 10.2900, 'longitude': 123.8900}, 
-    {'name': 'Ayala Center Cebu', 'latitude': 10.3175, 'longitude': 123.9050}, 
-  ];
+  List<Map<String, dynamic>> _dbRecentLocations = []; 
+  bool _isLoadingRecent = true; 
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
+  final User? _currentUser = FirebaseAuth.instance.currentUser; 
 
   @override
   void initState() {
@@ -35,6 +37,7 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     if (_searchController.text.isNotEmpty) {
       _debouncedSearch(_searchController.text);
     }
+    _fetchRecentLocations(); 
   }
 
   @override
@@ -42,6 +45,76 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     _searchController.dispose();
     _debounce?.cancel();
     super.dispose();
+  }
+
+  Future<void> _fetchRecentLocations() async {
+    if (_currentUser == null) {
+      if (mounted) setState(() => _isLoadingRecent = false);
+      return;
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(_currentUser!.uid)
+          .collection('recent_searches')
+          .orderBy('timestamp', descending: true) 
+          .limit(7) 
+          .get();
+
+      final recent = snapshot.docs.map((doc) => {
+            'id': doc.id,
+            'name': doc['name'] as String,
+            'latitude': doc['latitude'] as double,
+            'longitude': doc['longitude'] as double,
+          }).toList();
+
+      if (mounted) {
+        setState(() {
+          _dbRecentLocations = recent;
+          _isLoadingRecent = false;
+        });
+      }
+    } catch (e) {
+      print("Error fetching recent locations: $e");
+      if (mounted) {
+        setState(() {
+          _isLoadingRecent = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveRecentLocation({
+    required String name,
+    required double latitude,
+    required double longitude,
+  }) async {
+    if (_currentUser == null) return;
+
+    final locationData = {
+      'name': name,
+      'latitude': latitude,
+      'longitude': longitude,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+
+    try {
+      // Save the new location
+      await _firestore
+          .collection('users')
+          .doc(_currentUser!.uid)
+          .collection('recent_searches')
+          .add(locationData);
+
+      // No need to re-fetch if using Firestore snapshots, but since we are using get()
+      // we need to re-fetch to update the state immediately after saving.
+      // Keeping fetch for now as the streaming change was not fully implemented.
+      await _fetchRecentLocations();
+      
+    } catch (e) {
+      print("Error saving recent location: $e");
+    }
   }
 
   Future<void> _debouncedSearch(String query) async {
@@ -106,40 +179,52 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
       return;
     }
 
-    final place = {
-      'place_id': prediction['place_id'],
-      'description': prediction['description'],
-      'latitude': placeDetails['geometry']['location']['lat'],
-      'longitude': placeDetails['geometry']['location']['lng'],
-    };
+    final name = prediction['description'] as String;
+    final lat = placeDetails['geometry']['location']['lat'] as double;
+    final lng = placeDetails['geometry']['location']['lng'] as double;
 
-    // push RouteListPage and pass the selected destination
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
-    );
+    _saveRecentLocation(name: name, latitude: lat, longitude: lng); 
+
+
+    Navigator.pop(context, {
+      'place': {
+        'place_id': prediction['place_id'],
+        'description': prediction['description'],
+        'latitude': placeDetails['geometry']['location']['lat'],
+        'longitude': placeDetails['geometry']['location']['lng'],
+      }
+    });
   }
 
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white), 
         title: TextField(
           controller: _searchController,
           autofocus: true,
           onChanged: _debouncedSearch,
-          decoration: const InputDecoration(
-            hintText: 'Search for a destination...',
+          decoration: InputDecoration(
+            hintText: 'Search for a destination',
+            hintStyle: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontWeight: FontWeight.w400
+            ),
             border: InputBorder.none,
           ),
+          style: const TextStyle(color: Colors.white),
+          cursorColor: const Color.fromARGB(255, 56, 56, 56), // MODIFIED: Set caret color to black
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        backgroundColor: theme.primaryColor, 
       ),
       body: _predictions.isNotEmpty
           ? _buildPredictionList(cs)
@@ -162,7 +247,58 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     );
   }
 
+  // MODIFIED: Simplified loading and ensured left-alignment for all states
   Widget _buildRecentLocations(ColorScheme cs) {
+    
+    // Check if the user is not logged in first.
+    if (_currentUser == null) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(
+          "Sign in to track your recent search history.",
+          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+        ),
+      );
+    }
+    
+    // Handle Loading/Empty states using Column for left alignment
+    if (_isLoadingRecent || _dbRecentLocations.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start, // MODIFIED: Align to the left
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              "Recent Locations",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: cs.primary,
+              ),
+            ),
+          ),
+          // MODIFIED: Simple, non-expanded loading indicator
+          if (_isLoadingRecent)
+             Padding(
+                padding: const EdgeInsets.only(left: 16.0, top: 8),
+                child: SizedBox(
+                    width: 20, 
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
+             )
+          else if (_dbRecentLocations.isEmpty)
+             Padding(
+                padding: const EdgeInsets.only(left: 16.0, top: 8),
+                child: Text(
+                  "Start searching to see your recent locations here!",
+                  style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                ),
+              ),
+        ],
+      );
+    }
+
+    // Populated state remains the same, using Column for left alignment
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -179,9 +315,9 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         ),
         Expanded(
           child: ListView.builder(
-            itemCount: _recentLocations.length,
+            itemCount: _dbRecentLocations.length,
             itemBuilder: (context, index) {
-              final recentLocation = _recentLocations[index];
+              final recentLocation = _dbRecentLocations[index];
               return Card(
                 color: cs.surface,
                 elevation: 1,
@@ -194,16 +330,13 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
                     style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
                   ),
                   onTap: () {
-                    final place = {
-                      'place_id': null,
-                      'description': recentLocation['name'],
-                      'latitude': recentLocation['latitude'],
-                      'longitude': recentLocation['longitude'],
-                    };
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
-                    );
+                    Navigator.pop(context, {
+                      'recent_location': {
+                        'name': recentLocation['name'],
+                        'latitude': recentLocation['latitude'],
+                        'longitude': recentLocation['longitude'],
+                      }
+                    });
                   },
                 ),
               );

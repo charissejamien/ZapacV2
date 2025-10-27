@@ -6,54 +6,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/core/widgets/bottomNavBar.dart';
 import 'package:zapac/settings/settings_page.dart';
 import 'package:zapac/settings/profile_page.dart';
-
-// Import the new file names
+import 'package:zapac/dashboard/route_details_overlay.dart'; 
 import 'community_insights_page.dart';
 import '../core/widgets/searchBar.dart';
 import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
-import '../core/utils/map_utils.dart';
+import '../core/utils/map_utils.dart'; 
 import 'dart:io' show Platform;
-
-// Placeholder for ChatMessage model (re-exported from communityInsights)
 import 'community_insights_page.dart' show ChatMessage;
-
-// Sample data definition (UPDATED: Using createdAt Timestamp instead of timeAgo)
-final List<ChatMessage> _initialSampleMessages = [
-  ChatMessage(
-    sender: 'Zole Laverne',
-    message: '"Ig 6PM juseyo, expect traffic sa Escariomida..."',
-    route: 'Escario',
-    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&h=500&fit=crop',
-    likes: 15,
-    isMostHelpful: true,
-    id: 'sample_1', 
-    // Calculate a Timestamp representing 2 days ago
-    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 2))), 
-  ),
-  ChatMessage(
-    sender: 'Kyline Alcantara', 
-    message: '"Kuyaw kaaio sa Carbon..."', 
-    route: 'Carbon', 
-    imageUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=500&h=500&fit=crop', 
-    likes: 22, 
-    dislikes: 2,
-    id: 'sample_2',
-    // Calculate a Timestamp representing 9 days ago
-    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 9))),
-  ),
-  ChatMessage(
-    sender: 'Adopted Brother ni Mikha Lim', 
-    message: '"Ang plete kai tag 12 pesos..."', 
-    route: 'Lahug – Carbon', 
-    imageUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=500&h=500&fit=crop', 
-    likes: 5,
-    id: 'sample_3',
-    // Calculate a Timestamp representing 5 minutes ago
-    createdAt: Timestamp.fromDate(DateTime.now().subtract(const Duration(minutes: 5))), 
-  ),
-];
-
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -63,46 +25,40 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
-  // Map State
   late GoogleMapController _mapController;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
+  // The initial position remains a fallback until location is loaded
   final LatLng _initialCameraPosition = const LatLng(10.314481680817886, 123.88813209917954);
 
-  // UI State
   bool _isCommunityInsightExpanded = false;
   int _selectedIndex = 0;
   bool _isMapReady = false; 
 
-  // Firestore & Data State
   List<ChatMessage> _liveChatMessages = [];
   StreamSubscription? _chatSubscription;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; 
   final FirebaseAuth _auth = FirebaseAuth.instance; 
   
-// Defined API Key as a constant for easy management
+  bool _showDetailsButton = false;
+  Map<String, dynamic> _currentSearchDetails = {};
+  String? _currentSearchName;
+  
   String _getMapApiKey() {
     if (Platform.isIOS) {
-      // This key MUST match the one in AppDelegate.swift
       return "AIzaSyCWHublkXuYaWfT68qUwGY3o5L9NB82JA8";
     }
-    // Default to Android for all other platforms (Android/Web/Desktop)
     return "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
   }
-  // NEW: Store the current user ID
+
   String? _currentUserId;
   StreamSubscription? _authStateSubscription;
-
-  // Defined API Key as a constant for easy management
-  static const String _mapApiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; // Placeholder/Example Key
 
   @override
   void initState() {
     super.initState();
-    // Get user ID immediately (can be null if not logged in)
     _currentUserId = _auth.currentUser?.uid;
     
-    // Listen for auth state changes to update the user ID dynamically
     _authStateSubscription = _auth.authStateChanges().listen((User? user) {
       if (mounted) {
         setState(() {
@@ -111,16 +67,9 @@ class _DashboardState extends State<Dashboard> {
       }
     });
 
-    // CRITICAL FIX: Ensure ALL resource-dependent initial calls are delayed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        // 1. Move the marker addition here for maximum safety
-        MapUtils.addMarker(_markers, _initialCameraPosition, 'cebu_city_marker', 'Cebu City');
-        
-        // 2. Start the Firestore listener
         _fetchAndListenToMessages(); 
-        
-        // 3. Force update UI after initial resources are set
         setState(() {});
       }
     });
@@ -128,7 +77,6 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void dispose() {
-    // FIX: Cancel both stream subscriptions when the widget is disposed
     _chatSubscription?.cancel(); 
     _authStateSubscription?.cancel();
     super.dispose();
@@ -145,7 +93,6 @@ class _DashboardState extends State<Dashboard> {
         .limit(50)
         .snapshots()
         .listen((snapshot) {
-      // FIX: Only call setState if the widget is currently mounted
       if (!mounted) return; 
       
       final List<ChatMessage> fetchedMessages = snapshot.docs.map((doc) {
@@ -153,23 +100,11 @@ class _DashboardState extends State<Dashboard> {
       }).toList();
 
       List<ChatMessage> combinedMessages = [];
-      
-      // Filter out duplicate sample messages from being shown if a real message matches
-      List<ChatMessage> filteredSampleMessages = _initialSampleMessages.where((sample) {
-          return !fetchedMessages.any((fetched) => 
-            fetched.sender == sample.sender && 
-            fetched.message == sample.message
-          );
-      }).toList();
-      
-      combinedMessages.addAll(filteredSampleMessages);
       combinedMessages.addAll(fetchedMessages);
       
-      // Sort combined list by createdAt timestamp
       combinedMessages.sort((a, b) {
           final aTime = a.createdAt?.toDate().millisecondsSinceEpoch ?? 0;
           final bTime = b.createdAt?.toDate().millisecondsSinceEpoch ?? 0;
-          // Sample messages (which have a null createdAt) will go to the end if bTime is non-null
           return bTime.compareTo(aTime);
       });
       
@@ -180,7 +115,6 @@ class _DashboardState extends State<Dashboard> {
     }, onError: (error) {
       print("Error fetching community insights: $error");
       if (mounted) {
-        // Log the error to the console for debugging
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to load community feed.')),
         );
@@ -188,9 +122,12 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
+  // FIX: _onMapCreated now calls _handleMyLocationPressed() immediately after map is ready
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     _isMapReady = true;
+    
+    // Call location logic here to ensure it overrides the initial CameraPosition
     _handleMyLocationPressed(); 
   }
 
@@ -220,33 +157,128 @@ class _DashboardState extends State<Dashboard> {
 
   Future<void> _handleMyLocationPressed() async {
     if (!mounted || !_isMapReady) return;
-
+    _markers.clear();
+    _polylines.clear();
+    
+    // This call moves the camera to the current location with high zoom (18.0)
     await MapUtils.getCurrentLocationAndMarker(
-      _markers,
+      {},
       _mapController,
       context,
       isMounted: () => mounted,
     );
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _handlePlaceSelected(dynamic item) async {
-    if (!mounted) return;
     
-    await MapUtils.showRoute(
-      item: item,
-      apiKey: _getMapApiKey(), 
-      markers: _markers,
-      polylines: _polylines,
-      mapController: _mapController,
-      context: context,
-    );
-
-    if (mounted) setState(() {});
+    if (mounted) {
+       setState(() {
+           _showDetailsButton = false;
+           _currentSearchDetails = {};
+       });
+    }
   }
+  
+  Future<void> _handlePlaceSelected(dynamic item) async {
+    if (!mounted || !_isMapReady) return;
+    
+    double? lat;
+    double? lng;
+    String? name;
+
+    if (item.containsKey('place')) {
+      final place = item['place'];
+      lat = place['latitude'] as double;
+      lng = place['longitude'] as double;
+      name = place['description'] as String;
+    } else if (item.containsKey('recent_location')) {
+      final location = item['recent_location'];
+      lat = location['latitude'] as double;
+      lng = location['longitude'] as double;
+      name = location['name'] as String;
+    }
+
+    if (lat != null && lng != null) {
+      final newPosition = LatLng(lat, lng);
+      
+      final LatLng? currentLocation = await MapUtils.getCurrentLocation(context);
+      if (currentLocation == null) {
+          if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Could not get current location for route details.')),
+              );
+          }
+          return;
+      }
+
+      final routeDetails = await MapUtils.getRouteDetails(
+          origin: currentLocation,
+          destination: newPosition,
+          apiKey: _getMapApiKey(),
+      );
+
+      setState(() {
+        _markers.clear();
+        _polylines.clear(); 
+
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('destination_search'),
+            position: newPosition,
+            infoWindow: InfoWindow(title: name ?? 'Selected Location'),
+          ),
+        );
+        
+        _currentSearchName = name;
+        if (routeDetails != null) {
+            _currentSearchDetails = routeDetails;
+            _showDetailsButton = true; 
+        } else {
+            _currentSearchDetails = {'distance': 'N/A', 'duration': 'N/A'};
+            _showDetailsButton = true;
+            print("Failed to fetch route details.");
+        }
+      });
+
+      await _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(newPosition, 16.0),
+      );
+    }
+  }
+
+  void _clearSearchMarker() {
+      if (_markers.isNotEmpty || _polylines.isNotEmpty || _showDetailsButton) {
+          setState(() {
+              _markers.clear();
+              _polylines.clear();
+              _showDetailsButton = false;
+              _currentSearchDetails = {};
+              _currentSearchName = null;
+          });
+          _mapController.animateCamera(
+            CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0), 
+          );
+      }
+  }
+
+  void _showDetailsOverlay() {
+      if (_currentSearchDetails.isEmpty || _currentSearchName == null) return;
+      
+      showDialog(
+          context: context,
+          builder: (BuildContext context) {
+              return RouteDetailsOverlay(
+                  destinationName: _currentSearchName!,
+                  distance: _currentSearchDetails['distance'] ?? 'Unknown',
+                  duration: _currentSearchDetails['duration'] ?? 'Unknown',
+                  onClose: () => Navigator.of(context).pop(),
+              );
+          },
+      );
+  }
+
 
   @override
   Widget build(BuildContext context) {
+    final bottomSheetHeight = MediaQuery.of(context).size.height * (_isCommunityInsightExpanded ? 0.85 : 0.35);
+
     return Scaffold(
       bottomNavigationBar: BottomNavBar(
         selectedIndex: _selectedIndex,
@@ -256,7 +288,6 @@ class _DashboardState extends State<Dashboard> {
       body: SafeArea(
         child: Stack(
           children: [
-            // 1. Google Map (Map Screen)
             Positioned.fill(
               child: GoogleMap(
                 onMapCreated: _onMapCreated,
@@ -271,27 +302,50 @@ class _DashboardState extends State<Dashboard> {
               ),
             ),
 
-            // 2. Draggable Commenting Section (communityInsights.dart)
             CommentingSection(
               chatMessages: _liveChatMessages, 
               onExpansionChanged: _onCommunityInsightExpansionChanged,
-              currentUserId: _currentUserId, // PASS THE CURRENT USER ID HERE
+              currentUserId: _currentUserId,
             ),
 
-            // 3. Floating Search Bar (searchBar.dart)
             Positioned(
               top: 8,
               left: 16,
               right: 16,
-              child: SearchBar(onPlaceSelected: _handlePlaceSelected),
+              child: SearchBar(
+                onPlaceSelected: _handlePlaceSelected,
+                onSearchCleared: _clearSearchMarker,
+              ),
             ),
+
+            if (_showDetailsButton)
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                left: 16,
+                right: 16,
+                bottom: bottomSheetHeight - 50,
+                child: Center(
+                  child: ElevatedButton.icon(
+                    onPressed: _showDetailsOverlay,
+                    icon: const Icon(Icons.info_outline, size: 20),
+                    label: const Text('SHOW DETAILS', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
 
             AnimatedPositioned(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-
-                 right: 16,
-
+              right: 16,
               top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.08,
               bottom: _isCommunityInsightExpanded ? 20 : null,
 
@@ -308,11 +362,9 @@ class _DashboardState extends State<Dashboard> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-           
              FloatingButton(
                 isCommunityInsightExpanded: _isCommunityInsightExpanded,
                 onAddInsightPressed: () {
-                  // Get the current user ID right before showing the modal
                   final currentUserId = _auth.currentUser?.uid;
                   if (!mounted) return;
 
@@ -325,7 +377,7 @@ class _DashboardState extends State<Dashboard> {
 
                   showAddInsightModal(
                     context: context,
-                    firestore: _firestore, // Pass the Firestore instance
+                    firestore: _firestore,
                     onInsightAdded: _addNewInsight,
                   );
                 },

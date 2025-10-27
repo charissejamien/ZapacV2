@@ -91,11 +91,14 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             _buildSettingsTile(
               title: 'Logout',
-              onTap: () {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginPage()),
-                  (Route<dynamic> route) => false,
-                );
+              onTap: () async {
+                 await FirebaseAuth.instance.signOut();
+                 if (mounted) {
+                   Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (Route<dynamic> route) => false,
+                  );
+                 }
               },
               trailing: Icon(Icons.logout, color: Theme.of(context).iconTheme.color),
             ),
@@ -141,6 +144,7 @@ class _SettingsPageState extends State<SettingsPage> {
         elevation: 0,
         title: const Text('Settings', style: TextStyle(color: Colors.white)),
         centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white), // SET BACK BUTTON TO WHITE
       ),
       body: Column(
         children: [
@@ -205,6 +209,7 @@ class _SettingsPageState extends State<SettingsPage> {
               MaterialPageRoute(builder: (context) => const Dashboard()),
             );
           } else if (index == 1) {
+            // No action needed for Favorites since current index is 2
           } else if (index == 3) {
               Navigator.push(
               context,

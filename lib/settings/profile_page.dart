@@ -7,11 +7,12 @@ import 'package:zapac/dashboard/dashboard.dart';
 import 'package:zapac/authentication/login_page.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // REQUIRED
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 
-const Color accentYellow = Color(0xFFF4BE6C);
-const Color accentGreen = Color(0xFF6CA89A);
-const Color primaryColor = Color(0xFF4A6FA5);
+// New imports for modularized components
+import 'app_constants.dart';
+import 'profile_header.dart';
+import 'profile_info_row.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -22,7 +23,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   User? _currentUser;
   bool _isLoading = true;
-  int _selectedIndex = 2;
+  final int _selectedIndex = 2; // Fixed selected index for this page
 
   File? _profileImageFile;
   final ImagePicker _imagePicker = ImagePicker();
@@ -73,7 +74,7 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isLoading = false);
   }
 
-  // REINFORCED: Function to update profile picture and name across all user comments
+  // FIRESTORE LOGIC: Update user comments when name/photo changes
   Future<void> _updateUserComments({required String newDisplayName, required String newPhotoUrl}) async {
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser?.uid == null) return;
@@ -81,7 +82,6 @@ class _ProfilePageState extends State<ProfilePage> {
       final firestore = FirebaseFirestore.instance;
       final batch = firestore.batch();
       
-      // Query for all comments made by the current user
       final querySnapshot = await firestore
           .collection('public_data') 
           .doc('zapac_community')
@@ -91,18 +91,18 @@ class _ProfilePageState extends State<ProfilePage> {
 
       for (var doc in querySnapshot.docs) {
         batch.update(doc.reference, {
-          'imageUrl': newPhotoUrl, // This will be the Firebase URL or an empty string ('')
+          'imageUrl': newPhotoUrl, 
           'sender': newDisplayName, 
         });
       }
 
-      // Commit all updates
       await batch.commit();
       print("Firestore Batch Update complete. ${querySnapshot.docs.length} comments updated.");
   }
 
 
   Future<void> _showEditFullNameSheet(BuildContext context, ColorScheme colorScheme) async {
+    // MODAL LOGIC FOR EDITING NAME (Kept here as it uses _currentUser and _updateUserComments)
     if (_currentUser == null) return;
 
     final nameCtrl = TextEditingController(text: _displayName);
@@ -165,9 +165,6 @@ class _ProfilePageState extends State<ProfilePage> {
                               await _currentUser!.reload();
                               _loadUserData();
                               
-                              // CRITICAL: Call batch update here for photo and name sync
-                              // We use the photoURL from Firebase, which is the source for networked images, 
-                              // or empty string if null, which is the signal for initials avatar.
                               await _updateUserComments(
                                   newDisplayName: newName, 
                                   newPhotoUrl: _currentUser!.photoURL ?? ''
@@ -204,6 +201,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
 
+  // NAVIGATION LOGIC
   void _onItemTapped(int index) {
     if (index == _selectedIndex) return;
     if (index == 0) {
@@ -212,6 +210,8 @@ class _ProfilePageState extends State<ProfilePage> {
         MaterialPageRoute(builder: (_) => const Dashboard()),
       );
     } else if (index == 3) {
+      // Placeholder for navigating to SettingsPage if it were index 3
+      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SettingsPage())); 
     }
   }
 
@@ -263,148 +263,19 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return Column(
       children: [
-        _buildHeader(colorScheme),
+        // Using the modularized ProfileHeader
+        ProfileHeader(
+            currentUser: _currentUser,
+            profileImageFile: _profileImageFile,
+            displayName: _displayName,
+            userEmail: _userEmail,
+            initials: _initials,
+            onProfilePicTap: _onProfilePicTap,
+        ),
         Expanded(
           child: _buildInfoSection(colorScheme),
         ),
       ],
-    );
-  }
-
-  Widget _buildHeader(ColorScheme colorScheme) {
-    ImageProvider? avatarImage;
-    Widget avatarChild;
-
-    // 1. Check local file path
-    if (_profileImageFile != null) {
-        avatarImage = FileImage(_profileImageFile!);
-        avatarChild = const SizedBox.expand();
-    } 
-    // 2. Check Firebase/Network URL
-    else if (_currentUser?.photoURL?.isNotEmpty == true) {
-        avatarImage = NetworkImage(_currentUser!.photoURL!);
-        avatarChild = const SizedBox.expand();
-    } 
-    // 3. Fallback to Initials Avatar (First Letter)
-    else {
-        avatarChild = Text(
-            _initials,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-            ),
-        );
-        avatarImage = null;
-    }
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            colorScheme.primary,
-            colorScheme.primaryContainer,
-          ],
-        ),
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(24),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 500),
-        child: Column(
-          children: [
-            GestureDetector(
-              onTap: _onProfilePicTap,
-              child: Stack(
-                clipBehavior: Clip.none,
-                alignment: Alignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 42,
-                    backgroundColor: colorScheme.onPrimary.withOpacity(0.15),
-                    child: CircleAvatar(
-                      radius: 38,
-                      // Set fallback color for initials avatar
-                      backgroundColor: avatarImage != null ? colorScheme.surface : primaryColor, 
-                      backgroundImage: avatarImage,
-                      child: avatarImage == null ? avatarChild : null,
-                    ),
-                  ),
-                  Positioned(
-                    right: -2,
-                    bottom: -2,
-                    child: Material(
-                      color: colorScheme.onPrimary.withOpacity(0.95),
-                      shape: const CircleBorder(),
-                      child: InkWell(
-                        customBorder: const CircleBorder(),
-                        onTap: _onProfilePicTap,
-                        child: const Padding(
-                          padding: EdgeInsets.all(6),
-                          child: Icon(Icons.edit_outlined, size: 14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'PROFILE PHOTO',
-              style: TextStyle(
-                color: colorScheme.onPrimary.withOpacity(0.9),
-                fontSize: 11,
-                letterSpacing: 1.1,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _displayName,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colorScheme.onPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              _userStatus,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Flexible(
-                  child: Text(
-                    _userEmail,
-                    style: TextStyle(
-                      color: colorScheme.onPrimary.withOpacity(0.95),
-                      fontSize: 13,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
     );
   }
 
@@ -428,7 +299,8 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(height: 10),
-          _infoRow(
+          // Using the modularized ProfileInfoRow
+          ProfileInfoRow(
             icon: Icons.person_outline,
             label: 'Full name',
             value: _displayName,
@@ -436,7 +308,7 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: () => _showEditFullNameSheet(context, colorScheme),
           ),
           const SizedBox(height: 10),
-          _infoRow(
+          ProfileInfoRow(
             icon: Icons.transgender,
             label: 'Gender',
             value: _userGender,
@@ -444,7 +316,7 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: () => _showEditGenderSheet(context, colorScheme),
           ),
           const SizedBox(height: 10),
-          _infoRow(
+          ProfileInfoRow(
             icon: Icons.cake_outlined,
             label: 'Date of Birth',
             value: _userDOB,
@@ -452,7 +324,7 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: () => _showEditDOBDialog(context, colorScheme),
           ),
           const SizedBox(height: 10),
-          _infoRow(
+          ProfileInfoRow(
             icon: Icons.delete_outline,
             label: 'Delete account',
             value: 'All your data will be permanently removed',
@@ -465,87 +337,9 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _infoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    Color? valueColor,
-    required VoidCallback onTap,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    valueColor = valueColor ?? scheme.onSurface;
-
-    final borderAccent = label.toLowerCase().contains('delete') ? accentYellow : accentGreen;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: borderAccent, width: 3)),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Material(
-        color: scheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: scheme.outlineVariant),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 56),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(icon, color: scheme.onSurfaceVariant, size: 22),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          label.toUpperCase(),
-                          style: TextStyle(
-                            color: scheme.onSurfaceVariant,
-                            fontSize: 11,
-                            letterSpacing: 0.6,
-                            height: 1.1,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          value,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: valueColor,
-                            height: 1.2,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: scheme.onSurfaceVariant,
-                    size: 18,
-                    semanticLabel: 'Edit $label',
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
 
   Future<void> _onProfilePicTap() async {
+    // MODAL LOGIC FOR PROFILE PICTURE (Kept here as it uses all state/logic)
     final scheme = Theme.of(context).colorScheme;
     final prefs = await SharedPreferences.getInstance();
 
@@ -625,10 +419,34 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Feature will be added soon!')),
+                  onTap: () async {
+                    // --- CAMERA FEATURE IMPLEMENTATION ---
+                    final picked = await _imagePicker.pickImage(
+                      source: ImageSource.camera, // CHANGE SOURCE TO CAMERA
+                      maxWidth: 900,
+                      imageQuality: 90,
                     );
+                    if (picked != null) {
+                      final file = File(picked.path);
+                      if (context.mounted) {
+                        setState(() => _profileImageFile = file);
+                        await prefs.setString('profile_pic_path', file.path);
+                        
+                        final currentUser = FirebaseAuth.instance.currentUser;
+                        if (currentUser != null) {
+                            await _updateUserComments(
+                                newDisplayName: _displayName,
+                                newPhotoUrl: currentUser.photoURL ?? ''
+                            );
+                        }
+
+                        Navigator.of(ctx).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: const Text('Photo taken and profile updated!'), backgroundColor: accentGreen),
+                        );
+                      }
+                    }
+                    // --- END CAMERA FEATURE IMPLEMENTATION ---
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -673,9 +491,6 @@ class _ProfilePageState extends State<ProfilePage> {
                         setState(() => _profileImageFile = file);
                         await prefs.setString('profile_pic_path', file.path);
                         
-                        // CRITICAL: Call batch update here for photo sync
-                        // When a local file is used, the public facing imageUrl is the Firebase photoURL
-                        // which, if they just uploaded via Firebase auth, might be present.
                         final currentUser = FirebaseAuth.instance.currentUser;
                         if (currentUser != null) {
                             await _updateUserComments(
@@ -728,14 +543,11 @@ class _ProfilePageState extends State<ProfilePage> {
                       setState(() => _profileImageFile = null);
                       await prefs.remove('profile_pic_path');
                       
-                      // CRITICAL: Call batch update here for photo sync
                       final currentUser = FirebaseAuth.instance.currentUser;
                       if (currentUser != null) {
-                          // Pass empty string for photoURL to ensure the 'imageUrl' field in comments is set to '', 
-                          // triggering the initials avatar display on the dashboard.
                           await _updateUserComments(
                               newDisplayName: _displayName,
-                              newPhotoUrl: currentUser.photoURL ?? '' // Use Firebase URL if it exists, otherwise empty string
+                              newPhotoUrl: currentUser.photoURL ?? '' 
                           );
                       }
                       
@@ -786,6 +598,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _confirmDeleteAccount(ColorScheme colorScheme) async {
+    // MODAL LOGIC FOR DELETE ACCOUNT (Kept here as it performs final Auth/Nav)
     String? reason;
     bool acknowledged = false;
     final TextEditingController otherCtrl = TextEditingController();
@@ -954,6 +767,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _showEditGenderSheet(BuildContext context, ColorScheme colorScheme) async {
+    // MODAL LOGIC FOR EDIT GENDER (Kept here)
     String? choice = _userGender != 'Not provided' ? _userGender : null;
     final prefs = await SharedPreferences.getInstance();
 
@@ -1009,6 +823,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _showEditDOBDialog(BuildContext context, ColorScheme colorScheme) async {
+    // MODAL LOGIC FOR EDIT DOB (Kept here)
     DateTime initial = DateTime(2000);
     if (_userDOB != 'Not provided') {
         initial = DateTime.tryParse(_userDOB) ?? DateTime(2000);

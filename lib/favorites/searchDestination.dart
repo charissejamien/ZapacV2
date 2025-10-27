@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:zapac/core/utils/map_utils.dart'; 
 import 'package:google_maps_flutter/google_maps_flutter.dart'; 
+import '../routes/route_list.dart'; // <-- added import
 
 class SearchDestinationPage extends StatefulWidget {
   final String? initialSearchText;
@@ -105,14 +106,18 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
       return;
     }
 
-    Navigator.pop(context, {
-      'place': {
-        'place_id': prediction['place_id'],
-        'description': prediction['description'],
-        'latitude': placeDetails['geometry']['location']['lat'],
-        'longitude': placeDetails['geometry']['location']['lng'],
-      }
-    });
+    final place = {
+      'place_id': prediction['place_id'],
+      'description': prediction['description'],
+      'latitude': placeDetails['geometry']['location']['lat'],
+      'longitude': placeDetails['geometry']['location']['lng'],
+    };
+
+    // push RouteListPage and pass the selected destination
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
+    );
   }
 
 
@@ -189,13 +194,16 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
                     style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
                   ),
                   onTap: () {
-                    Navigator.pop(context, {
-                      'recent_location': {
-                        'name': recentLocation['name'],
-                        'latitude': recentLocation['latitude'],
-                        'longitude': recentLocation['longitude'],
-                      }
-                    });
+                    final place = {
+                      'place_id': null,
+                      'description': recentLocation['name'],
+                      'latitude': recentLocation['latitude'],
+                      'longitude': recentLocation['longitude'],
+                    };
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
+                    );
                   },
                 ),
               );

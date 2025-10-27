@@ -5,7 +5,6 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
-// Removed: import 'package:zapac/models/favorite_route.dart';
 
 class MapUtils {
   // -------------------------
@@ -42,6 +41,44 @@ class MapUtils {
   // Location & Routing
   // -------------------------
 
+  static Future<LatLng?> getCurrentLocation(BuildContext context) async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location services are disabled. Please enable them.')),
+        );
+      }
+      return null;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied.')),
+          );
+        }
+        return null;
+      }
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      return LatLng(position.latitude, position.longitude);
+    } catch (e) {
+      print('Error getting location: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get current location.')),
+        );
+      }
+      return null;
+    }
+  }
+
   static Future<void> getCurrentLocationAndMarker(
     Set<Marker> markers,
     GoogleMapController mapController,
@@ -50,60 +87,71 @@ class MapUtils {
   }) async {
     if (!isMounted()) return;
 
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      if (isMounted()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location services are disabled. Please enable them.')),
-        );
-      }
-      return;
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        if (isMounted()) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission denied.')),
-          );
-        }
-        return;
-      }
-    }
-
-    try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      if (!isMounted()) return;
-
-      LatLng currentLatLng = LatLng(position.latitude, position.longitude);
-      
-      markers.removeWhere((marker) => marker.markerId.value == 'current_location');
-      markers.add(
-        Marker(
-          markerId: const MarkerId('current_location'),
-          position: currentLatLng,
-          infoWindow: const InfoWindow(title: 'Your Location'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        ),
-      );
-
-      if (isMounted()) {
-        mapController.animateCamera(CameraUpdate.newLatLng(currentLatLng));
-      }
-    } catch (e) {
-      print('Error getting location: $e');
-      if (isMounted()) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not get current location.')),
-        );
-      }
+    LatLng? currentLatLng = await getCurrentLocation(context);
+    
+    if (currentLatLng != null && isMounted()) {
+      mapController.animateCamera(CameraUpdate.newLatLngZoom(currentLatLng, 18.0)); 
     }
   }
 
+  static Future<Map<String, dynamic>?> getRouteDetails({
+    required LatLng origin,
+    required LatLng destination,
+    required String apiKey,
+  }) async {
+    final originStr = "${origin.latitude},${origin.longitude}";
+    final destinationStr = "${destination.latitude},${destination.longitude}";
+    
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/directions/json?origin=$originStr&destination=$destinationStr&key=$apiKey&mode=driving'
+    );
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data['routes'] != null && data['routes'].isNotEmpty) {
+          final leg = data['routes'][0]['legs'][0];
+          
+          return {
+            'distance': leg['distance']['text'] as String,
+            'duration': leg['duration']['text'] as String,
+          };
+        }
+      }
+    } catch (e) {
+      print("Error fetching route details: $e");
+    }
+    return null;
+  }
+  
+  // RE-ADDED: The getPredictions function, now correctly inside MapUtils
+  static Future<List<dynamic>> getPredictions(String input, String apiKey) async {
+    if (input.isEmpty) return [];
+
+    try {
+      const components = "country:ph";
+      final url =
+          'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=$components';
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['predictions'];
+      } else {
+        print('Failed to load predictions: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('Error getting predictions: $e');
+      return [];
+    }
+  }
+
+
+  // Existing showRoute function 
   static Future<Map<String, dynamic>> showRoute({
-    required dynamic item, // Can be place ID or route object
+    required dynamic item,
     required String apiKey,
     required Set<Marker> markers,
     required Set<Polyline> polylines,
@@ -115,13 +163,11 @@ class MapUtils {
     LatLng? destinationLatLng;
     String destinationName = '';
 
-    // --- Destination Extraction (Simplified due to lack of FavoriteRoute model) ---
     try {
       if (item is Map && item.containsKey('place')) {
         final placeId = item['place']['place_id'];
         destinationName = item['place']['description'];
 
-        // Get details (lat/lng) from Place ID
         final url = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey';
         final response = await http.get(Uri.parse(url));
         if (!context.mounted || response.statusCode != 200) return {};
@@ -134,7 +180,6 @@ class MapUtils {
           return {};
         }
       } else {
-        // Handle case where item is a simpler route/marker object if needed
         return {};
       }
     } catch (_) {
@@ -145,24 +190,11 @@ class MapUtils {
 
     if (destinationLatLng == null) return {};
 
-    // --- Permissions & Current Position Check ---
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return {};
+    LatLng? originLatLng = await getCurrentLocation(context);
+    if (originLatLng == null || !context.mounted) return {};
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        return {};
-      }
-    }
 
-    Position currentPosition = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-    if (!context.mounted) return {};
-
-    LatLng originLatLng = LatLng(currentPosition.latitude, currentPosition.longitude);
-
-    // --- Directions API Call ---
+    // Directions API Call
     String url = 'https://maps.googleapis.com/maps/api/directions/json?origin=${originLatLng.latitude},${originLatLng.longitude}&destination=${destinationLatLng.latitude},${destinationLatLng.longitude}&key=$apiKey';
     var response = await http.get(Uri.parse(url));
     if (!context.mounted) return {};
@@ -230,25 +262,5 @@ class MapUtils {
     } else {
       return {};
     }
-  }
-}
-
-Future<List<dynamic>> getPredictions(String input, String apiKey) async {
-  if (input.isEmpty) return [];
-
-  try {
-    final url =
-        'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=country:ph';
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['predictions'];
-    } else {
-      print('Failed to load predictions: ${response.statusCode}');
-      return [];
-    }
-  } catch (e) {
-    print('Error getting predictions: $e');
-    return [];
   }
 }

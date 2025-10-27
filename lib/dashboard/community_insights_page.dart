@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 
 String timeAgoSinceDate(Timestamp? timestamp) {
-  // Handles null timestamps from samples or delayed Firebase writes
   if (timestamp == null) {
     return 'N/A'; 
   }
@@ -34,7 +33,6 @@ String timeAgoSinceDate(Timestamp? timestamp) {
   }
 }
 
-// --- UserInteraction Model (Constant) ---
 @immutable 
 class UserInteraction {
   final bool isLiked;
@@ -54,21 +52,19 @@ class UserInteraction {
   }
 }
 
-// --- ChatMessage Model ---
 class ChatMessage {
   final String? id; 
   final String sender;
   final String message;
   final String route;
   final String imageUrl;
-  final String? senderUid; // <-- RETAINED FOR SECURITY/DELETE/REPORTING
+  final String? senderUid; 
   int likes;
   int dislikes;
   
   UserInteraction userInteraction; 
   
-  bool isMostHelpful;
-  
+  final bool isMostHelpful;
   final Timestamp? createdAt; 
 
   ChatMessage({
@@ -77,7 +73,7 @@ class ChatMessage {
     required this.message,
     required this.route,
     required this.imageUrl,
-    this.senderUid, // <-- RETAINED
+    this.senderUid, 
     this.likes = 0,
     this.dislikes = 0,
     this.userInteraction = const UserInteraction(), 
@@ -92,8 +88,8 @@ class ChatMessage {
       sender: data['sender'] ?? 'Anonymous',
       message: data['message'] ?? 'No message',
       route: data['route'] ?? 'Unknown Route',
-      imageUrl: data['imageUrl'] ?? 'https://placehold.co/50x50/cccccc/000000?text=User',
-      senderUid: data['senderUid'] as String?, // <-- RETAINED
+      imageUrl: data['imageUrl'] ?? '',
+      senderUid: data['senderUid'] as String?, 
       likes: data['likes'] ?? 0,
       dislikes: data['dislikes'] ?? 0,
       isMostHelpful: data['isMostHelpful'] ?? false,
@@ -107,7 +103,7 @@ class ChatMessage {
       'message': message,
       'route': route,
       'imageUrl': imageUrl,
-      'senderUid': senderUid, // <-- RETAINED
+      'senderUid': senderUid, 
       'likes': 0, 
       'dislikes': 0,
       'isMostHelpful': false,
@@ -123,7 +119,6 @@ class CommentingSection extends StatefulWidget {
   
   final FirebaseFirestore firestore = FirebaseFirestore.instance; 
 
-  // FIX: Removed 'const' keyword
   CommentingSection({
     super.key,
     this.onExpansionChanged,
@@ -137,7 +132,6 @@ class CommentingSection extends StatefulWidget {
 
 class _CommentingSectionState extends State<CommentingSection> {
   final DraggableScrollableController _sheetController = DraggableScrollableController();
-  final TextEditingController _commentController = TextEditingController();
   
   bool _isSheetFullyExpanded = false;
   String _selectedFilter = 'All';
@@ -212,7 +206,6 @@ class _CommentingSectionState extends State<CommentingSection> {
   @override
   void dispose() {
     _sheetController.dispose();
-    _commentController.dispose();
     super.dispose();
   }
 
@@ -270,7 +263,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     
     final batch = widget.firestore.batch();
     
-    // 1. Update the global counters atomically
     if (likeChange != 0 || dislikeChange != 0) {
       batch.update(messageRef, {
         'likes': FieldValue.increment(likeChange),
@@ -278,7 +270,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       });
     }
 
-    // 2. Set the user's vote status
     batch.set(voteRef, {
       'isLiked': newIsLiked,
       'isDisliked': newIsDisliked,
@@ -288,7 +279,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     try {
       await batch.commit();
       
-      // 3. OPTIMISTIC UI UPDATE
       if (mounted) {
         setState(() {
           _userInteractions[messageId] = UserInteraction(
@@ -308,7 +298,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     }
   }
   
-  // Function to handle reporting a message (with modal confirmation)
   Future<void> _handleReport(ChatMessage message) async {
     if (widget.currentUserId == null || message.id == null || !mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -320,48 +309,41 @@ class _CommentingSectionState extends State<CommentingSection> {
     final messageId = message.id!;
     final userId = widget.currentUserId!;
 
-    // Reference to the specific report by the user on this comment
     final reportRef = widget.firestore
         .collection('public_data')
         .doc('zapac_community')
         .collection('comments')
         .doc(messageId)
         .collection('reports')
-        .doc(userId); // Use the user's ID to prevent duplicate reports
+        .doc(userId);
 
     try {
-      // 1. Record the report
       await reportRef.set({
         'reporterUid': userId,
         'timestamp': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       
-      // 2. Atomically increment a 'reportCount' on the main comment document
       final messageRef = widget.firestore
           .collection('public_data')
           .doc('zapac_community')
           .collection('comments')
           .doc(messageId);
           
-      // Ensure 'reportCount' exists on the document or is created as 1
       await messageRef.set({'reportCount': FieldValue.increment(1)}, SetOptions(merge: true));
       
       if (mounted) {
-        // Prominent Dialog for success confirmation
         await showDialog(
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
               backgroundColor: Theme.of(context).colorScheme.background,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              // Reduced bottom padding of the content section
               contentPadding: const EdgeInsets.only(top: 20, left: 24, right: 24, bottom: 8), 
-              // Reduced padding around the actions section
               actionsPadding: const EdgeInsets.only(right: 15, bottom: 5), 
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.check_circle_outline,
                     color: Colors.orange,
                     size: 40,
@@ -409,9 +391,7 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
 
-  // Function to handle message deletion
   Future<void> _deleteMessage(ChatMessage message) async {
-    // SECURE AUTHORIZATION CHECK
     if (widget.currentUserId == null || message.senderUid == null || message.id == null || !mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cannot delete: Missing user or message ID.'), backgroundColor: Colors.red),
@@ -426,16 +406,13 @@ class _CommentingSectionState extends State<CommentingSection> {
       return;
     }
     
-    // 2. Confirmation Dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Confirm Deletion'),
-          // MODIFIED: Use custom contentPadding to reduce gap above buttons
           contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 5.0),
           content: const Text('Are you sure you want to delete this insight? This action cannot be undone.'),
-          // MODIFIED: Use custom actionsPadding to INCREASE gap below buttons
           actionsPadding: const EdgeInsets.only(right: 15.0, bottom: 12.0),
           actions: <Widget>[
             TextButton(
@@ -453,15 +430,12 @@ class _CommentingSectionState extends State<CommentingSection> {
 
     if (confirmed != true) return;
 
-    // --- Loading Overlay Implementation ---
     final loadingContext = context; 
     
-    // Show the full-screen loading overlay
     showGeneralDialog(
         context: loadingContext,
         barrierDismissible: false,
         transitionDuration: const Duration(milliseconds: 150),
-        // Faded black overlay
         barrierColor: Colors.black.withOpacity(0.7),
         pageBuilder: (context, a1, a2) {
             return Center(
@@ -472,9 +446,7 @@ class _CommentingSectionState extends State<CommentingSection> {
             );
         },
     );
-    // ------------------------------------------
 
-    // 3. Perform Deletion
     try {
       final messageRef = widget.firestore
           .collection('public_data')
@@ -484,7 +456,6 @@ class _CommentingSectionState extends State<CommentingSection> {
 
       await messageRef.delete();
       
-      // Success: Hide the loading overlay
       if (loadingContext.mounted) {
           Navigator.of(loadingContext).pop();
       }
@@ -492,7 +463,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     } catch (e) {
       print("Error deleting message ${message.id}: $e");
       
-      // Error: Hide the loading overlay before showing the error SnackBar
       if (loadingContext.mounted) {
           Navigator.of(loadingContext).pop();
       }
@@ -514,15 +484,15 @@ class _CommentingSectionState extends State<CommentingSection> {
     final dividerColor = Theme.of(context).dividerColor;
     
     final interaction = _userInteractions[message.id] ?? message.userInteraction;
-    
-    // NEW: Calculate time ago dynamically
     final timeDisplay = timeAgoSinceDate(message.createdAt);
     
-    // SECURE AUTHORIZATION CHECK: Check if the logged-in user's UID matches the message's saved UID
     final bool isCurrentUserSender = 
         widget.currentUserId != null && 
         message.senderUid != null &&
         widget.currentUserId == message.senderUid;
+
+    final bool hasImageUrl = message.imageUrl.isNotEmpty;
+    final String initials = message.sender.isNotEmpty ? message.sender[0].toUpperCase() : '?';
 
 
     return Padding(
@@ -535,7 +505,16 @@ class _CommentingSectionState extends State<CommentingSection> {
             children: [
               CircleAvatar(
                 radius: 25,
-                backgroundImage: NetworkImage(message.imageUrl),
+                backgroundColor: hasImageUrl ? Colors.transparent : colorScheme.primary, 
+                backgroundImage: hasImageUrl
+                    ? NetworkImage(message.imageUrl) as ImageProvider<Object>?
+                    : null,
+                child: hasImageUrl
+                    ? null
+                    : Text(
+                        initials,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -569,23 +548,19 @@ class _CommentingSectionState extends State<CommentingSection> {
                               ),
                             ),
                           ),
-                        // REPLACED: GestureDetector with PopupMenuButton
                         PopupMenuButton<String>(
                           onSelected: (String result) {
                             if (result == 'delete' && message.id != null) {
                               _deleteMessage(message);
                             } else if (result == 'report' && message.id != null) {
-                                // MODIFIED: Call the new report handler
                                 _handleReport(message);
                             }
                           },
                           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                            // Allow all users to report
                             const PopupMenuItem<String>(
                               value: 'report',
                               child: Text('Report'),
                             ),
-                            // Only show Delete if the current user is the sender
                             if (isCurrentUserSender)
                               const PopupMenuItem<String>(
                                 value: 'delete',
@@ -608,7 +583,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // NEW: Display the calculated time
                     Text(
                       'Route: ${message.route}  |  $timeDisplay',
                       style: TextStyle(
@@ -622,14 +596,13 @@ class _CommentingSectionState extends State<CommentingSection> {
             ],
           ),
           const SizedBox(height: 12),
-          // Like/Dislike Buttons
           Padding(
             padding: const EdgeInsets.only(left: 61),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 InkWell(
-                  onTap: () => _handleVote(message, true), // Handle Like
+                  onTap: () => _handleVote(message, true),
                   child: Row(
                     children: [
                       Icon(
@@ -639,7 +612,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        message.likes.toString(), // Display global count from Firestore
+                        message.likes.toString(),
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
                       ),
                     ],
@@ -647,7 +620,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
                 const SizedBox(width: 24),
                 InkWell(
-                  onTap: () => _handleVote(message, false), // Handle Dislike
+                  onTap: () => _handleVote(message, false),
                   child: Row(
                     children: [
                       Icon(
@@ -657,7 +630,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        message.dislikes.toString(), // Display global count from Firestore
+                        message.dislikes.toString(),
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
                       ),
                     ],
@@ -706,7 +679,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // Inject the fetched user interaction state into the message objects for rendering
     final List<ChatMessage> currentMessages = widget.chatMessages.map((msg) {
         if (msg.id != null && _userInteractions.containsKey(msg.id)) {
           return ChatMessage(
@@ -726,13 +698,11 @@ class _CommentingSectionState extends State<CommentingSection> {
         return msg;
     }).toList(); 
 
-    // Filter messages after injecting user interaction state
     final filteredMessages = currentMessages.where((message) {
       if (_selectedFilter == 'All') return true;
 
       final messageLower = message.message.toLowerCase();
 
-      // START NEW FILTERING LOGIC
       switch (_selectedFilter) {
         case 'Warning':
           return messageLower.contains('traffic') ||
@@ -789,7 +759,6 @@ class _CommentingSectionState extends State<CommentingSection> {
         default:
           return true;
       }
-      // END NEW FILTERING LOGIC
     }).toList();
 
 
@@ -816,7 +785,6 @@ class _CommentingSectionState extends State<CommentingSection> {
           ),
           child: Column(
             children: [
-              // Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -850,7 +818,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                   ),
                 ),
               ),
-              // Filter Chips
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: SingleChildScrollView(
@@ -872,13 +839,12 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
               ),
               Divider(height: 1, color: Theme.of(context).dividerColor),
-              // Comments List
               Expanded(
                 child: ListView.builder(
                   controller: scrollController,
                   itemCount: filteredMessages.length,
                   itemBuilder: (context, index) {
-                    return _buildInsightCard(filteredMessages[index]); // Pass the updated message
+                    return _buildInsightCard(filteredMessages[index]);
                   },
                 ),
               ),

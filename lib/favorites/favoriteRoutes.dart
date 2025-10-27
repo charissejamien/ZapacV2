@@ -21,12 +21,12 @@ class _FavoriteRoutesPageState extends State<FavoriteRoutesPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.primary,
         elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           'Favorite Routes',
           style: TextStyle(color: cs.onPrimary),

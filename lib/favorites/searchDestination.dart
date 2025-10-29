@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async'; 
-import 'favoriteRouteData.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:zapac/core/utils/map_utils.dart'; 
 import 'package:google_maps_flutter/google_maps_flutter.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart'; 
+import '../routes/route_list.dart'; // <-- added import
+import 'favoriteRouteData.dart'; // ensure favorites data is available
 
 class SearchDestinationPage extends StatefulWidget {
   final String? initialSearchText;
@@ -185,24 +186,18 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     _saveRecentLocation(name: name, latitude: lat, longitude: lng); 
 
 
-    Navigator.pop(context, {
-      'place': {
-        'place_id': prediction['place_id'],
-        'description': name,
-        'latitude': lat,
-        'longitude': lng,
-      }
-    });
-  }
+    final place = {
+      'place_id': prediction['place_id'],
+      'description': prediction['description'],
+      'latitude': placeDetails['geometry']['location']['lat'],
+      'longitude': placeDetails['geometry']['location']['lng'],
+    };
 
-  void _onRecentLocationSelected(Map<String, dynamic> location) {
-    Navigator.pop(context, {
-        'recent_location': {
-          'name': location['name'],
-          'latitude': location['latitude'],
-          'longitude': location['longitude'],
-        }
-      });
+    // push RouteListPage and pass the selected destination
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
+    );
   }
 
 
@@ -235,9 +230,19 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         ),
         backgroundColor: theme.primaryColor, 
       ),
+      // When predictions exist show them, otherwise show favorites first then recents
       body: _predictions.isNotEmpty
           ? _buildPredictionList(cs)
-          : _buildRecentLocations(cs),
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Favorites (fixed height horizontal list)
+                _buildFavoritesSection(cs),
+                const Divider(height: 1),
+                // Recent locations fill remaining space
+                Expanded(child: _buildRecentLocations(cs)),
+              ],
+            ),
     );
   }
 
@@ -256,7 +261,69 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     );
   }
 
-  // MODIFIED: Simplified loading and ensured left-alignment for all states
+  // New: Favorites section shown above recent locations
+  Widget _buildFavoritesSection(ColorScheme cs) {
+    if (favoriteRoutes.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(
+          "No favorite routes saved.",
+          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12.0, bottom: 8.0),
+      child: SizedBox(
+        height: 140,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: favoriteRoutes.length,
+          itemBuilder: (context, index) {
+            final route = favoriteRoutes[index];
+            return GestureDetector(
+              onTap: () {
+                final place = {
+                  'place_id': null,
+                  'description': route.endAddress,
+                  'latitude': route.latitude,
+                  'longitude': route.longitude,
+                };
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
+                );
+              },
+              child: Card(
+                margin: const EdgeInsets.only(right: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                color: cs.surface,
+                child: Container(
+                  width: 260,
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(route.routeName, style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface)),
+                      const SizedBox(height: 6),
+                      Text('From: ${route.startAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 12)),
+                      Text('To: ${route.endAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 12)),
+                      const Spacer(),
+                      Text('${route.distance} • ${route.duration}', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // Modified: _buildRecentLocations now returns only the recent list widget (no Expanded internally)
   Widget _buildRecentLocations(ColorScheme cs) {
     
     // Check if the user is not logged in first.
@@ -272,79 +339,74 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     
     // Handle Loading/Empty states using Column for left alignment
     if (_isLoadingRecent || _dbRecentLocations.isEmpty) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // MODIFIED: Align to the left
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              "Recent Locations",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: cs.primary,
-              ),
-            ),
-          ),
-          // MODIFIED: Simple, non-expanded loading indicator
-          if (_isLoadingRecent)
-             Padding(
-                padding: const EdgeInsets.only(left: 16.0, top: 8),
-                child: SizedBox(
-                    width: 20, 
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
-             )
-          else if (_dbRecentLocations.isEmpty)
-             Padding(
-                padding: const EdgeInsets.only(left: 16.0, top: 8),
-                child: Text(
-                  "Start searching to see your recent locations here!",
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+      return SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, // MODIFIED: Align to the left
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                "Recent Locations",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: cs.primary,
                 ),
               ),
-        ],
+            ),
+            if (_isLoadingRecent)
+               Padding(
+                  padding: const EdgeInsets.only(left: 16.0, top: 8),
+                  child: SizedBox(
+                      width: 20, 
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
+               )
+            else
+               Padding(
+                  padding: const EdgeInsets.only(left: 16.0, top: 8),
+                  child: Text(
+                    "Start searching to see your recent locations here!",
+                    style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                  ),
+                ),
+          ],
+        ),
       );
     }
 
-    // Populated state remains the same, using Column for left alignment
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            "Recent Locations",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: cs.primary,
+    // Populated state: show a vertical list of recent locations
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 8),
+      itemCount: _dbRecentLocations.length,
+      itemBuilder: (context, index) {
+        final recentLocation = _dbRecentLocations[index];
+        return Card(
+          color: cs.surface,
+          elevation: 1,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: ListTile(
+            leading: Icon(Icons.history, color: cs.secondary),
+            title: Text(
+              recentLocation['name'] as String, 
+              style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
             ),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _dbRecentLocations.length,
-            itemBuilder: (context, index) {
-              final recentLocation = _dbRecentLocations[index];
-              return Card(
-                color: cs.surface,
-                elevation: 1,
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                child: ListTile(
-                  leading: Icon(Icons.history, color: cs.secondary),
-                  title: Text(
-                    recentLocation['name'] as String, 
-                    style: TextStyle(fontWeight: FontWeight.w500, color: cs.onSurface),
-                  ),
-                  onTap: () => _onRecentLocationSelected(recentLocation),
-                ),
+            onTap: () {
+              final place = {
+                'place_id': null,
+                'description': recentLocation['name'],
+                'latitude': recentLocation['latitude'],
+                'longitude': recentLocation['longitude'],
+              };
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
               );
             },
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

@@ -21,7 +21,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.zapac"
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName

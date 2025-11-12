@@ -230,6 +230,8 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         ),
         backgroundColor: theme.primaryColor, 
       ),
+      
+      
       // When predictions exist show them, otherwise show favorites first then recents
       body: _predictions.isNotEmpty
           ? _buildPredictionList(cs)

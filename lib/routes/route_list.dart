@@ -1,53 +1,76 @@
 import 'package:flutter/material.dart';
+import 'routes_service.dart';
 
 class RouteListPage extends StatefulWidget {
   final Map<String, dynamic>? destination;
   final Map<String, dynamic>? origin;
 
-  const RouteListPage({Key? key, this.destination, this.origin}) : super(key: key);
+  const RouteListPage({Key? key, this.destination, this.origin})
+      : super(key: key);
 
   @override
   State<RouteListPage> createState() => _RouteListPageState();
 }
 
 class _RouteListPageState extends State<RouteListPage> {
-  // sample model - replace with real route data when available
-  final List<RouteOption> options = List.generate(
-    5,
-    (i) => RouteOption(
-      depart: '10:07',
-      arrive: '10:36',
-      durationMinutes: 21,
-      totalFare: 50,
-      legs: ['walk', 'jeep', 'bus'],
-    ),
-  );
+  List<RouteOption> options = [];
+  bool isLoading = true;
+  bool hasError = false;
 
   SortBy _sortBy = SortBy.time;
 
   @override
   void initState() {
     super.initState();
-    // debug: remove in production
-    // print('RouteListPage destination: ${widget.destination}');
+    _loadRoutes();
+  }
+
+  Future<void> _loadRoutes() async {
+    try {
+      final origin = widget.origin?['description'] ??
+          widget.origin?['name'] ??
+          "Filinvest Cyberzone Cebu Tower One";
+
+      final destination = widget.destination?['description'] ??
+          widget.destination?['name'] ??
+          "SM City Cebu";
+
+      final result = await RoutesService.getRoutes(
+        origin: origin,
+        destination: destination,
+      );
+
+      setState(() {
+        options = result;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        hasError = true;
+        isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final destLabel = widget.destination != null
-        ? (widget.destination!['description'] ?? widget.destination!['name'] ?? 'Destination')
+        ? (widget.destination!['description'] ??
+            widget.destination!['name'] ??
+            'Destination')
         : 'SM City Cebu';
 
     final originLabel = widget.origin != null
-        ? (widget.origin!['description'] ?? widget.origin!['name'] ?? 'Origin')
-        : 'Filinvest Cyberzone Cebu Tower one';
+        ? (widget.origin!['description'] ??
+            widget.origin!['name'] ??
+            'Origin')
+        : 'Filinvest Cyberzone Cebu Tower One';
 
     return Scaffold(
       backgroundColor: const Color(0xFF3C3F42),
       body: SafeArea(
         child: Column(
           children: [
-            // white card area
             Container(
               margin: const EdgeInsets.all(12),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -63,34 +86,62 @@ class _RouteListPageState extends State<RouteListPage> {
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
-                  _HeaderChips(originLabel: originLabel, destLabel: destLabel),
+                  _HeaderChips(
+                    originLabel: originLabel,
+                    destLabel: destLabel,
+                  ),
                   const SizedBox(height: 12),
                   _SortRow(
                     sortBy: _sortBy,
                     onChanged: (s) => setState(() => _sortBy = s),
                   ),
-                  const SizedBox(height: 8),
-                  // route list area
+                  const SizedBox(height: 12),
+
+                  /// MAIN ROUTE LIST
                   SizedBox(
                     height: MediaQuery.of(context).size.height * 0.60,
-                    child: ListView.separated(
-                      itemCount: options.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (context, index) {
-                        final opt = options[index];
-                        return _RouteCard(option: opt);
-                      },
-                    ),
+                    child: Builder(builder: (context) {
+                      if (isLoading) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.blue,
+                          ),
+                        );
+                      }
+
+                      if (hasError) {
+                        return const Center(
+                          child: Text(
+                            "Failed to load routes",
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        );
+                      }
+
+                      if (options.isEmpty) {
+                        return const Center(
+                          child: Text("No routes found"),
+                        );
+                      }
+
+                      return ListView.separated(
+                        itemCount: options.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final opt = options[index];
+                          return _RouteCard(option: opt);
+                        },
+                      );
+                    }),
                   ),
                 ],
               ),
             ),
-            // optional: a small spacer so content doesn't touch bottom of screen
             const SizedBox(height: 8),
           ],
         ),
       ),
-      // NOTE: do not include bottomNavigationBar here — you said you have a shared component
     );
   }
 }
@@ -125,7 +176,9 @@ class _SortRow extends StatelessWidget {
               child: Text('Time', style: TextStyle(fontSize: 12)),
             ),
           ],
-          onPressed: (i) => onChanged(i == 0 ? SortBy.fare : SortBy.time),
+          onPressed: (i) {
+            onChanged(i == 0 ? SortBy.fare : SortBy.time);
+          },
         ),
       ],
     );
@@ -135,7 +188,11 @@ class _SortRow extends StatelessWidget {
 class _HeaderChips extends StatelessWidget {
   final String originLabel;
   final String destLabel;
-  const _HeaderChips({this.originLabel = 'Filinvest Cyberzone Cebu Tower one', this.destLabel = 'SM City Cebu'});
+
+  const _HeaderChips({
+    required this.originLabel,
+    required this.destLabel,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -182,13 +239,14 @@ class RouteOption {
 
 class _RouteCard extends StatelessWidget {
   final RouteOption option;
+
   const _RouteCard({required this.option});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        // TODO: navigate to route details
+        // TODO: Navigate to route details
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
@@ -201,9 +259,10 @@ class _RouteCard extends StatelessWidget {
                   Text(
                     '${option.depart} - ${option.arrive}',
                     style: const TextStyle(
-                        color: Color(0xFF1976D2),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600),
+                      color: Color(0xFF1976D2),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -222,11 +281,15 @@ class _RouteCard extends StatelessWidget {
               children: [
                 Text(
                   '${option.durationMinutes} mins',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 6),
-                Text('Total Fare: ${option.totalFare} php',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                Text(
+                  'Total Fare: ${option.totalFare} php',
+                  style: const TextStyle(
+                      color: Colors.black54, fontSize: 12),
+                ),
               ],
             ),
           ],
@@ -242,10 +305,10 @@ class _RouteCard extends StatelessWidget {
         icon = Icons.directions_walk;
         break;
       case 'jeep':
-        icon = Icons.directions_bus;
+        icon = Icons.directions_bus; // use bus icon for jeepney
         break;
       case 'bus':
-        icon = Icons.directions_transit;
+        icon = Icons.directions_bus_filled;
         break;
       case 'train':
         icon = Icons.train;

@@ -16,6 +16,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  bool _isFacebookLoading = false; 
   String? _errorMessage;
 
   final emailController = TextEditingController();
@@ -29,12 +30,14 @@ class _LoginPageState extends State<LoginPage> {
   final appBarColor = const Color(0xFF4A6FA5);
 
   void _setLocalError(String message) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = message;
-          if (_isLoading) _isLoading = false;
-        });
-      }
+    if (mounted) {
+      setState(() {
+        _errorMessage = message;
+        if (_isLoading) _isLoading = false;
+        if (_isFacebookLoading) _isFacebookLoading = false;
+        if (_isGoogleLoading) _isGoogleLoading = false;
+      });
+    }
   }
 
   Future<void> _onGoogleLogin() async {
@@ -51,14 +54,39 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       String message = e.toString().replaceFirst('Exception: ', '');
       if (message.contains('Google sign-in failed')) {
-          _setLocalError('Google sign-in failed. Please try again.');
+        _setLocalError('Google sign-in failed. Please try again.');
       } else {
-          _setLocalError(message);
+        _setLocalError(message);
       }
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
+  
+  // Implemented Facebook Login Handler
+  Future<void> _onFacebookLogin() async {
+    setState(() {
+      _isFacebookLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final user = await _authService.signInWithFacebook();
+      if (user != null && mounted) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard()));
+      }
+    } catch (e) {
+      String message = e.toString().replaceFirst('Exception: ', '');
+      if (message.contains('Facebook sign-in failed')) {
+        _setLocalError('Facebook sign-in failed. Please try again.');
+      } else {
+        _setLocalError(message);
+      }
+    } finally {
+      if (mounted) setState(() => _isFacebookLoading = false);
+    }
+  }
+
 
   Future<void> _handleLogin() async {
     final email = emailController.text.trim();
@@ -92,8 +120,13 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      String message = 'Invalid email or password. Please try again.';
-      _setLocalError(message);
+      String message = e.toString().replaceFirst('Exception: ', '');
+      
+      if (message.contains('Invalid email or password') || message.contains('user-not-found')) {
+          _setLocalError('Invalid email or password. Please try again.');
+      } else {
+          _setLocalError(message);
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -103,16 +136,23 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-   void _navigateToSignUp() {
-  Navigator.pushReplacement(
-    context, 
-    PageRouteBuilder(
-      pageBuilder: (context, animation1, animation2_) => const SignUpPage(),
-      transitionDuration: Duration.zero,
-      reverseTransitionDuration: Duration.zero,
-    )
-  );
-}
+  void _navigateToSignUp() {
+    Navigator.pushReplacement(
+      context, 
+      PageRouteBuilder(
+        pageBuilder: (context, animation1, animation2_) => const SignUpPage(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      )
+    );
+  }
+  
+  void _navigateToResetPassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ResetPasswordPage()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,10 +167,10 @@ class _LoginPageState extends State<LoginPage> {
         ? Colors.white
         : Colors.black;
 
+    final bool disableAll = _isLoading || _isGoogleLoading || _isFacebookLoading;
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
-
-     // INSERT THIS:
 
       appBar: 
       AuthHeader(
@@ -187,7 +227,7 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: (_isLoading || _isGoogleLoading) ? null : _handleLogin,
+                    onPressed: disableAll ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: greenColor,
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -221,12 +261,7 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     Text("Forgotten your password? ", style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ResetPasswordPage()),
-                        );
-                      },
+                      onTap: _navigateToResetPassword,
                       child: const Text(
                         "Reset password",
                         style: TextStyle(color: Colors.red, fontWeight: FontWeight.w400),
@@ -306,8 +341,8 @@ class _LoginPageState extends State<LoginPage> {
 
     final facebookBgLight = isDarkMode ? darkBgColor : Theme.of(context).scaffoldBackgroundColor;
     final facebookFgLight = isDarkMode ? darkFgColor : Colors.black;
-    final isFacebookLoading = false;
-    final bool disableFacebook = isGoogleLoading;
+    
+    final bool disableSocial = _isLoading || _isGoogleLoading || _isFacebookLoading;
 
 
     return Row(
@@ -321,8 +356,8 @@ class _LoginPageState extends State<LoginPage> {
             googleBgLight,
             googleFgLight,
             googleFgLight,
-            isGoogleLoading,
-            _onGoogleLogin,
+            _isGoogleLoading,
+            disableSocial ? () {} : _onGoogleLogin,
           ),
         ),
         SizedBox(
@@ -333,8 +368,8 @@ class _LoginPageState extends State<LoginPage> {
             facebookBgLight,
             isDarkMode ? darkFgColor : Colors.blue,
             facebookFgLight,
-            isFacebookLoading,
-            disableFacebook ? () {} : () {},
+            _isFacebookLoading,
+            disableSocial ? () {} : _onFacebookLogin,
           ),
         ),
       ],

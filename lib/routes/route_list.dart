@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 class RouteListPage extends StatefulWidget {
@@ -16,7 +17,8 @@ class _RouteListPageState extends State<RouteListPage> {
   List<RouteOption> options = [];
   bool _isLoading = true;
   String? _errorMessage;
-  SortBy _sortBy = SortBy.time;
+  // SortBy _sortBy = SortBy.time;
+  Map<String, double>? _originCoords;
 
   // Replace with your actual API key
   final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc";
@@ -36,14 +38,22 @@ class _RouteListPageState extends State<RouteListPage> {
       return;
     }
 
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
+      final origin = await _resolveOrigin();
+      if (!mounted) return;
+
       // Get origin coordinates (current location or provided origin)
-      final originLat = widget.origin?['latitude'] ?? 10.3157; // Default to Cebu
-      final originLng = widget.origin?['longitude'] ?? 123.8854;
+      final originLat = origin['latitude'] ?? 10.3157; // Default to Cebu
+      final originLng = origin['longitude'] ?? 123.8854;
 
       // Get destination coordinates
-      final destLat = widget.destination!['latitude'];
-      final destLng = widget.destination!['longitude'];
+      final destLat = _toDouble(widget.destination!['latitude']);
+      final destLng = _toDouble(widget.destination!['longitude']);
 
       if (destLat == null || destLng == null) {
         setState(() {
@@ -159,12 +169,72 @@ class _RouteListPageState extends State<RouteListPage> {
         });
       }
     } catch (e) {
-      print('Error fetching routes: $e');
+      final message = e.toString().replaceFirst('Exception: ', '');
+      print('Error fetching routes: $message');
       setState(() {
-        _errorMessage = "Error: $e";
+        _errorMessage = message.isEmpty ? "Error fetching routes." : message;
         _isLoading = false;
       });
     }
+  }
+
+  Future<Map<String, double>> _resolveOrigin() async {
+    if (_originCoords != null) {
+      return _originCoords!;
+    }
+
+    final providedOrigin = _extractCoordinates(widget.origin);
+    if (providedOrigin != null) {
+      _originCoords = providedOrigin;
+      return providedOrigin;
+    }
+
+    final currentLocation = await _getCurrentLocation();
+    _originCoords = currentLocation;
+    return currentLocation;
+  }
+
+  Map<String, double>? _extractCoordinates(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    final lat = _toDouble(data['latitude']);
+    final lng = _toDouble(data['longitude']);
+
+    if (lat == null || lng == null) return null;
+
+    return {'latitude': lat, 'longitude': lng};
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  Future<Map<String, double>> _getCurrentLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('Location services are disabled. Please enable them.');
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      throw Exception('Location permission denied. Allow access to continue.');
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception(
+          'Location permissions are permanently denied. Enable them from Settings.');
+    }
+
+    final position =
+        await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+
+    return {'latitude': position.latitude, 'longitude': position.longitude};
   }
 
   int _calculateFare(double distanceKm) {
@@ -177,18 +247,12 @@ class _RouteListPageState extends State<RouteListPage> {
     }
   }
 
-  void _sortRoutes() {
-    setState(() {
-      if (_sortBy == SortBy.fare) {
-        options.sort((a, b) => a.totalFare.compareTo(b.totalFare));
-      } else {
-        options.sort((a, b) => a.durationMinutes.compareTo(b.durationMinutes));
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     final destLabel = widget.destination != null
         ? (widget.destination!['description'] ?? widget.destination!['name'] ?? 'Destination')
         : 'Destination';
@@ -198,139 +262,117 @@ class _RouteListPageState extends State<RouteListPage> {
         : 'Your Location';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF3C3F42),
+      backgroundColor: colorScheme.background,
+      appBar: AppBar(
+        backgroundColor: colorScheme.primary,
+        elevation: 0,
+        iconTheme: IconThemeData(color: colorScheme.onPrimary),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: colorScheme.onPrimary),
+          onPressed: _handleBackToDashboard,
+        ),
+        title: Text(
+          'Routes',
+          style: TextStyle(
+            color: colorScheme.onPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: false,
+      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _HeaderChips(originLabel: originLabel, destLabel: destLabel),
+              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              
+              // Loading, Error, or Route List
+              Expanded(
+                child: _buildRouteContent(colorScheme),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Routes',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 8),
-                  _HeaderChips(originLabel: originLabel, destLabel: destLabel),
-                  const SizedBox(height: 12),
-                  _SortRow(
-                    sortBy: _sortBy,
-                    onChanged: (s) {
-                      setState(() => _sortBy = s);
-                      _sortRoutes();
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Loading, Error, or Route List
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.60,
-                    child: _isLoading
-                        ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 16),
-                                Text('Fetching routes...', style: TextStyle(color: Colors.black54)),
-                              ],
-                            ),
-                          )
-                        : _errorMessage != null
-                            ? Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      _errorMessage!,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(color: Colors.black87),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _isLoading = true;
-                                          _errorMessage = null;
-                                        });
-                                        _fetchRoutes();
-                                      },
-                                      child: const Text('Retry'),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : options.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'No routes available',
-                                      style: TextStyle(color: Colors.black54),
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    itemCount: options.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1),
-                                    itemBuilder: (context, index) {
-                                      final opt = options[index];
-                                      return _RouteCard(option: opt);
-                                    },
-                                  ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
-}
 
-enum SortBy { fare, time }
-
-class _SortRow extends StatelessWidget {
-  final SortBy sortBy;
-  final ValueChanged<SortBy> onChanged;
-
-  const _SortRow({required this.sortBy, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Text('Sort', style: TextStyle(color: Colors.black54)),
-        const Spacer(),
-        ToggleButtons(
-          isSelected: [sortBy == SortBy.fare, sortBy == SortBy.time],
-          borderRadius: BorderRadius.circular(6),
-          selectedColor: Colors.white,
-          color: Colors.black54,
-          fillColor: Colors.blueGrey,
-          children: const [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('Fare', style: TextStyle(fontSize: 12)),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text('Time', style: TextStyle(fontSize: 12)),
+  Widget _buildRouteContent(ColorScheme colorScheme) {
+    if (_isLoading) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Fetching routes...',
+              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
             ),
           ],
-          onPressed: (i) => onChanged(i == 0 ? SortBy.fare : SortBy.time),
         ),
-      ],
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: colorScheme.error),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colorScheme.onSurface),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _fetchRoutes,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (options.isEmpty) {
+      return Center(
+        child: Text(
+          'No routes available right now.',
+          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 24),
+      itemCount: options.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final opt = options[index];
+        return _RouteCard(option: opt);
+      },
     );
   }
+
+  void _handleBackToDashboard() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 }
+
 
 class _HeaderChips extends StatelessWidget {
   final String originLabel;
@@ -339,26 +381,83 @@ class _HeaderChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _roundedChip(originLabel),
-        const SizedBox(height: 8),
-        _roundedChip(destLabel),
-      ],
-    );
-  }
+    final colorScheme = Theme.of(context).colorScheme;
+    final textColor = colorScheme.onPrimary;
 
-  Widget _roundedChip(String label) {
+    Widget buildRow(String label, String value, IconData icon) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: textColor, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: textColor.withOpacity(0.8),
+                    fontSize: 12,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFE9F0F6),
-        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary,
+            colorScheme.primaryContainer.withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withOpacity(0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Text(
-        label,
-        style: const TextStyle(color: Colors.black87),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Trip summary',
+            style: TextStyle(
+              color: textColor.withOpacity(0.9),
+              fontSize: 13,
+              letterSpacing: 0.4,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          buildRow('Your Location', originLabel, Icons.radio_button_checked),
+          const SizedBox(height: 12),
+          Divider(color: textColor.withOpacity(0.2), height: 1),
+          const SizedBox(height: 12),
+          buildRow('Destination', destLabel, Icons.location_on_rounded),
+        ],
       ),
     );
   }
@@ -386,73 +485,129 @@ class _RouteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        // TODO: navigate to route details
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      elevation: 2,
+      shadowColor: colorScheme.shadow.withOpacity(0.1),
+      color: colorScheme.surface,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          // TODO: hook into route detail flow
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${option.depart} - ${option.arrive}',
-                    style: const TextStyle(
-                        color: Color(0xFF1976D2),
+                  Icon(Icons.schedule, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${option.depart} → ${option.arrive}',
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
                         fontSize: 16,
-                        fontWeight: FontWeight.w600),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      for (var leg in option.legs) ...[
-                        _iconForLeg(leg),
-                        const SizedBox(width: 8),
-                      ],
-                    ],
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '${option.durationMinutes} mins',
+                      style: TextStyle(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${option.durationMinutes} mins',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                Text('Total Fare: ₱${option.totalFare}',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12)),
-              ],
-            ),
-          ],
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final leg in option.legs) _legChip(leg, colorScheme),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Estimated fare',
+                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+                  ),
+                  Text(
+                    '₱${option.totalFare}',
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _iconForLeg(String leg) {
-    IconData icon;
+  Widget _legChip(String leg, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.secondary.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_iconForLeg(leg), size: 16, color: colorScheme.secondary),
+          const SizedBox(width: 6),
+          Text(
+            _formatLegLabel(leg),
+            style: TextStyle(
+              color: colorScheme.secondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatLegLabel(String leg) {
+    if (leg.isEmpty) return leg;
+    return leg[0].toUpperCase() + leg.substring(1);
+  }
+
+  IconData _iconForLeg(String leg) {
     switch (leg) {
       case 'walk':
-        icon = Icons.directions_walk;
-        break;
+        return Icons.directions_walk;
       case 'jeep':
-        icon = Icons.directions_bus;
-        break;
+        return Icons.directions_bus;
       case 'bus':
-        icon = Icons.directions_transit;
-        break;
+        return Icons.directions_transit;
       case 'train':
-        icon = Icons.train;
-        break;
+        return Icons.train;
       default:
-        icon = Icons.circle;
+        return Icons.circle;
     }
-    return Icon(icon, size: 16, color: Colors.black54);
   }
 }

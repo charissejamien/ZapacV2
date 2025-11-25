@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'login_page.dart';
 import 'authentication.dart';
 import 'package:zapac/core/widgets/authheader.dart';
@@ -96,6 +97,72 @@ class _SignUpPageState extends State<SignUpPage> {
     });
   }
 
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, 
+      barrierColor: Colors.black.withOpacity(0.2),
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: Colors.white, 
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+
+                Icon(
+                  Icons.check_circle,
+                  color: _green,
+                  size: 60,
+                ),
+                const SizedBox(height: 20),
+                
+                // Success Message
+                const Text(
+                  "Sign up successful! Please check your email inbox (and spam folder) to verify your account.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 25),
+                
+                // Log In Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _green,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text(
+                      "Log In", 
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _onSignUp() async {
     setState(() {
       _generalError = null;
@@ -126,10 +193,7 @@ class _SignUpPageState extends State<SignUpPage> {
     try {
       final cred = await AuthService().signUpWithEmail(email, pw);
       if (cred != null && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-        );
+        _showSuccessDialog();
       }
     } catch (e) {
       setState(() => _generalError = e.toString());
@@ -343,7 +407,6 @@ class _SignUpPageState extends State<SignUpPage> {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final spacing = screenHeight * 0.006;
-    final appBarColor = const Color(0xFF4A6FA5);
     final bool disableEmailPassSignup = _isLoading || _isGoogleLoading;
 
 

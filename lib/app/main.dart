@@ -13,10 +13,9 @@ class ThemeNotifier extends ChangeNotifier {
   void setThemeMode(ThemeMode mode) async {
     if (mode != _themeMode) {
       _themeMode = mode;
-      // This call triggers a rebuild on all widgets listening to ThemeNotifier,
-      // which now includes ZapacApp via ListenableBuilder.
+
       notifyListeners();
-      
+
       final prefs = await SharedPreferences.getInstance();
       prefs.setBool('isDarkMode', mode == ThemeMode.dark);
     }
@@ -32,12 +31,11 @@ final ThemeNotifier themeNotifier = ThemeNotifier(ThemeMode.light);
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  
-  // OPTIMIZATION: Load theme preference before running the app
+
   final prefs = await SharedPreferences.getInstance();
   final isDarkMode = prefs.getBool('isDarkMode') ?? false;
   themeNotifier.setInitialTheme(isDarkMode ? ThemeMode.dark : ThemeMode.light);
-  
+
   runApp(const ZapacApp());
 }
 
@@ -46,14 +44,14 @@ class ZapacApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // FIX: Wrap MaterialApp in ListenableBuilder to rebuild on themeNotifier changes
+
     return ListenableBuilder(
       listenable: themeNotifier,
       builder: (context, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Zapac',
-          
+
           // --- Light Theme ---
           theme: ThemeData(
             brightness: Brightness.light,
@@ -72,7 +70,7 @@ class ZapacApp extends StatelessWidget {
               color: Color(0xFF4A6FA5),
             ),
           ),
-          
+
           // --- Dark Theme ---
           darkTheme: ThemeData(
             brightness: Brightness.dark,
@@ -87,15 +85,13 @@ class ZapacApp extends StatelessWidget {
               error: Color(0xFFCF6679),
               outlineVariant: Color(0xFF444444),
             ),
-            // Changed Colors.grey to const Color(0xFF1E1E1E) for consistency
-            appBarTheme: const AppBarTheme(color: Color(0xFF1E1E1E)), 
-            scaffoldBackgroundColor: const Color(0xFF121212), // Use defined Color for const
-            cardColor: const Color(0xFF1E1E1E), // Use defined Color for const
+            appBarTheme: const AppBarTheme(color: Color(0xFF1E1E1E)),
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            cardColor: const Color(0xFF1E1E1E),
           ),
-          
-          // This value is now updated on every themeNotifier change
+
           themeMode: themeNotifier.themeMode,
-          
+
           initialRoute: '/',
           routes: {
             '/': (context) => const LoginPage(),

@@ -1,7 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Optional semantic colors you can access via Theme.of(context).extension<AppColors>().
+class _AppThemeColors {
+  // Primary color
+  final Color blue = const Color(0xFF4A6FA5);
+  // Secondary color
+  final Color green = const Color(0xFF6CA89A);
+  // Custom Dark Green
+  final Color darkGreen = const Color(0xFF38645C);
+}
+
+class AppTheme {
+  static final _AppThemeColors colors = _AppThemeColors();
+}
+
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   final Color success;
@@ -23,10 +35,8 @@ class AppColors extends ThemeExtension<AppColors> {
     }
 }
 
-// Preferred font family order based on provided CSS variables.
-// We will set Manrope as the base, then fall back in this order.
 const List<String> _fallbackFonts = <String>[
-  'SF Pro Text', // iOS/macOS system font (if available on device)
+  'SF Pro Text',
   'Istok Web',
   'Inter',
   'Lexend Zetta',
@@ -36,17 +46,13 @@ const List<String> _fallbackFonts = <String>[
 ];
 
 class ZapacTheme {
-  // Shared typography
-  static const _fontFamily = null; // set your custom font here if any
 
   static TextTheme _textTheme(Brightness b) {
     final base = ThemeData(brightness: b, useMaterial3: true).textTheme;
 
-    // Base body uses Inter for readability
     final body = GoogleFonts.interTextTheme(base);
 
     return body.copyWith(
-      // Big headlines: Lexend Zetta for strong display
       headlineLarge: GoogleFonts.lexendZetta(
         fontSize: 28,
         fontWeight: FontWeight.w700,
@@ -58,7 +64,6 @@ class ZapacTheme {
         letterSpacing: -0.2,
       ),
 
-      // Titles: Manrope for clean UI headings
       titleLarge: GoogleFonts.manrope(
         fontSize: 20,
         fontWeight: FontWeight.w700,
@@ -72,22 +77,20 @@ class ZapacTheme {
         fontWeight: FontWeight.w600,
       ),
 
-      // Body: Inter (already set via body), tweak sizes
       bodyLarge: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w400),
       bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400),
       bodySmall: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
 
-      // Labels/Buttons: Nunito for friendliness
+
       labelLarge: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700),
       labelMedium: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w600),
       labelSmall: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w600),
 
-      // Optional alt text: Istok Web for captions/hints
+
       displaySmall: GoogleFonts.istokWeb(fontSize: 12, fontWeight: FontWeight.w400),
     );
   }
 
-  // Component themes used by both light & dark
   static List<ThemeExtension<dynamic>> _extensions(Brightness b) => [
     AppColors(
       success: b == Brightness.light ? const Color(0xFF2E7D32) : const Color(0xFF81C784),
@@ -99,21 +102,21 @@ class ZapacTheme {
   static ThemeData light = ThemeData(
     brightness: Brightness.light,
     useMaterial3: true,
-    primaryColor: const Color(0xFF4A6FA5),
+    primaryColor: AppTheme.colors.blue,
     fontFamily: GoogleFonts.manrope().fontFamily,
     fontFamilyFallback: _fallbackFonts,
-    colorScheme: const ColorScheme.light(
-      primary: Color(0xFF4A6FA5),
+    colorScheme: ColorScheme.light(
+      primary: AppTheme.colors.blue,
       onPrimary: Colors.white,
       background: Colors.white,
       surface: Colors.white,
       onSurface: Colors.black,
-      secondary: Color(0xFF6CA89A),
-      error: Color(0xFFE97C7C),
-      outlineVariant: Color(0xFFDDDDDD),
+      secondary: AppTheme.colors.green,
+      error: const Color(0xFFE97C7C),
+      outlineVariant: const Color(0xFFDDDDDD),
     ),
     textTheme: _textTheme(Brightness.light),
-    appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF4A6FA5)),
+    appBarTheme: AppBarTheme(backgroundColor: AppTheme.colors.blue),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         minimumSize: const Size.fromHeight(44),

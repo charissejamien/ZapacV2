@@ -1,5 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Zapac</string>
     <string name="facebook_app_id">1469785710946441</string>
-    <string name="fb_login_protocol_scheme">f1469785710946441</string>
+    <string name="facebook_client_token">3d2d19e96b9ec304f9b63675c343fa35</string> <!-- 🔥 MISSING LINE ADDED 🔥 -->
+    <string name="fb_login_protocol_scheme">fb1469785710946441</string>
 </resources>

@@ -1,73 +1,238 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:zapac/app/app_theme.dart';
+import 'package:zapac/authentication/authentication.dart';
+import 'package:zapac/authentication/verify_code_page.dart';
 
 class ResetPasswordPage extends StatefulWidget {
-  const ResetPasswordPage({Key? key}) : super(key: key);
+  const ResetPasswordPage({super.key});
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
 }
 
-
 class _ResetPasswordPageState extends State<ResetPasswordPage> {
-  final TextEditingController _emailController = TextEditingController();
-  bool _isLoading = false;
+  final emailController = TextEditingController();
+  String? _errorMessage;
+  final AuthService _auth = AuthService();
 
-  Future<void> _sendCode() async {
-  final email = _emailController.text.trim();
-  if (email.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please enter your email')),
-    );
-    return;
+  void resetPassword(BuildContext context) async {
+    setState(() {
+      _errorMessage = null;
+    });
+
+    final email = emailController.text.trim();
+    const String placeholderSentCode = "123456";
+
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = "Please enter your email.";
+      });
+      return;
+    }
+
+
+    try {
+      await _auth.resetPassword(email);
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VerifyCodePage(
+            email: email,
+            sentCode: placeholderSentCode,
+          ),
+        ),
+      );
+    } catch (e) {
+
+      setState(() {
+        final String errorString = e.toString().replaceFirst('Exception: ', '');
+
+        if (errorString == 'No account found for this email.') {
+          _errorMessage = 'Account Not Found';
+        } else {
+
+          _errorMessage = errorString;
+        }
+      });
+    }
+
   }
 
-  try {
-    print("Sending email: $email");
-    final callable = FirebaseFunctions.instance.httpsCallable('sendResetCode');
-    final result = await callable.call({'email': email});
-    print("Response: ${result.data}");
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Code sent successfully')),
-    );
-  } catch (e) {
-    print('Error sending code: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error sending code: $e')),
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 120,
+      decoration: BoxDecoration(
+        color: AppTheme.colors.blue,
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(50.0),
+          bottomRight: Radius.circular(50.0),
+        ),
+      ),
+      child: Stack(
+        children: [
+
+          Positioned(
+            top: 60, 
+            left: 40, 
+            child: TextButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(
+                Icons.arrow_back,
+                color: Colors.white,
+                size: 20,
+              ),
+              label: const Text(
+                'Back',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
-}
+
+  Widget _buildFooter() {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        width: double.infinity,
+        height: 80, 
+        decoration: BoxDecoration(
+          color: AppTheme.colors.blue,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(50.0),
+            topRight: Radius.circular(50.0),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Forgot Password?')),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Enter the email associated with your account and we'll send a code to your email to reset your password.",
-              style: TextStyle(fontSize: 16),
+      body: Stack(
+        children: [
+
+          SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+
+                _buildHeader(context),
+
+                const SizedBox(height: 120),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 45),
+                  child: Text(
+                    "Forgot Password?",
+                    style: TextStyle(
+                      color: AppTheme.colors.green,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.left,
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 45),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Description Text
+                      Text(
+                        "Enter the email associated with your account and we’ll send a code to your email to reset your password.",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 50),
+
+                      // Email Label
+                      const Text(
+                        " Email",
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.left,
+                      ),
+                      const SizedBox(height: 2),
+
+                      // Email Field
+                      TextField(
+                        controller: emailController,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: const Color(0xFFF3EEE6),
+                          errorText: _errorMessage,
+                          errorStyle: const TextStyle(color: Colors.red),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 14.0, horizontal: 12.0),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+
+                      // Send Button
+                      ElevatedButton(
+                        onPressed: () => resetPassword(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.colors.green,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          "Send",
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 100),
+              ],
             ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _sendCode,
-              child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Send'),
-            ),
-          ],
-        ),
+          ),
+          _buildFooter(),
+        ],
       ),
     );
   }

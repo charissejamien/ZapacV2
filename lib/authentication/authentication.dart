@@ -14,6 +14,8 @@ class AuthService {
         email: email,
         password: password,
       );
+
+      await credential.user?.sendEmailVerification();
       return credential;
     } on FirebaseAuthException catch (e) {
       throw Exception(_firebaseError(e));
@@ -29,6 +31,32 @@ class AuthService {
       return credential;
     } on FirebaseAuthException catch (e) {
       throw Exception(_firebaseError(e));
+    }
+  }
+
+  Future<void> resetPassword(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      throw Exception(_firebaseError(e));
+    } catch (e) {
+      throw Exception("Password reset failed: $e");
+    }
+  }
+
+  Future<bool> checkUserExists(String email) async {
+    try {
+
+      final methods = await _auth.fetchSignInMethodsForEmail(email);
+      return methods.isNotEmpty;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'invalid-email') {
+        throw Exception('Invalid email format.');
+      }
+
+      return true; 
+    } catch (e) {
+      throw Exception('Failed to check account status.');
     }
   }
 

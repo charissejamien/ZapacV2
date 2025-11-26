@@ -219,19 +219,19 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  Future<void> _onFacebook() async {
-    setState(() => _isLoading = true);
-    try {
-      final user = await AuthService().signInWithFacebook();
-      if (user != null && mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
-      }
-    } catch (e) {
-      setState(() => _generalError = e.toString());
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
+  // Future<void> _onFacebook() async {
+  //   setState(() => _isLoading = true);
+  //   try {
+  //     final user = await AuthService().signInWithFacebook();
+  //     if (user != null && mounted) {
+  //       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+  //     }
+  //   } catch (e) {
+  //     setState(() => _generalError = e.toString());
+  //   } finally {
+  //     if (mounted) setState(() => _isLoading = false);
+  //   }
+  // }
 
   Widget _inputField({
     required String label,
@@ -487,7 +487,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 _dividerWithText("or sign in with"),
                 const SizedBox(height: 18),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _socialBtn(
                       icon: Icons.g_mobiledata,
@@ -496,21 +496,21 @@ class _SignUpPageState extends State<SignUpPage> {
                       iconColor: Colors.white,
                       textColor: Colors.white,
                       onPressed: _isGoogleLoading ? (){} : _onGoogle,
-                      width: MediaQuery.of(context).size.width * 0.42,
+                      width: 250,
                       isLoading: _isGoogleLoading,
                       isGoogle: true,
                     ),
-                    _socialBtn(
-                      icon: Icons.facebook,
-                      label: "Facebook",
-                      bg: Colors.white,
-                      iconColor: Colors.blue,
-                      textColor: Colors.black,
-                      onPressed: disableEmailPassSignup ? (){} : _onFacebook,
-                      width: MediaQuery.of(context).size.width * 0.42,
-                      isLoading: false,
-                      isGoogle: false,
-                    ),
+                    // _socialBtn(
+                    //   icon: Icons.facebook,
+                    //   label: "Facebook",
+                    //   bg: Colors.white,
+                    //   iconColor: Colors.blue,
+                    //   textColor: Colors.black,
+                    //   onPressed: disableEmailPassSignup ? (){} : _onFacebook,
+                    //   width: MediaQuery.of(context).size.width * 0.42,
+                    //   isLoading: false,
+                    //   isGoogle: false,
+                    // ),
                   ],
                 ),
 

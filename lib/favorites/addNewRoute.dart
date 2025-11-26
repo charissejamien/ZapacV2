@@ -26,6 +26,118 @@ final Future<List<dynamic>> Function(String, String) getPredictions = (String in
   }
 };
 
+// New: Helper method to parse the distance and duration from the route data
+// FIX: Added safer parsing with ?? 0.0 to prevent nulls from distance/duration text
+Map<String, double> _parseRouteMetrics(String distanceText, String durationText) {
+  // Distance parsing (e.g., "5.2 km")
+  final String distanceString = distanceText.replaceAll(RegExp(r' km|\,'), '').trim();
+  final double distanceKm = double.tryParse(distanceString) ?? 0.0; 
+  
+  // Duration parsing (e.g., "7 mins" or "1 hour 2 mins")
+  double durationMin = 0.0;
+  final String durationLower = durationText.toLowerCase();
+  
+  final RegExp timeRegex = RegExp(r'(\d+)\s+(hour|hr|min|mins)');
+  final matches = timeRegex.allMatches(durationLower);
+
+  for (var match in matches) {
+    final value = double.tryParse(match.group(1)!) ?? 0.0;
+    final unit = match.group(2)!;
+    if (unit.startsWith('h')) {
+      durationMin += value * 60;
+    } else if (unit.startsWith('m')) {
+      durationMin += value;
+    }
+  }
+  
+  // Fallback for simple case like "30 min"
+  if (matches.isEmpty && durationLower.contains('min')) {
+    final parts = durationLower.split(' ');
+    durationMin = double.tryParse(parts.first) ?? 0.0;
+  }
+
+  return {
+    'distanceKm': distanceKm,
+    'durationMin': durationMin,
+  };
+}
+
+// New: Method to calculate all estimated fares based on the provided formulas
+Map<String, String> _calculateAllEstimatedFares(String distanceText, String durationText) {
+  final metrics = _parseRouteMetrics(distanceText, durationText);
+  final double distanceKm = metrics['distanceKm']!;
+  final double durationMin = metrics['durationMin']!;
+  
+  final Map<String, double> fares = {};
+
+  // 1. Moto Taxi (Previous single fare)
+  double motoTaxiFare;
+  if (distanceKm <= 4.0) {
+    motoTaxiFare = 15.0; 
+  } else {
+    motoTaxiFare = 15.0 + ((distanceKm - 4.0) * 2.5);
+  }
+  fares['Moto Taxi'] = motoTaxiFare;
+
+  // 2. Grab (4-seater)
+  const double grabBase = 45.0;
+  const double grabDistRate = 15.0;
+  const double grabTimeRate = 2.0;
+  const double grabSurge = 1.5;
+  double grabFare = (grabBase + (distanceKm * grabDistRate + durationMin * grabTimeRate)) * grabSurge;
+  fares['Grab (4-seater)'] = grabFare;
+  
+  // 3. Taxi
+  const double taxiFlagDown = 50.0;
+  const double taxiDistRate = 13.50;
+  const double taxiTimeRate = 2.0;
+  double taxiFare = taxiFlagDown + (distanceKm * taxiDistRate) + (durationMin * taxiTimeRate);
+  fares['Taxi'] = taxiFare;
+  
+  // 4. Modern and Electric PUJ (Regular)
+  const double modernPujBaseKm = 4.0;
+  const double modernPujBaseFare = 15.0;
+  const double modernPujSucceedingRate = 2.20;
+  double modernPujFare = modernPujBaseFare;
+  if (distanceKm > modernPujBaseKm) {
+    modernPujFare += (distanceKm - modernPujBaseKm) * modernPujSucceedingRate;
+  }
+  fares['Modern/E-PUJ'] = modernPujFare;
+  
+  // 5. Traditional PUJ (Regular)
+  const double tradPujBaseKm = 4.0;
+  const double tradPujBaseFare = 13.0;
+  const double tradPujSucceedingRate = 1.80;
+  double tradPujFare = tradPujBaseFare;
+  if (distanceKm > tradPujBaseKm) {
+    tradPujFare += (distanceKm - tradPujBaseKm) * tradPujSucceedingRate;
+  }
+  fares['Traditional PUJ'] = tradPujFare;
+
+  // 6. Bus Airconditioned (Regular)
+  const double acBusBaseKm = 5.0;
+  const double acBusBaseFare = 15.0;
+  const double acBusSucceedingRate = 2.65;
+  double acBusFare = acBusBaseFare;
+  if (distanceKm > acBusBaseKm) {
+    acBusFare += (distanceKm - acBusBaseKm) * acBusSucceedingRate;
+  }
+  fares['Bus (Aircon)'] = acBusFare;
+  
+  // 7. Bus Non-Airconditioned (Regular)
+  const double nonAcBusBaseKm = 5.0;
+  const double nonAcBusBaseFare = 13.0;
+  const double nonAcBusSucceedingRate = 2.25;
+  double nonAcBusFare = nonAcBusBaseFare;
+  if (distanceKm > nonAcBusBaseKm) {
+    nonAcBusFare += (distanceKm - nonAcBusBaseKm) * nonAcBusSucceedingRate;
+  }
+  fares['Bus (Non-Aircon)'] = nonAcBusFare;
+
+  // Format all calculated fares to currency string
+  return fares.map((key, value) => MapEntry(key, '₱${value.toStringAsFixed(2)}'));
+}
+
 
 class AddNewRoutePage extends StatefulWidget {
   const AddNewRoutePage({super.key});
@@ -272,24 +384,6 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     }
   }
 
-  String _calculateEstimatedFare(String distanceText) {
-    final double distanceKm;
-    try {
-      distanceKm = double.parse(distanceText.replaceAll(RegExp(r' km|\,'), ''));
-    } catch (e) {
-      return 'Fare N/A';
-    }
-
-    final double fare;
-    if (distanceKm <= 4.0) {
-      fare = 15.0; 
-    } else {
-      fare = 15.0 + ((distanceKm - 4.0) * 2.5);
-    }
-
-    return '₱${fare.toStringAsFixed(2)}';
-  }
-
   void _saveRoute() {
     if (_routeNameController.text.isEmpty || _directionsResponse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -304,7 +398,11 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     final startLocation = leg['start_location'];
     final endLocation = leg['end_location'];
 
-    final String calculatedFare = _calculateEstimatedFare(leg['distance']['text']);
+    // NEW: Calculate all fares once and store the map
+    final Map<String, String> allFares = _calculateAllEstimatedFares(
+      leg['distance']['text'], 
+      leg['duration']['text']
+    );
 
     final List<LatLng> polylinePoints = _polylines.isNotEmpty ? _polylines.first.points : const [];
 
@@ -321,7 +419,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
       startLatitude: startLocation['lat'],
       startLongitude: startLocation['lng'],
       polylineEncoded: routeData['overview_polyline']['points'],
-      estimatedFare: calculatedFare,
+      estimatedFares: allFares, 
     );
 
     if (favoriteRoutes.any((r) => r.routeName == newRoute.routeName)) {
@@ -388,7 +486,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
-          color: headerTextColor,
+          color: Colors.white,
           onPressed: () => Navigator.pop(context),
         ),
         backgroundColor: cs.background,

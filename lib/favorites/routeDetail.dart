@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'favorite_route.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'favoriteRouteData.dart'; // <--- MISSING IMPORT ADDED HERE
+import 'favoriteRouteData.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final FavoriteRoute route;
@@ -97,6 +96,48 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
+  // Widget to build the list of estimated fares
+  Widget _buildFareList(ColorScheme cs, Color textColor) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Estimated Fares",
+            style: TextStyle(
+              fontSize: 18, 
+              fontWeight: FontWeight.bold, 
+              color: cs.primary
+            )
+          ),
+          const SizedBox(height: 10),
+          // Iterate over the fares stored in the FavoriteRoute object
+          ...widget.route.estimatedFares.entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 5.0),
+              child: Row(
+                children: [
+                  Icon(Icons.directions_car, size: 20, color: cs.secondary),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${entry.key}:', 
+                    style: TextStyle(fontSize: 15, color: textColor.withOpacity(0.8))
+                  ),
+                  const Spacer(),
+                  Text(
+                    entry.value, 
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: cs.onSurface)
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -106,6 +147,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     return Scaffold(
       backgroundColor: cs.background,
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white), // ✅ FIX: This forces the back button color to white
         title: Text(widget.route.routeName, style: TextStyle(color: cs.onPrimary)),
         backgroundColor: cs.primary,
         actions: [
@@ -153,9 +195,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                             children: [
                               _buildStatColumn("Distance", widget.route.distance, textColor),
                               _buildStatColumn("Duration", widget.route.duration, textColor),
-                              _buildStatColumn("Estimated Fare", widget.route.estimatedFare, textColor),
+                              _buildStatColumn("", "", textColor), // Placeholder for balance
                             ],
                           ),
+                          // New section for the detailed fare list
+                          _buildFareList(cs, textColor),
                         ],
                       ),
                     ),

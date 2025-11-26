@@ -13,7 +13,7 @@ class FavoriteRoute {
   final double startLatitude;
   final double startLongitude;
   final String polylineEncoded;
-  final String estimatedFare;
+  final Map<String, String> estimatedFares;
 
   const FavoriteRoute({
     required this.routeName,
@@ -28,6 +28,6 @@ class FavoriteRoute {
     required this.startLatitude,
     required this.startLongitude,
     required this.polylineEncoded,
-    required this.estimatedFare,
+    required this.estimatedFares,
   });
 }

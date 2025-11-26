@@ -78,13 +78,7 @@ class _FavoriteRoutesPageState extends State<FavoriteRoutesPage> {
                             '${route.distance} | ${route.duration}',
                             style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 12),
                           ),
-                          Text(
-                            'Estimated Fare: ${route.estimatedFare}', 
-                            style: TextStyle(
-                                color: cs.onSurface.withOpacity(0.8),
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold),
-                          ),
+                          // The problematic 'Estimated Fare' text has been removed here.
                         ],
                       ),
                       onTap: () {

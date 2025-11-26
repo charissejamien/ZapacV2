@@ -64,28 +64,28 @@ class _LoginPageState extends State<LoginPage> {
   }
   
   // Implemented Facebook Login Handler
-  Future<void> _onFacebookLogin() async {
-    setState(() {
-      _isFacebookLoading = true;
-      _errorMessage = null;
-    });
+  // Future<void> _onFacebookLogin() async {
+  //   setState(() {
+  //     _isFacebookLoading = true;
+  //     _errorMessage = null;
+  //   });
 
-    try {
-      final user = await _authService.signInWithFacebook();
-      if (user != null && mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard()));
-      }
-    } catch (e) {
-      String message = e.toString().replaceFirst('Exception: ', '');
-      if (message.contains('Facebook sign-in failed')) {
-        _setLocalError('Facebook sign-in failed. Please try again.');
-      } else {
-        _setLocalError(message);
-      }
-    } finally {
-      if (mounted) setState(() => _isFacebookLoading = false);
-    }
-  }
+  //   try {
+  //     final user = await _authService.signInWithFacebook();
+  //     if (user != null && mounted) {
+  //       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard()));
+  //     }
+  //   } catch (e) {
+  //     String message = e.toString().replaceFirst('Exception: ', '');
+  //     if (message.contains('Facebook sign-in failed')) {
+  //       _setLocalError('Facebook sign-in failed. Please try again.');
+  //     } else {
+  //       _setLocalError(message);
+  //     }
+  //   } finally {
+  //     if (mounted) setState(() => _isFacebookLoading = false);
+  //   }
+  // }
 
 
   Future<void> _handleLogin() async {
@@ -346,10 +346,10 @@ class _LoginPageState extends State<LoginPage> {
 
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         SizedBox(
-          width: screenWidth * 0.42,
+          width: 250,
           child: _socialButton(
             Icons.g_mobiledata,
             "Google",
@@ -360,18 +360,18 @@ class _LoginPageState extends State<LoginPage> {
             disableSocial ? () {} : _onGoogleLogin,
           ),
         ),
-        SizedBox(
-          width: screenWidth * 0.42,
-          child: _socialButton(
-            Icons.facebook,
-            "Facebook",
-            facebookBgLight,
-            isDarkMode ? darkFgColor : Colors.blue,
-            facebookFgLight,
-            _isFacebookLoading,
-            disableSocial ? () {} : _onFacebookLogin,
-          ),
-        ),
+        // SizedBox(
+        //   width: screenWidth * 0.42,
+        //   child: _socialButton(
+        //     Icons.facebook,
+        //     "Facebook",
+        //     facebookBgLight,
+        //     isDarkMode ? darkFgColor : Colors.blue,
+        //     facebookFgLight,
+        //     _isFacebookLoading,
+        //     disableSocial ? () {} : _onFacebookLogin,
+        //   ),
+        // ),
       ],
     );
   }

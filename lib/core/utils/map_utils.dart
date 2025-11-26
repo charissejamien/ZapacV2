@@ -126,14 +126,28 @@ class MapUtils {
     return null;
   }
   
-  // RE-ADDED: The getPredictions function, now correctly inside MapUtils
+  // REVISED: The getPredictions function with a larger radius for strict Cebu restriction
   static Future<List<dynamic>> getPredictions(String input, String apiKey) async {
     if (input.isEmpty) return [];
 
     try {
-      const components = "country:ph";
+      // Approximate geographic center of Cebu Province
+      const cebuCenter = "10.35,123.90"; 
+      // Radius in meters (increased to 100km to cover the entire province area)
+      const searchRadius = "100000"; 
+      // Restricts to Philippines (required by API best practices)
+      const components = "country:ph"; 
+
       final url =
-          'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=$components';
+          'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+          '?input=$input'
+          '&key=$apiKey'
+          '&components=$components'
+          // New parameters to enforce strict search within the Cebu area
+          '&location=$cebuCenter' 
+          '&radius=$searchRadius'
+          '&strictbounds=true'; // This is the key to forcing results within the circular area
+
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -205,8 +219,8 @@ class MapUtils {
 
       final routeData = decoded['routes'][0];
       final leg = routeData['legs'][0];
-      final startLatLng = leg['start_location'];
-      final endLatLng = leg['end_location'];
+      final startLatLng = routeData['legs'][0]['start_location'];
+      final endLatLng = routeData['legs'][0]['end_location'];
 
       // Update markers
       markers.clear();

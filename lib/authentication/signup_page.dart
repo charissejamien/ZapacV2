@@ -284,7 +284,7 @@ class _SignUpPageState extends State<SignUpPage> {
           decoration: InputDecoration(
             filled: true,
             fillColor: _beige,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(18),
               borderSide: BorderSide(color: borderColor, width: _borderWidth),
@@ -419,11 +419,11 @@ class _SignUpPageState extends State<SignUpPage> {
 
       body: ListView(
         children: [
-          const SizedBox(height: 30),
+          const SizedBox(height: 20),
           Center(
             child: Text(
               "Create an Account",
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: _green),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _green),
             ),
           ),
           const SizedBox(height: 18),
@@ -441,7 +441,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   hintColorBelow: _emailError != null ? _red : Colors.transparent,
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 _inputField(
                   label: ' Password',
                   controller: _passwordCtrl,
@@ -450,7 +450,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   hintColorBelow: _passwordHintColor,
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 _inputField(
                   label: ' Confirm Password',
                   controller: _confirmCtrl,
@@ -459,7 +459,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   hintColorBelow: _confirmHintColor,
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 5),
                 if (_generalError != null)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
@@ -478,14 +478,14 @@ class _SignUpPageState extends State<SignUpPage> {
                       elevation: 0,
                     ),
                     child: _isLoading
-                        ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
-                        : const Text("Sign Up", style: TextStyle(color: Colors.black, fontSize: 15, fontWeight: FontWeight.normal,)),
+                        ? const SizedBox(height: 12, width: 18, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+                        : const Text("Sign Up", style: TextStyle(color: Colors.black, fontSize: 13, fontWeight: FontWeight.normal,)),
                   ),
                 ),
 
                 SizedBox(height: spacing * 4),
                 _dividerWithText("or sign in with"),
-                const SizedBox(height: 18),
+                const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -522,7 +522,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
       ),
       bottomNavigationBar: Container(
-        height: 75,
+        height: 35,
         decoration: const BoxDecoration(
           color: Color(0xFF4A6FA5),
           borderRadius: BorderRadius.only(

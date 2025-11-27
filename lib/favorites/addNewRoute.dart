@@ -7,24 +7,61 @@ import 'package:zapac/favorites/favorite_route.dart';
 import 'favoriteRouteData.dart';
 import 'dart:async'; 
 
-final Future<List<dynamic>> Function(String, String) getPredictions = (String input, String apiKey) async {
+Future<List<dynamic>> Function(String, String) getPredictions = (String input, String apiKey) async {
   if (input.isEmpty) return const [];
-  try {
-    const components = "country:ph";
-    final url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=$components';
-    final response = await http.get(Uri.parse(url));
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['predictions'];
-    } else {
-      print('Failed to load predictions: ${response.statusCode}');
+
+const String cebuLatLng = '10.315700,123.885437';
+    const String radiusMeters = '30000'; // 30 km
+
+    final uri = Uri.https(
+      'maps.googleapis.com',
+      '/maps/api/place/autocomplete/json',
+      {
+        'input': input,
+        'key': apiKey,
+        // Restrict to Philippines and bias to Cebu City area
+        'components': 'country:ph',
+        'location': cebuLatLng,
+        'radius': radiusMeters,
+        // use strictbounds to prefer results inside the radius (some keys accept 'strictbounds' without value)
+        'strictbounds': 'true',
+        'types': 'geocode', 
+      },
+    );
+
+    try {
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (resp.statusCode != 200) return const [];
+
+      final Map<String, dynamic> data = json.decode(resp.body);
+      final status = (data['status'] ?? '').toString();
+
+      if (status != 'OK') {
+        // ZERO_RESULTS or OVER_QUERY_LIMIT etc.
+        return const [];
+      }
+
+      return (data['predictions'] as List<dynamic>?) ?? const [];
+    } catch (e) {
+      // network / timeout / parse error -> return empty list
       return const [];
     }
-  } catch (e) {
-    print('Error getting predictions: $e');
-    return const [];
-  }
-};
+  };
+
+
+
+// Helper method to check if coordinates are within Cebu bounds
+bool _isWithinCebuBounds(double lat, double lng) {
+  // Approximate Cebu City bounds
+  // Cebu City roughly: lat 10.25-10.40, lng 123.75-124.00
+  // Expanded for Cebu Province: lat 9.50-11.50, lng 123.00-124.50
+  const double minLat = 9.50;
+  const double maxLat = 11.50;
+  const double minLng = 123.00;
+  const double maxLng = 124.50;
+  
+  return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+}
 
 // New: Helper method to parse the distance and duration from the route data
 // FIX: Added safer parsing with ?? 0.0 to prevent nulls from distance/duration text
@@ -151,9 +188,6 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
 
   final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
 
-  final GlobalKey _startFieldKey = GlobalKey();
-  final GlobalKey _destinationFieldKey = GlobalKey();
-
   final TextEditingController _routeNameController = TextEditingController();
   final TextEditingController _startLocationController = TextEditingController();
   final TextEditingController _destinationController = TextEditingController();
@@ -165,8 +199,8 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
   Map<String, dynamic>? _destinationLocation;
   Map<String, dynamic>? _directionsResponse;
 
-  List<dynamic> _predictions = const [];
-  Rect? _activeFieldRect;
+  List<dynamic> _startPredictions = const [];
+  List<dynamic> _destinationPredictions = const [];
   
   Timer? _debounce; 
 
@@ -182,34 +216,14 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
   }
 
   void _onFocusChange() {
+    // Clear predictions when fields lose focus
     if (!_startFocusNode.hasFocus && !_destinationFocusNode.hasFocus) {
       if (mounted) {
         setState(() {
-          _predictions = const [];
-          _activeFieldRect = null;
+          _startPredictions = const [];
+          _destinationPredictions = const [];
         });
       }
-    }
-    
-    final GlobalKey? activeKey = _startFocusNode.hasFocus 
-        ? _startFieldKey 
-        : _destinationFocusNode.hasFocus ? _destinationFieldKey : null;
-
-    if (activeKey != null) {
-      Future.delayed(const Duration(milliseconds: 50), () {
-        final renderBox = activeKey.currentContext?.findRenderObject() as RenderBox?;
-        if (renderBox != null && mounted) {
-          final offset = renderBox.localToGlobal(Offset.zero);
-          setState(() {
-            _activeFieldRect = Rect.fromLTWH(
-              offset.dx,
-              offset.dy,
-              renderBox.size.width,
-              renderBox.size.height,
-            );
-          });
-        }
-      });
     }
   }
 
@@ -236,26 +250,59 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
   void _debouncedGetPredictions(String input) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     
+    final bool isStart = _startFocusNode.hasFocus;
+    final bool isDestination = _destinationFocusNode.hasFocus;
+    
     if (input.isEmpty) {
-        if (mounted) setState(() => _predictions = const []);
+        if (mounted) {
+          setState(() {
+            if (isStart) {
+              _startPredictions = const [];
+            } else if (isDestination) {
+              _destinationPredictions = const [];
+            }
+          });
+        }
         return;
     }
 
     _debounce = Timer(const Duration(milliseconds: 500), () async {
-        final isStart = _startFocusNode.hasFocus;
-        final isDestination = _destinationFocusNode.hasFocus;
+        final bool stillStart = _startFocusNode.hasFocus;
+        final bool stillDest = _destinationFocusNode.hasFocus;
         
-        if (input.isEmpty || (!isStart && !isDestination)) return;
+        // Verify focus hasn't changed during debounce
+        if (input.isEmpty || (!stillStart && !stillDest)) return;
+        if (isStart != stillStart || isDestination != stillDest) return;
 
         try {
-            final List<dynamic> results = await getPredictions(input, apiKey); 
+            final List<dynamic> results = await getPredictions(input, apiKey);
+            // Filter to only Cebu results - check description and verify coordinates
+            final List<dynamic> filteredResults = results.where((prediction) {
+              final String description = (prediction['description'] ?? '').toString().toLowerCase();
+              // Check if description contains Cebu-related terms
+              final bool hasCebuInDescription = description.contains('cebu');
+              return hasCebuInDescription;
+            }).toList();
+            
             if (mounted) {
               setState(() {
-                _predictions = results;
+                if (isStart) {
+                  _startPredictions = filteredResults;
+                } else if (isDestination) {
+                  _destinationPredictions = filteredResults;
+                }
               });
             }
         } catch (e) {
-            if (mounted) setState(() => _predictions = const []);
+            if (mounted) {
+              setState(() {
+                if (isStart) {
+                  _startPredictions = const [];
+                } else if (isDestination) {
+                  _destinationPredictions = const [];
+                }
+              });
+            }
         }
     });
   }
@@ -282,8 +329,8 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     final bool isDestination = _destinationFocusNode.hasFocus;
 
     setState(() {
-      _predictions = const [];
-      _activeFieldRect = null;
+      _startPredictions = const [];
+      _destinationPredictions = const [];
     });
     FocusScope.of(context).unfocus();
     
@@ -298,11 +345,22 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
       return;
     }
 
+    final double lat = placeDetails['geometry']['location']['lat'] as double;
+    final double lng = placeDetails['geometry']['location']['lng'] as double;
+    
+    // Verify the selected place is actually in Cebu
+    if (!_isWithinCebuBounds(lat, lng)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This location is not in Cebu. Please select a location within Cebu.')),
+      );
+      return;
+    }
+
     final Map<String, dynamic> locationData = {
       'place_id': prediction['place_id'],
       'description': prediction['description'],
-      'latitude': placeDetails['geometry']['location']['lat'],
-      'longitude': placeDetails['geometry']['location']['lng'],
+      'latitude': lat,
+      'longitude': lng,
     };
     
     if (isStart) {
@@ -459,11 +517,11 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     final cs = Theme.of(context).colorScheme;
     return InputDecoration(
       filled: true,
-      fillColor: cs.surface,
+      fillColor: Color(0xFFF3EEE6),
       hintText: hintText,
       hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(18),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
@@ -486,7 +544,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios),
-          color: Colors.white,
+          color: headerTextColor,
           onPressed: () => Navigator.pop(context),
         ),
         backgroundColor: cs.background,
@@ -505,47 +563,104 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
         onTap: () {
           FocusScope.of(context).unfocus();
           setState(() {
-            _predictions = const [];
-            _activeFieldRect = null;
+            _startPredictions = const [];
+            _destinationPredictions = const [];
           });
         },
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  
-                  TextField(
-                    controller: _routeNameController,
-                    decoration: _inputDecoration(context, 'Route Name (e.g., Downtown Loop)'),
-                    style: TextStyle(color: cs.onSurface),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              
+              TextField(
+                controller: _routeNameController,
+                decoration: _inputDecoration(context, 'Route Name (e.g., Home to Work)'),
+                style: TextStyle(color: cs.onSurface),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: _startLocationController,
+                focusNode: _startFocusNode,
+                onChanged: _debouncedGetPredictions, 
+                decoration: _inputDecoration(context, 'Starting Location'),
+                style: TextStyle(color: cs.onSurface),
+              ),
+              // Show start predictions directly below start field
+              if (_startPredictions.isNotEmpty && _startFocusNode.hasFocus)
+                Container(
+                  margin: const EdgeInsets.only(top: 5),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 6.0,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 15),
-                  Container(
-                    key: _startFieldKey,
-                    child: TextField(
-                      controller: _startLocationController,
-                      focusNode: _startFocusNode,
-                      onChanged: _debouncedGetPredictions, 
-                      decoration: _inputDecoration(context, 'Starting Location'),
-                      style: TextStyle(color: cs.onSurface),
-                    ),
+                  constraints: const BoxConstraints(maxHeight: 250),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: _startPredictions.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          _startPredictions[index]['description'],
+                          style: TextStyle(color: cs.onSurface, fontSize: 14),
+                        ),
+                        onTap: () => _onPredictionSelected(_startPredictions[index]),
+                      );
+                    },
                   ),
-                  const SizedBox(height: 15),
-                  Container(
-                    key: _destinationFieldKey,
-                    child: TextField(
-                      controller: _destinationController,
-                      focusNode: _destinationFocusNode,
-                      onChanged: _debouncedGetPredictions, 
-                      decoration: _inputDecoration(context, 'Destination'),
-                      style: TextStyle(color: cs.onSurface),
-                    ),
+                ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: _destinationController,
+                focusNode: _destinationFocusNode,
+                onChanged: _debouncedGetPredictions, 
+                decoration: _inputDecoration(context, 'Destination'),
+                style: TextStyle(color: cs.onSurface)
+              ),
+              // Show destination predictions directly below destination field
+              if (_destinationPredictions.isNotEmpty && _destinationFocusNode.hasFocus)
+                Container(
+                  margin: const EdgeInsets.only(top: 5),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 6.0,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  Expanded(
+                  constraints: const BoxConstraints(maxHeight: 250),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: EdgeInsets.zero,
+                    itemCount: _destinationPredictions.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          _destinationPredictions[index]['description'],
+                          style: TextStyle(color: cs.onSurface, fontSize: 14),
+                        ),
+                        onTap: () => _onPredictionSelected(_destinationPredictions[index]),
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 15),
+                  SizedBox(
+                    height: 400,
                     child: ClipRRect(
                       borderRadius: const BorderRadius.all(Radius.circular(15)),
                       child: GoogleMap(
@@ -593,37 +708,6 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
                   )
                 ],
               ),
-            ),
-            if (_predictions.isNotEmpty && _activeFieldRect != null)
-              Positioned(
-                top: _activeFieldRect!.bottom + 5, 
-                left: 20,
-                right: 20, 
-                child: Material(
-                  color: theme.cardColor,
-                  elevation: 6.0,
-                  borderRadius: BorderRadius.circular(10),
-                  child: LimitedBox(
-                    maxHeight: 250,
-                    child: ListView.builder(
-                      padding: EdgeInsets.zero,
-                      shrinkWrap: true,
-                      itemCount: _predictions.length,
-                      itemBuilder: (context, index) {
-                        return ListTile(
-                          dense: true,
-                          title: Text(
-                            _predictions[index]['description'],
-                            style: TextStyle(color: cs.onSurface, fontSize: 14),
-                          ),
-                          onTap: () => _onPredictionSelected(_predictions[index]),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
-          ],
         ),
       ),
     );

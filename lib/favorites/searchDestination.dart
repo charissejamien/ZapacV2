@@ -135,19 +135,43 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
 
   Future<List<dynamic>> _getPredictions(String input) async {
     if (input.isEmpty) return const [];
+
+     const String cebuLatLng = '10.315700,123.885437';
+    const String radiusMeters = '30000'; // 30 km
+
+     final uri = Uri.https(
+      'maps.googleapis.com',
+      '/maps/api/place/autocomplete/json',
+      {
+        'input': input,
+        'key': apiKey,
+        // Restrict to Philippines and bias to Cebu City area
+        'components': 'country:ph',
+        'location': cebuLatLng,
+        'radius': radiusMeters,
+        // use strictbounds to prefer results inside the radius (some keys accept 'strictbounds' without value)
+        'strictbounds': 'true',
+        'types': 'geocode', // limit to address/results (change/remove as desired)
+        'language': 'en',
+      },
+    );
+
+    
     try {
-      const components = "country:ph";
-      final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=$input&key=$apiKey&components=$components';
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['predictions'];
-      } else {
-        print('Search failed: ${response.statusCode}');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 8));
+      if (resp.statusCode != 200) return const [];
+
+      final Map<String, dynamic> data = json.decode(resp.body);
+      final status = (data['status'] ?? '').toString();
+
+      if (status != 'OK') {
+        // ZERO_RESULTS or OVER_QUERY_LIMIT etc.
         return const [];
       }
+
+      return (data['predictions'] as List<dynamic>?) ?? const [];
     } catch (e) {
-      print('Network error: $e');
+      // network / timeout / parse error -> return empty list
       return const [];
     }
   }

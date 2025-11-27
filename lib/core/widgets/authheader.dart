@@ -21,7 +21,7 @@ class AuthHeader extends StatelessWidget implements PreferredSizeWidget {
   final logoImage = 'assets/Logo.png'; 
 
   @override
-  Size get preferredSize => const Size.fromHeight(230);
+  Size get preferredSize => const Size.fromHeight(150);
 
   // Helper to build the text tabs (Login/Sign Up)
   // 💥 REMOVED 'destinationPage' ARGUMENT 💥
@@ -48,7 +48,7 @@ class AuthHeader extends StatelessWidget implements PreferredSizeWidget {
           ),
           Container(
             width: 48,
-            height: 1.5,
+            height: 1.2,
             color: isActive ? activeColor : Colors.transparent,
             margin: const EdgeInsets.only(top: 6),
           ),
@@ -66,13 +66,13 @@ class AuthHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
       child: AppBar(
         backgroundColor: appBarColor,
-        toolbarHeight: 250,
+        toolbarHeight: 150,
         automaticallyImplyLeading: false,
         title: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            const SizedBox(height: 20),
-            Image.asset(logoImage, height: 130),
+            const SizedBox(height: 10),
+            Image.asset(logoImage, height: 70),
             const SizedBox(height: 15),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

@@ -122,13 +122,15 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
-  // FIX: _onMapCreated now calls _handleMyLocationPressed() immediately after map is ready
+  // Map is set to Cebu - no automatic location detection
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
     _isMapReady = true;
     
-    // Call location logic here to ensure it overrides the initial CameraPosition
-    _handleMyLocationPressed(); 
+    // Ensure map stays centered on Cebu
+    _mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
+    );
   }
 
   void _onItemTapped(int index) {
@@ -160,12 +162,9 @@ class _DashboardState extends State<Dashboard> {
     _markers.clear();
     _polylines.clear();
     
-    // This call moves the camera to the current location with high zoom (18.0)
-    await MapUtils.getCurrentLocationAndMarker(
-      {},
-      _mapController,
-      context,
-      isMounted: () => mounted,
+    // Always center map on Cebu
+    await _mapController.animateCamera(
+      CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
     );
     
     if (mounted) {
@@ -346,8 +345,8 @@ class _DashboardState extends State<Dashboard> {
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
               right: 16,
-              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.08,
-              bottom: _isCommunityInsightExpanded ? 20 : null,
+              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.30,
+              bottom: _isCommunityInsightExpanded ? 10 : null,
 
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 800),

@@ -345,8 +345,8 @@ class _DashboardState extends State<Dashboard> {
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
               right: 16,
-              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.08,
-              bottom: _isCommunityInsightExpanded ? 20 : null,
+              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.30,
+              bottom: _isCommunityInsightExpanded ? 10 : null,
 
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 800),

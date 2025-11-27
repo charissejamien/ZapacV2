@@ -185,13 +185,13 @@ class _LoginPageState extends State<LoginPage> {
             child: Text(
               "Welcome Back!",
               style: TextStyle(
-                fontSize: 26,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: greenColor,
               ),
             ),
           ),
-          const SizedBox(height: 25),
+          const SizedBox(height: 15),
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30),
@@ -201,14 +201,14 @@ class _LoginPageState extends State<LoginPage> {
                 const Text(" Email", style: TextStyle(fontSize: 15)),
                 const SizedBox(height: 2),
                 _buildTextField(emailController, ""),
-                const SizedBox(height: 30),
+                const SizedBox(height: 20),
                 const Text(" Password", style: TextStyle(fontSize: 15)),
                 const SizedBox(height: 2),
                 _buildTextField(passwordController, "", isPassword: true),
                 const SizedBox(height: 10),
 
                 SizedBox(
-                  height: 35,
+                  height: 20,
                   child: Center(
                     child: _errorMessage != null
                         ? Text(
@@ -239,7 +239,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: _isLoading
                         ? const SizedBox(
                             width: 20,
-                            height: 20,
+                            height: 10,
                             child: CircularProgressIndicator(
                               color: Colors.black,
                               strokeWidth: 3,
@@ -256,10 +256,21 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                // 💡 Alternative: Wrap the Row in Padding to constrain its size.
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text("Forgotten your password? ", style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+                    // 💡 FIX: Wrap the longer Text in a Flexible widget.
+                    // This allows it to take up only the remaining space,
+                    // preventing the Row from overflowing.
+                    Flexible(
+                      child: Text(
+                        "Forgotten your password? ",
+                        // To allow truncation if space is extremely tight
+                        overflow: TextOverflow.ellipsis, 
+                        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                      ),
+                    ),
                     GestureDetector(
                       onTap: _navigateToResetPassword,
                       child: const Text(
@@ -280,7 +291,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
 
       bottomNavigationBar: Container(
-        height: 75,
+        height: 55,
         decoration: BoxDecoration(
           color: appBarColor,
           borderRadius: const BorderRadius.only(
@@ -319,7 +330,7 @@ class _LoginPageState extends State<LoginPage> {
           borderSide: BorderSide.none,
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
       ),
     );
   }

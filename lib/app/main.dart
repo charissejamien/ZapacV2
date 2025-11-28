@@ -26,7 +26,7 @@ class ThemeNotifier extends ChangeNotifier {
   }
 }
 
-final ThemeNotifier themeNotifier = ThemeNotifier(ThemeMode.light);
+late ThemeNotifier themeNotifier = ThemeNotifier(ThemeMode.light);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

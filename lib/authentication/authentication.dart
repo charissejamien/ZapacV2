@@ -1,6 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -87,26 +86,26 @@ class AuthService {
   // ────────────────────────────────
   //  Facebook
   // ────────────────────────────────
-  Future<UserCredential?> signInWithFacebook() async {
-    try {
-      final LoginResult result = await FacebookAuth.instance.login();
+  // Future<UserCredential?> signInWithFacebook() async {
+  //   try {
+  //     final LoginResult result = await FacebookAuth.instance.login();
 
-      if (result.status == LoginStatus.success) {
-        final AccessToken accessToken = result.accessToken!;
-        final credential =
-            FacebookAuthProvider.credential(accessToken.tokenString);
-        return await _auth.signInWithCredential(credential);
-      } else if (result.status == LoginStatus.cancelled) {
-        return null;
-      } else {
-        throw Exception(result.message ?? 'Facebook sign-in failed.');
-      }
-    } on FirebaseAuthException catch (e) {
-      throw Exception(_firebaseError(e));
-    } catch (e) {
-      throw Exception("Facebook sign-in failed: $e");
-    }
-  }
+  //     if (result.status == LoginStatus.success) {
+  //       final AccessToken accessToken = result.accessToken!;
+  //       final credential =
+  //           FacebookAuthProvider.credential(accessToken.tokenString);
+  //       return await _auth.signInWithCredential(credential);
+  //     } else if (result.status == LoginStatus.cancelled) {
+  //       return null;
+  //     } else {
+  //       throw Exception(result.message ?? 'Facebook sign-in failed.');
+  //     }
+  //   } on FirebaseAuthException catch (e) {
+  //     throw Exception(_firebaseError(e));
+  //   } catch (e) {
+  //     throw Exception("Facebook sign-in failed: $e");
+  //   }
+  // }
 
   // ────────────────────────────────
   //  Logout
@@ -115,7 +114,7 @@ class AuthService {
     try {
       await _auth.signOut();
       await GoogleSignIn().signOut();
-      await FacebookAuth.instance.logOut();
+     // await FacebookAuth.instance.logOut();
     } catch (e) {
       throw Exception("Sign-out failed: $e");
     }

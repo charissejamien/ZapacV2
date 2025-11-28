@@ -17,6 +17,15 @@ import 'community_insights_page.dart' show ChatMessage;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+// Category Model for the Chips
+class Category {
+  final String label;
+  final IconData icon;
+  final String placeType; // Google Place Type identifier
+
+  const Category({required this.label, required this.icon, required this.placeType});
+}
+
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
@@ -25,7 +34,7 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
-  late GoogleMapController _mapController;
+  late GoogleMapController _mapController; 
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   // The initial position remains a fallback until location is loaded
@@ -43,6 +52,23 @@ class _DashboardState extends State<Dashboard> {
   bool _showDetailsButton = false;
   Map<String, dynamic> _currentSearchDetails = {};
   String? _currentSearchName;
+  
+  // State to hold the current address
+  String _currentAddress = "Fetching location..."; 
+  
+  // State: Control visibility of the temporary address modal
+  bool _showAddressModal = false;
+  Timer? _addressTimer; 
+  
+  // List of categories for the chips
+  static const List<Category> _categories = [
+    Category(label: 'Terminal', icon: Icons.tram, placeType: 'bus_station'), // Use bus_station for PUV terminals
+    Category(label: 'Mall', icon: Icons.shopping_bag, placeType: 'shopping_mall'),
+    Category(label: 'Grocery', icon: Icons.local_grocery_store, placeType: 'supermarket'),
+    Category(label: 'Gasoline', icon: Icons.local_gas_station, placeType: 'gas_station'),
+    Category(label: 'School', icon: Icons.school, placeType: 'school'),
+    Category(label: 'Hospital', icon: Icons.local_hospital, placeType: 'hospital'),
+  ];
   
   String _getMapApiKey() {
     if (Platform.isIOS) {
@@ -79,6 +105,7 @@ class _DashboardState extends State<Dashboard> {
   void dispose() {
     _chatSubscription?.cancel(); 
     _authStateSubscription?.cancel();
+    _addressTimer?.cancel(); // Cancel timer on dispose
     super.dispose();
   }
 
@@ -123,7 +150,7 @@ class _DashboardState extends State<Dashboard> {
   }
   
   // Map is set to Cebu - no automatic location detection
-  void _onMapCreated(GoogleMapController controller) {
+  void _onMapCreated(GoogleMapController controller) async { 
     _mapController = controller;
     _isMapReady = true;
     
@@ -131,6 +158,9 @@ class _DashboardState extends State<Dashboard> {
     _mapController.animateCamera(
       CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
     );
+    
+    // Attempt to get and display the initial address
+    await _updateCurrentAddress(location: _initialCameraPosition); 
   }
 
   void _onItemTapped(int index) {
@@ -157,21 +187,91 @@ class _DashboardState extends State<Dashboard> {
     print("Insight added, Firestore listener will refresh UI.");
   }
 
+  // Function to fetch and display the current address
+  Future<void> _updateCurrentAddress({LatLng? location}) async {
+    if (!mounted) return;
+
+    LatLng? currentLatLng = location;
+    if (currentLatLng == null) {
+      currentLatLng = await MapUtils.getCurrentLocation(context);
+    }
+
+    if (currentLatLng != null) {
+      try {
+        final address = await MapUtils.getAddressFromLatLng(
+          latLng: currentLatLng,
+          apiKey: _getMapApiKey(), // Use your map API key for geocoding
+        );
+        setState(() {
+          _currentAddress = address ?? "Location not found.";
+        });
+      } catch (e) {
+        print("Reverse Geocoding Error: $e");
+        setState(() {
+          _currentAddress = "Error getting address.";
+        });
+      }
+    } else {
+      setState(() {
+        _currentAddress = "Location access denied.";
+      });
+    }
+  }
+
+
   Future<void> _handleMyLocationPressed() async {
     if (!mounted || !_isMapReady) return;
-    _markers.clear();
-    _polylines.clear();
     
-    // Always center map on Cebu
-    await _mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
-    );
+    // Clear any existing timer
+    _addressTimer?.cancel(); 
+    
+    // Clear previous search/route markers
+    _markers.clear();
+    _polylines.clear(); 
+    
+    // 1. Fetch the user's actual current location
+    final LatLng? currentLocation = await MapUtils.getCurrentLocation(context);
+
+    if (currentLocation != null) {
+      // 2. Animate the camera to the current location (GPS)
+      await _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(currentLocation, 16.0), // Use a closer zoom level
+      );
+      // 3. Update address based on new location
+      await _updateCurrentAddress(location: currentLocation); 
+      
+      // 4. Show the address modal and start timer
+      setState(() {
+          _showAddressModal = true;
+      });
+
+      _addressTimer = Timer(const Duration(seconds: 5), () {
+          if(mounted) {
+              setState(() {
+                  _showAddressModal = false;
+              });
+          }
+      });
+
+    } else {
+      // Fallback: If location is unavailable, reset to Cebu center
+      await _mapController.animateCamera(
+        CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get current location. Check permissions.')),
+        );
+      }
+      // Update address to the fallback location
+      await _updateCurrentAddress(location: _initialCameraPosition);
+    }
     
     if (mounted) {
-       setState(() {
-           _showDetailsButton = false;
-           _currentSearchDetails = {};
-       });
+        setState(() {
+            _showDetailsButton = false;
+            _currentSearchDetails = {};
+        });
     }
   }
   
@@ -243,6 +343,12 @@ class _DashboardState extends State<Dashboard> {
   }
 
   void _clearSearchMarker() {
+      // Hide the temporary address modal when searching/clearing
+      _addressTimer?.cancel();
+      setState(() {
+          _showAddressModal = false;
+      });
+      
       if (_markers.isNotEmpty || _polylines.isNotEmpty || _showDetailsButton) {
           setState(() {
               _markers.clear();
@@ -255,6 +361,8 @@ class _DashboardState extends State<Dashboard> {
             CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0), 
           );
       }
+      // Re-fetch current address when markers are cleared
+      _updateCurrentAddress();
   }
 
   void _showDetailsOverlay() {
@@ -273,10 +381,164 @@ class _DashboardState extends State<Dashboard> {
       );
   }
 
+  // Function to search POIs by category
+  Future<void> _searchPOIsByCategory(String placeType) async {
+    if (!mounted || !_isMapReady || _mapController == null) return; 
+    _clearSearchMarker(); 
+
+    try {
+      // Use getVisibleRegion() and calculate center from bounds
+      final LatLngBounds bounds = await _mapController.getVisibleRegion();
+      final LatLng mapCenter = LatLng(
+        (bounds.northeast.latitude + bounds.southwest.latitude) / 2,
+        (bounds.northeast.longitude + bounds.southwest.longitude) / 2,
+      );
+      
+      final String apiKey = _getMapApiKey();
+
+      final String url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${mapCenter.latitude},${mapCenter.longitude}&radius=5000&type=$placeType&key=$apiKey';
+
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['status'] == 'OK' && data['results'] != null) {
+          final List<dynamic> results = data['results'];
+          _markers.clear();
+          
+          for (var result in results) {
+            final lat = result['geometry']['location']['lat'];
+            final lng = result['geometry']['location']['lng'];
+            final name = result['name'];
+            
+            _markers.add(
+              Marker(
+                markerId: MarkerId(result['place_id']),
+                position: LatLng(lat, lng),
+                infoWindow: InfoWindow(title: name),
+                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+              ),
+            );
+          }
+
+          if (mounted) {
+            setState(() {
+              _showDetailsButton = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Found ${results.length} ${placeType.replaceAll("_", " ")}s nearby.')),
+            );
+          }
+        } else {
+           if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('No results found for this category nearby.')),
+              );
+          }
+        }
+      } else {
+         if (mounted) {
+             ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to fetch POI data from Google Places.')),
+            );
+         }
+      }
+    } catch (e) {
+      print("POI Search Error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('An error occurred during POI search.')),
+        );
+      }
+    }
+  }
+
+  // Widget to build the horizontal list of category chips
+  Widget _buildCategoryChips(ColorScheme cs) {
+    return Container(
+      height: 48, // Fixed height for the horizontal list
+      margin: const EdgeInsets.only(top: 8.0),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.zero,
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final category = _categories[index];
+          return Padding(
+            padding: EdgeInsets.only(right: index == _categories.length - 1 ? 0 : 8.0),
+            child: ActionChip(
+              avatar: Icon(category.icon, size: 18, color: cs.primary),
+              label: Text(category.label, style: TextStyle(color: cs.onSurface)),
+              backgroundColor: cs.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(color: cs.primary.withOpacity(0.5)),
+              ),
+              onPressed: () {
+                _searchPOIsByCategory(category.placeType);
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // MODIFIED: Widget for the temporary, address modal, constrained width/height, non-full-width
+  Widget _buildAddressModal(ColorScheme cs) {
+    return AnimatedOpacity(
+        opacity: _showAddressModal ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 300),
+        child: Visibility(
+            visible: _showAddressModal,
+            maintainAnimation: true,
+            maintainState: true,
+            maintainSize: true,
+            child: Container(
+                width: 315, // Constrain width (not full width)
+                constraints: const BoxConstraints(minHeight: 40), // Minimum height for alignment
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                    color: cs.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                        BoxShadow(
+                            color: cs.onSurface.withOpacity(0.15),
+                            blurRadius: 5,
+                            offset: const Offset(0, 3),
+                        ),
+                    ],
+                ),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                        const SizedBox(height: 2),
+                        // Text should flow, max 2 lines to maintain compact height
+                        Text( 
+                            _currentAddress, // State variable
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: cs.onSurface,
+                            ),
+                            maxLines: 3, // Constrain lines to fit
+                            overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                ),
+            ),
+        ),
+    );
+}
+
 
   @override
   Widget build(BuildContext context) {
     final bottomSheetHeight = MediaQuery.of(context).size.height * (_isCommunityInsightExpanded ? 0.85 : 0.35);
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       bottomNavigationBar: BottomNavBar(
@@ -306,14 +568,30 @@ class _DashboardState extends State<Dashboard> {
               onExpansionChanged: _onCommunityInsightExpansionChanged,
               currentUserId: _currentUserId,
             ),
-
+            
+            // Contains SearchBar and Category Chips
             Positioned(
               top: 8,
-              left: 16,
-              right: 16,
-              child: SearchBar(
-                onPlaceSelected: _handlePlaceSelected,
-                onSearchCleared: _clearSearchMarker,
+              left: 0, 
+              right: 0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // SearchBar
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: SearchBar(
+                      onPlaceSelected: _handlePlaceSelected,
+                      onSearchCleared: _clearSearchMarker,
+                    ),
+                  ),
+                  // Category Chips
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: _buildCategoryChips(cs), 
+                  ),
+                ],
               ),
             ),
 
@@ -341,11 +619,12 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
 
+            // MODIFIED: Floating Buttons and Address Modal (right edge)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
               right: 16,
-              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.30,
+              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.10,
               bottom: _isCommunityInsightExpanded ? 10 : null,
 
               child: AnimatedSwitcher(
@@ -356,37 +635,58 @@ class _DashboardState extends State<Dashboard> {
                     child: child);
                 },
 
-              child: Column(
+              // Use Row to place modal beside the FloatingButton stack
+              child: Row( 
                 key: ValueKey<bool>(_isCommunityInsightExpanded),
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
+                // Align content to the bottom of the tallest element in the Row (which is the FAB stack)
+                crossAxisAlignment: CrossAxisAlignment.end, 
                 children: [
-             FloatingButton(
-                isCommunityInsightExpanded: _isCommunityInsightExpanded,
-                onAddInsightPressed: () {
-                  final currentUserId = _auth.currentUser?.uid;
-                  if (!mounted) return;
+                    // Modal appears on the LEFT of the buttons
+                    if (_showAddressModal && !_isCommunityInsightExpanded) 
+                        // Wrap in a Column to allow vertical centering/alignment within the space defined by the Row
+                        Column( 
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                                _buildAddressModal(cs),
+                            ],
+                        ),
+                    
+                    if (_showAddressModal && !_isCommunityInsightExpanded) const SizedBox(width: 8),
 
-                  if (currentUserId == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please sign in to post an insight.'), backgroundColor: Colors.red),
-                    );
-                    return;
-                  }
+                    // Floating Button Stack (RIGHT)
+                    Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                            FloatingButton(
+                              isCommunityInsightExpanded: _isCommunityInsightExpanded,
+                              onAddInsightPressed: () {
+                                final currentUserId = _auth.currentUser?.uid;
+                                if (!mounted) return;
 
-                  showAddInsightModal(
-                    context: context,
-                    firestore: _firestore,
-                    onInsightAdded: _addNewInsight,
-                  );
-                },
-                onMyLocationPressed: _handleMyLocationPressed, 
-                ),
-          ],
+                                if (currentUserId == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Please sign in to post an insight.'), backgroundColor: Colors.red),
+                                  );
+                                  return;
+                                }
+
+                                showAddInsightModal(
+                                  context: context,
+                                  firestore: _firestore,
+                                  onInsightAdded: _addNewInsight,
+                                );
+                              },
+                              onMyLocationPressed: _handleMyLocationPressed, 
+                            ),
+                        ],
+                    ),
+                ],
               ),
             ),
             ),
-        ],
+          ],
         ),
       ),
     );

@@ -4,8 +4,11 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:zapac/favorites/favorite_route.dart';
-import 'favoriteRouteData.dart';
+// import 'favoriteRouteData.dart'; // REMOVED: Local data store
 import 'dart:async'; 
+// NEW IMPORTS for Firebase
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:zapac/favorites/favorite_routes_service.dart';
 
 final Future<List<dynamic>> Function(String, String) getPredictions = (String input, String apiKey) async {
   if (input.isEmpty) return const [];
@@ -150,6 +153,9 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
   static const String _darkMapStyle = '[{"elementType":"geometry","stylers":[{"color":"#1f1f1f"}]},{"elementType":"labels.icon","stylers":[{"visibility":"off"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#e0e0e0"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3a3a3a"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#273a2c"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c2c2c"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3d3d3d"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"transit.station.bus","stylers":[{"visibility":"off"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0e1b25"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#a0a0a0"}]}]';
 
   final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
+
+  // NEW: Initialize the service
+  final FavoriteRoutesService _routesService = FavoriteRoutesService();
 
   final GlobalKey _startFieldKey = GlobalKey();
   final GlobalKey _destinationFieldKey = GlobalKey();
@@ -384,7 +390,17 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     }
   }
 
-  void _saveRoute() {
+  // MODIFIED: _saveRoute now uses FavoriteRoutesService to save to Firestore
+  void _saveRoute() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+    
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to save a favorite route.')),
+      );
+      return;
+    }
+
     if (_routeNameController.text.isEmpty || _directionsResponse == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a route name and show the route first.')),
@@ -398,7 +414,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
     final startLocation = leg['start_location'];
     final endLocation = leg['end_location'];
 
-    // NEW: Calculate all fares once and store the map
+    // Calculate all fares once and store the map
     final Map<String, String> allFares = _calculateAllEstimatedFares(
       leg['distance']['text'], 
       leg['duration']['text']
@@ -421,21 +437,25 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
       polylineEncoded: routeData['overview_polyline']['points'],
       estimatedFares: allFares, 
     );
+    
+    try {
+      // Use the service to save the route to Firestore
+      await _routesService.saveFavoriteRoute(newRoute);
 
-    if (favoriteRoutes.any((r) => r.routeName == newRoute.routeName)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Route name already exists.')),
-      );
-      return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Route saved successfully!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        // Display any error from the Firebase service
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save route: ${e.toString()}')),
+        );
+      }
     }
-
-    favoriteRoutes.add(newRoute);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Route saved successfully!')),
-    );
-
-    Navigator.pop(context);
   }
 
   LatLngBounds _createBounds(List<LatLng> positions) {

@@ -744,6 +744,9 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('price') ||
                  messageLower.contains('cost') ||
                  messageLower.contains('plete') ||
+                 messageLower.contains('plite') ||
+                 messageLower.contains('pliti') ||
+                 messageLower.contains('pleti') ||
                  messageLower.contains('sukli') ||
                  messageLower.contains('tagpila') ||
                  messageLower.contains('bayad');

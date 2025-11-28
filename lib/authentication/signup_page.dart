@@ -423,7 +423,7 @@ class _SignUpPageState extends State<SignUpPage> {
           Center(
             child: Text(
               "Create an Account",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _green),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: _green),
             ),
           ),
           const SizedBox(height: 18),
@@ -522,7 +522,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
       ),
       bottomNavigationBar: Container(
-        height: 35,
+        height: 75,
         decoration: const BoxDecoration(
           color: Color(0xFF4A6FA5),
           borderRadius: BorderRadius.only(

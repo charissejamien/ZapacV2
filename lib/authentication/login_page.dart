@@ -185,7 +185,7 @@ class _LoginPageState extends State<LoginPage> {
             child: Text(
               "Welcome Back!",
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 26,
                 fontWeight: FontWeight.bold,
                 color: greenColor,
               ),
@@ -291,7 +291,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
 
       bottomNavigationBar: Container(
-        height: 55,
+        height: 75,
         decoration: BoxDecoration(
           color: appBarColor,
           borderRadius: const BorderRadius.only(
@@ -330,7 +330,7 @@ class _LoginPageState extends State<LoginPage> {
           borderSide: BorderSide.none,
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       ),
     );
   }

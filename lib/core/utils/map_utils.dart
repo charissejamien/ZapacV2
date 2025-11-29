@@ -78,6 +78,31 @@ class MapUtils {
       return null;
     }
   }
+  
+  // NEW: Method to perform reverse geocoding (LatLng to Address)
+  static Future<String?> getAddressFromLatLng({
+    required LatLng latLng,
+    required String apiKey,
+  }) async {
+    final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/geocode/json?latlng=${latLng.latitude},${latLng.longitude}&key=$apiKey'
+    );
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          // Return the formatted address from the first result
+          return data['results'][0]['formatted_address'] as String;
+        }
+      }
+    } catch (e) {
+      print("Error fetching address: $e");
+    }
+    return null;
+  }
 
   static Future<void> getCurrentLocationAndMarker(
     Set<Marker> markers,

@@ -46,3 +46,7 @@ flutter:
 
   assets:
     - assets/Logo.png
+    - assets/maxim.png
+    - assets/moveit.png
+    - assets/angkas.jpg
+

@@ -775,7 +775,7 @@ class _DashboardState extends State<Dashboard> {
                duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 right: _isCommunityInsightExpanded ? 16 :10,
-                bottom: _isCommunityInsightExpanded ? 10 : 500,
+                bottom: _isCommunityInsightExpanded ? 10 : 520,
                 top: _isCommunityInsightExpanded ? null : 50,
 
               child: AnimatedSwitcher(

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:zapac/dashboard/dashboard.dart';
+import 'package:zapac/core/widgets/onboardHeader.dart';
+import 'package:zapac/core/widgets/onboardFooter.dart'; 
 import 'onboarding_tour.dart'; 
 
 enum UserProfile {
@@ -29,7 +32,7 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
     // Simulate checkmark highlight for 1 second, then navigate
     Future.delayed(const Duration(milliseconds: 1000), () {
       if (mounted) {
-        // MODIFIED: Navigate to OnboardingTourPage
+        // Navigate to OnboardingTourPage
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => OnboardingTourPage(
             userProfile: profile.toString().split('.').last, // pass selected profile
@@ -106,6 +109,13 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
 
     return Scaffold(
       backgroundColor: cs.background,
+      
+      // APPLIED NEW PLAIN HEADER
+      appBar: const OnboardingHeader(),
+      
+      // APPLIED FOOTER
+      bottomNavigationBar: const AuthFooter(),
+
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -140,8 +150,6 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
               _buildProfileButton(UserProfile.local, "Cebu Local", cs),
               _buildProfileButton(UserProfile.tourist, "Tourist", cs),
               _buildProfileButton(UserProfile.commuter, "Daily Commuter", cs),
-
-              // Note: You would save the selected profile type (e.g., to Firestore/SharedPreferences) here.
             ],
           ),
         ),

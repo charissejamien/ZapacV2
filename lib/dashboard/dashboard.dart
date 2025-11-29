@@ -16,6 +16,7 @@ import 'dart:io' show Platform;
 import 'community_insights_page.dart' show ChatMessage;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:math'; // Added for min/max calculation
 
 // Category Model for the Chips
 class Category {
@@ -59,7 +60,49 @@ class _DashboardState extends State<Dashboard> {
   // State: Control visibility of the temporary address modal
   bool _showAddressModal = false;
   Timer? _addressTimer; 
-  
+
+  // Hardcoded terminal data
+  final List<Map<String, dynamic>> _hardcodedTerminals = const [
+    {
+      'id': 'cebu_south_terminal',
+      'name': 'Cebu South Bus Terminal',
+      'lat': 10.3015, 
+      'lng': 123.8965, 
+      'details': {
+        'title': 'Cebu South Bus Terminal',
+        'status': 'Open 24/7',
+        'routes': 'Southern Cebu (Oslob, Moalboal, Carcar)',
+        'facilities': 'Restrooms, Ticketing Counters, Food Stalls',
+      }
+    },
+    {
+      'id': 'cebu_north_terminal',
+      'name': 'Cebu North Bus Terminal',
+      'lat': 10.3200, 
+      'lng': 123.9110, 
+      'details': {
+        'title': 'Cebu North Bus Terminal',
+        'status': 'Open 4:00 AM - 10:00 PM',
+        'routes': 'Northern Cebu (Bogo, Daanbantayan, Danao)',
+        'facilities': 'Waiting Area, Ticket Booths, Vending Machines',
+      }
+    },
+    {
+      'id': 'sm_city_cebu_terminal',
+      'name': 'SM City Cebu PUV Terminal',
+      'lat': 10.3164, 
+      'lng': 123.9189, 
+      'details': {
+        'title': 'SM City Cebu PUV Terminal',
+        'status': 'Open 10:00 AM - 9:00 PM',
+        'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
+        'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
+      }
+    },
+];
+  // NEW: Terminal Icon
+  BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+
   // List of categories for the chips
   static const List<Category> _categories = [
     Category(label: 'Terminal', icon: Icons.tram, placeType: 'bus_station'), // Use bus_station for PUV terminals
@@ -93,6 +136,9 @@ class _DashboardState extends State<Dashboard> {
       }
     });
 
+    // NOTE: If you add an asset 'assets/icons/bus_icon.png', uncomment and change the path here
+    // _loadTerminalIcon(); 
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _fetchAndListenToMessages(); 
@@ -100,6 +146,21 @@ class _DashboardState extends State<Dashboard> {
       }
     });
   }
+  
+  // NOTE: This function is only needed if you use a custom asset for the terminal icon.
+  /*
+  Future<void> _loadTerminalIcon() async {
+      final newIcon = await BitmapDescriptor.fromAssetImage(
+          const ImageConfiguration(size: Size(48, 48)),
+          'assets/icons/bus_icon.png', // Replace with your actual path
+      );
+      if (mounted) {
+          setState(() {
+              _terminalIcon = newIcon;
+          });
+      }
+  }
+  */
 
   @override
   void dispose() {
@@ -219,8 +280,39 @@ class _DashboardState extends State<Dashboard> {
   }
 
 
+  // Handler for when a hardcoded terminal marker is tapped
+  void _handleTerminalTapped(String terminalId) {
+      final terminal = _hardcodedTerminals.firstWhere(
+          (t) => t['id'] == terminalId,
+          orElse: () => <String, dynamic>{}, 
+      );
+
+      // Add check to ensure terminal is not the empty fallback map
+      if (terminal.isNotEmpty && mounted) {
+          showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                  return TerminalDetailsModal(
+                      details: terminal['details'] as Map<String, String>,
+                      cs: Theme.of(context).colorScheme,
+                  );
+              },
+          );
+      }
+  }
+
+
+  // MODIFIED: _handleMyLocationPressed to collapse sheet, center on actual location and manage modal visibility
   Future<void> _handleMyLocationPressed() async {
     if (!mounted || !_isMapReady) return;
+    
+    // Collapse the Community Insights Sheet if it is expanded
+    if (_isCommunityInsightExpanded) {
+        setState(() {
+            _isCommunityInsightExpanded = false; // THIS LINE COLLAPSES THE SHEET
+        });
+        await Future.delayed(const Duration(milliseconds: 350)); 
+    }
     
     // Clear any existing timer
     _addressTimer?.cancel(); 
@@ -381,11 +473,62 @@ class _DashboardState extends State<Dashboard> {
       );
   }
 
-  // Function to search POIs by category
+  // MODIFIED: Function to search POIs by category (Points 1, 2, 3 implemented here)
   Future<void> _searchPOIsByCategory(String placeType) async {
     if (!mounted || !_isMapReady || _mapController == null) return; 
     _clearSearchMarker(); 
 
+    // Handle hardcoded terminals separately
+    if (placeType == 'bus_station') {
+      _markers.clear();
+      
+      // Variables for bounds calculation (Point 2)
+      double minLat = 90.0, maxLat = -90.0;
+      double minLng = 180.0, maxLng = -180.0;
+
+      for (var terminal in _hardcodedTerminals) {
+        final lat = terminal['lat'] as double;
+        final lng = terminal['lng'] as double;
+        
+        // Calculate bounds
+        minLat = min(minLat, lat);
+        maxLat = max(maxLat, lat);
+        minLng = min(minLng, lng);
+        maxLng = max(maxLng, lng);
+
+        _markers.add(
+          Marker(
+            markerId: MarkerId(terminal['id'] as String),
+            position: LatLng(lat, lng),
+            infoWindow: InfoWindow(title: terminal['name'] as String),
+            icon: _terminalIcon, // Use custom icon (Pin will be Green - Point 3)
+            onTap: () => _handleTerminalTapped(terminal['id'] as String),
+          ),
+        );
+      }
+      
+      if (mounted) {
+        setState(() {
+          _showDetailsButton = false;
+        });
+        // REMOVED: Snackbar notification (Point 1)
+      }
+      
+      // Zoom to fit all terminal locations (Point 2)
+      if (_hardcodedTerminals.isNotEmpty) {
+          final bounds = LatLngBounds(
+              southwest: LatLng(minLat, minLng),
+              northeast: LatLng(maxLat, maxLng),
+          );
+          // 50.0 padding is added for better visual spacing around the markers
+          _mapController.animateCamera(
+              CameraUpdate.newLatLngBounds(bounds, 50.0), 
+          );
+      }
+      return; // Exit here to use hardcoded markers for terminals
+    }
+
+    // Existing Google Places API logic for other categories
     try {
       // Use getVisibleRegion() and calculate center from bounds
       final LatLngBounds bounds = await _mapController.getVisibleRegion();
@@ -496,8 +639,8 @@ class _DashboardState extends State<Dashboard> {
             maintainState: true,
             maintainSize: true,
             child: Container(
-                width: 315, // Constrain width (not full width)
-                constraints: const BoxConstraints(minHeight: 40), // Minimum height for alignment
+                width: 300, // Increased width
+                constraints: const BoxConstraints(minHeight: 60), // Minimum height for alignment
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                     color: cs.surface,
@@ -515,6 +658,14 @@ class _DashboardState extends State<Dashboard> {
                     mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                        Text(
+                            "CURRENTLY AT",
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: cs.secondary,
+                            ),
+                        ),
                         const SizedBox(height: 2),
                         // Text should flow, max 2 lines to maintain compact height
                         Text( 
@@ -552,8 +703,8 @@ class _DashboardState extends State<Dashboard> {
             Positioned.fill(
               child: GoogleMap(
                 onMapCreated: _onMapCreated,
-                initialCameraPosition: CameraPosition(
-                  target: _initialCameraPosition,
+                initialCameraPosition: const CameraPosition(
+                  target: LatLng(10.314481680817886, 123.88813209917954),
                   zoom: 14.0,
                 ),
                 markers: _markers,
@@ -619,14 +770,15 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
 
-            // MODIFIED: Floating Buttons and Address Modal (right edge)
+            // Floating Buttons and Address Modal (right edge)
             AnimatedPositioned(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
               right: 16,
-              top: _isCommunityInsightExpanded ? null: MediaQuery.of(context).size.height * 0.10,
-              bottom: _isCommunityInsightExpanded ? 10 : null,
-
+              // Anchor the buttons to the bottom when collapsed to prevent movement.
+              bottom: _isCommunityInsightExpanded ? 10 : 80.0, 
+              top: null, // Rely only on bottom property for vertical positioning
+              
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 800),
                 transitionBuilder: (Widget child, Animation<double> animation) {
@@ -689,6 +841,65 @@ class _DashboardState extends State<Dashboard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// =========================================================================
+// Terminal Details Modal Widget
+// =========================================================================
+
+class TerminalDetailsModal extends StatelessWidget {
+  final Map<String, String> details;
+  final ColorScheme cs;
+
+  const TerminalDetailsModal({super.key, required this.details, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(details['title'] ?? 'Terminal Details', style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary)),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildDetailRow(context, 'Status', details['status'] ?? 'N/A', Icons.access_time_filled, cs),
+            const SizedBox(height: 10),
+            _buildDetailRow(context, 'Primary Routes', details['routes'] ?? 'N/A', Icons.directions_bus, cs),
+            const SizedBox(height: 10),
+            _buildDetailRow(context, 'Facilities', details['facilities'] ?? 'N/A', Icons.local_convenience_store, cs),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          child: Text('CLOSE', style: TextStyle(color: cs.primary)),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailRow(BuildContext context, String label, String value, IconData icon, ColorScheme cs) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: cs.secondary, size: 20),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurface.withOpacity(0.7))),
+              const SizedBox(height: 2),
+              Text(value, style: TextStyle(fontSize: 15, color: cs.onSurface)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

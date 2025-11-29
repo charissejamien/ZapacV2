@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:zapac/dashboard/dashboard.dart';
+import 'package:zapac/core/widgets/onboardHeader.dart';
+import 'package:zapac/core/widgets/onboardFooter.dart';
 
 class OnboardingTourPage extends StatefulWidget {
-  // A place to store the selected profile, if needed later
-  final String userProfile; 
+
+  final String userProfile;
   const OnboardingTourPage({super.key, required this.userProfile});
 
   @override
@@ -72,15 +74,6 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          // Placeholder for image/illustration here
-          SizedBox(
-            height: 200,
-            child: Icon(
-              Icons.directions_bus, 
-              size: 100, 
-              color: cs.primary.withOpacity(0.5)
-            ),
-          ),
           const SizedBox(height: 50.0),
           
           // Title
@@ -126,6 +119,11 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
 
     return Scaffold(
       backgroundColor: cs.background,
+      
+      appBar: const OnboardingHeader(),
+      
+      bottomNavigationBar: const AuthFooter(),
+      
       body: SafeArea(
         child: Column(
           children: [

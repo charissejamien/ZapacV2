@@ -168,15 +168,15 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildSettingsSection(
               'SUPPORT',
               [
-                _buildSettingsTile(
-                  title: 'Share our app',
-                  icon: Icons.share_rounded,
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Share app functionality coming soon!')),
-                    );
-                  },
-                ),
+                // _buildSettingsTile(
+                //   title: 'Share our app',
+                //   icon: Icons.share_rounded,
+                //   onTap: () {
+                //     ScaffoldMessenger.of(context).showSnackBar(
+                //       const SnackBar(content: Text('Share app functionality coming soon!')),
+                //     );
+                //   },
+                // ),
                 _buildSettingsTile(
                   title: 'Help & Feedback',
                   icon: Icons.help_outline_rounded,

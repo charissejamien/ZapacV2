@@ -43,6 +43,17 @@
 	<string>We need access to your camera to take a profile picture.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to show your current position on the map and provide routing assistance.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Your location is needed to provide accurate routing and map services.</string>
+
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Your location helps us accurately determine your current position for navigation.</string>
+
+	<key>NSLocationTemporaryUsageDescriptionDictionary</key>
+	<dict>
+		<key>Default</key>
+		<string>We temporarily access your location to improve navigation accuracy.</string>
+	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>We need access to your photo library to select a profile picture.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

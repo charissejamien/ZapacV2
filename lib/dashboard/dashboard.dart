@@ -772,13 +772,12 @@ class _DashboardState extends State<Dashboard> {
 
             // Floating Buttons and Address Modal (right edge)
             AnimatedPositioned(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              right: 16,
-              // Anchor the buttons to the bottom when collapsed to prevent movement.
-              bottom: _isCommunityInsightExpanded ? 10 : 80.0, 
-              top: null, // Rely only on bottom property for vertical positioning
-              
+               duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                right: _isCommunityInsightExpanded ? 16 :10,
+                bottom: _isCommunityInsightExpanded ? 10 : 520,
+                top: _isCommunityInsightExpanded ? null : 50,
+
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 800),
                 transitionBuilder: (Widget child, Animation<double> animation) {

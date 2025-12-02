@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'routes_service.dart';
-import 'route_list.dart'; // Import RouteOption and LatLngBounds (if defined here, otherwise you need to import google_maps_flutter directly)
+import 'route_list.dart'; 
 import 'package:url_launcher/url_launcher.dart'; 
 import 'dart:io' show Platform; 
 
@@ -54,7 +54,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   final Color grabGreen = const Color.fromARGB(255, 5, 199, 76);
   final Color joyrideBlue = const Color(0xFF1E21CD);
   
-  // App Links remain the same
   static const Map<String, dynamic> appLinks = {
     'Angkas': {
       'scheme': 'angkasrider://', 
@@ -87,7 +86,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   @override
   void initState() {
     super.initState();
-    _extractDataFromRouteOption(); // Start by extracting data from the passed option
+    _extractDataFromRouteOption(); 
   }
   
   // --- Data Extraction Helpers from previous response ---

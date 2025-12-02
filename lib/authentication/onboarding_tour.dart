@@ -22,7 +22,6 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     super.initState();
     _pageController.addListener(() {
       if (_pageController.page != null) {
-        // FIX: Added mounted check before setState, although generally safe here, it's good practice.
         if (mounted) {
           setState(() {
             _currentPage = _pageController.page!.round();
@@ -45,9 +44,6 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
         curve: Curves.easeInOut,
       );
     } else {
-      // Last page: Navigate to Dashboard
-      // FIX: The context usage here is before an await, but since it's navigating away, it's generally safe.
-      // However, we ensure the context is still available for the MaterialPageRoute builder.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const Dashboard()),
         (Route<dynamic> route) => false,
@@ -55,8 +51,15 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     }
   }
 
+  // Helper function for navigating directly to Dashboard
+  void _onSkipPressed() {
+     Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const Dashboard()),
+      (Route<dynamic> route) => false,
+    );
+  }
+
   Widget _buildPageIndicator(int index, ColorScheme cs) {
-    // 0.3 opacity ≈ alpha 77
     final inactiveAlpha = 77;
     
     return Container(
@@ -64,18 +67,40 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
       height: 8.0,
       width: _currentPage == index ? 24.0 : 8.0,
       decoration: BoxDecoration(
-        // FIX: Replaced .withOpacity(0.3) with .withAlpha(77)
         color: _currentPage == index ? cs.primary : cs.primary.withAlpha(inactiveAlpha),
         borderRadius: BorderRadius.circular(12),
       ),
     );
   }
 
+  Widget _buildGradientText(String text, double fontSize, {required bool isTitle}) {
+    final Color gradientStart = const Color(0xFF6CA89A);
+    final Color gradientEnd = const Color(0xFF4A6FA5);
+
+    return ShaderMask(
+      shaderCallback: (bounds) => LinearGradient(
+        colors: [gradientStart, gradientEnd],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(bounds),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          color: Colors.white, 
+        ),
+      ),
+    );
+  }
+
   Widget _buildTourPage({
-    required String title,
+    required String? title,
     required String subtitle,
     required String description,
     required ColorScheme cs,
+    required String imagePath,
   }) {
     // 0.8 opacity ≈ alpha 204
     final descriptionAlpha = 204;
@@ -87,29 +112,22 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           const SizedBox(height: 50.0),
+
+          Image.asset(
+            imagePath, 
+            height: 280, 
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(height: 30.0),
           
           // Title
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              // FIX: Replaced cs.onBackground with cs.onSurface
-              color: cs.onSurface,
-            ),
-          ),
-          // Subtitle (or second line of title)
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              // FIX: Replaced cs.onBackground with cs.onSurface
-              color: cs.onSurface,
-            ),
-          ),
+          if (title != null && title.isNotEmpty) ...[
+            _buildGradientText(title, 32, isTitle: true),
+          ],
+          
+          // Subtitle
+          _buildGradientText(subtitle, 32, isTitle: false),
+
           const SizedBox(height: 20.0),
           
           // Description
@@ -118,7 +136,6 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
-              // FIX: Replaced .withOpacity(0.8) with .withAlpha(204)
               color: cs.onSurface.withAlpha(descriptionAlpha),
             ),
           ),
@@ -133,7 +150,6 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     final isLastPage = _currentPage == _numPages - 1;
 
     return Scaffold(
-      // FIX: Replaced cs.background with cs.surface
       backgroundColor: cs.surface,
       
       appBar: const OnboardingHeader(),
@@ -153,62 +169,73 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
                   });
                 },
                 children: <Widget>[
-                  // Page 1: Cebuano Buddy
+                  // Page 1
                   _buildTourPage(
-                    title: 'Your Cebuano Buddy',
+                    title: null, 
                     subtitle: 'Commuting in Cebu, Simplified.',
                     description: 'Navigating the city shouldn\'t be a guessing game. Ditch the confusion and ride like a local.',
                     cs: cs,
+                    imagePath: 'assets/onboardingOne.png',
                   ),
                   
-                  // Page 2: Asa ni Muagi
+                  // Page 2
                   _buildTourPage(
-                    title: 'Never Ask "Asa ni Muagi?"',
-                    subtitle: 'Again.',
+                    title: null,
+                    subtitle: 'Never ask "Asa ni Muagi?" Again.',
                     description: 'Confused by Jeepney codes? Just type your destination. We’ll show you exactly which Jeep or Bus to take and where to say "Para!" (Stop).',
                     cs: cs,
+                    imagePath: 'assets/onboardingTwo.png',
                   ),
                   
-                  // Page 3: Know Your Plete
+                  // Page 3
                   _buildTourPage(
                     title: 'Know Your "Plete"',
                     subtitle: 'Before You Hop On.',
                     description: 'No more guessing how much to pay. Get accurate fare estimates for Jeeps, Modern Jeeps, and Buses so you can prepare your coins.',
                     cs: cs,
+                    imagePath: 'assets/onboardingThree.png',
                   ),
                 ],
               ),
             ),
             
-            // Bottom UI (Indicators and Button)
             Padding(
               padding: const EdgeInsets.only(bottom: 40, left: 30, right: 30, top: 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Page Indicators
+                  TextButton(
+                    onPressed: _onSkipPressed,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(60, 40),
+                    ),
+                    child: Text(
+                      'Skip',
+                      style: TextStyle(
+                        color: cs.onSurface.withAlpha(204),
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(_numPages, (index) => _buildPageIndicator(index, cs)),
                   ),
-                  const SizedBox(height: 30),
-                  
-                  // Next / Get Started Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      onPressed: _onNextPressed,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: cs.primary,
-                        foregroundColor: cs.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        isLastPage ? 'Get Started' : 'Next',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+                  TextButton(
+                    onPressed: _onNextPressed,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(60, 40),
+                    ),
+                    child: Text(
+                      isLastPage ? 'Get Started' : 'Next',
+                      style: TextStyle(
+                        color: cs.primary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),

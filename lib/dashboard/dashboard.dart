@@ -62,7 +62,7 @@ class _DashboardState extends State<Dashboard> {
   bool _showAddressModal = false;
   Timer? _addressTimer; 
 
-  // Hardcoded terminal data
+  // Hardcoded terminal data (USED BY CommentingSection)
   final List<Map<String, dynamic>> _hardcodedTerminals = const [
     {
       'id': 'cebu_south_terminal',
@@ -125,8 +125,8 @@ class _DashboardState extends State<Dashboard> {
       }
     },
 ];
-  // FIX: Made private field _terminalIcon 'final'
-  final BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+  // MODIFIED: Initial value for the icon is a default, will be updated in initState
+  BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
 
   // List of categories for the chips
   static const List<Category> _categories = [
@@ -161,8 +161,8 @@ class _DashboardState extends State<Dashboard> {
       }
     });
 
-    // NOTE: If you add an asset 'assets/icons/bus_icon.png', uncomment and change the path here
-    // _loadTerminalIcon(); 
+    // NEW: Load the custom marker icon
+    _loadTerminalIcon(); 
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -172,12 +172,12 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
-  // NOTE: This function is only needed if you use a custom asset for the terminal icon.
-  /*
+  // NEW: Function to load the custom image asset as a BitmapDescriptor
   Future<void> _loadTerminalIcon() async {
+      // **NOTE: Change 'assets/images/bus_terminal_pin.png' to your actual asset path.**
       final newIcon = await BitmapDescriptor.fromAssetImage(
           const ImageConfiguration(size: Size(48, 48)),
-          'assets/icons/bus_icon.png', // Replace with your actual path
+          'assets/insightsIcon.png', 
       );
       if (mounted) {
           setState(() {
@@ -185,7 +185,6 @@ class _DashboardState extends State<Dashboard> {
           });
       }
   }
-  */
 
   @override
   void dispose() {
@@ -226,7 +225,6 @@ class _DashboardState extends State<Dashboard> {
       });
 
     }, onError: (error) {
-      // FIX: Replaced print with logger comment
       // Logger.error("Error fetching community insights: $error");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -531,7 +529,7 @@ class _DashboardState extends State<Dashboard> {
             markerId: MarkerId(terminal['id'] as String),
             position: LatLng(lat, lng),
             infoWindow: InfoWindow(title: terminal['name'] as String),
-            icon: _terminalIcon, // Use custom icon (Pin will be Green - Point 3)
+            icon: _terminalIcon, // <--- NOW USES THE CUSTOM LOADED ICON
             onTap: () => _handleTerminalTapped(terminal['id'] as String),
           ),
         );
@@ -746,10 +744,12 @@ class _DashboardState extends State<Dashboard> {
               ),
             ),
 
+            // MODIFIED: Pass the hardcoded terminal data
             CommentingSection(
               chatMessages: _liveChatMessages, 
               onExpansionChanged: _onCommunityInsightExpansionChanged,
               currentUserId: _currentUserId,
+              hardcodedTerminals: _hardcodedTerminals, // <--- NEW PROP
             ),
             
             // Contains SearchBar and Category Chips
@@ -819,8 +819,8 @@ class _DashboardState extends State<Dashboard> {
                 },
 
               // Use Row to place modal beside the FloatingButton stack
+              key: ValueKey<bool>(_isCommunityInsightExpanded),
               child: Row( 
-                key: ValueKey<bool>(_isCommunityInsightExpanded),
                 mainAxisSize: MainAxisSize.min,
                 // Align content to the bottom of the tallest element in the Row (which is the FAB stack)
                 crossAxisAlignment: CrossAxisAlignment.end, 
@@ -930,6 +930,50 @@ class TerminalDetailsModal extends StatelessWidget {
               Text(value, style: TextStyle(fontSize: 15, color: cs.onSurface)),
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// =========================================================================
+// PLACEHOLDER: FloatingButton Class (Missing from provided files)
+// =========================================================================
+
+// This is added to fix the compilation error in the build method.
+class FloatingButton extends StatelessWidget {
+  final bool isCommunityInsightExpanded;
+  final VoidCallback onAddInsightPressed;
+  final VoidCallback onMyLocationPressed;
+
+  const FloatingButton({
+    super.key,
+    required this.isCommunityInsightExpanded,
+    required this.onAddInsightPressed,
+    required this.onMyLocationPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Placeholder implementation for functionality not available in provided files
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton(
+          heroTag: 'add_insight',
+          onPressed: onAddInsightPressed,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          mini: true,
+          child: const Icon(Icons.comment),
+        ),
+        const SizedBox(height: 10),
+        FloatingActionButton(
+          heroTag: 'my_location',
+          onPressed: onMyLocationPressed,
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          child: const Icon(Icons.my_location),
         ),
       ],
     );

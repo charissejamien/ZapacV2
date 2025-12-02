@@ -54,4 +54,8 @@ flutter:
     - assets/grab.png
     - assets/angkas.png
     - assets/bus_icon.png
-
+    - assets/onboardingOne.png
+    - assets/onboardingTwo.png
+    - assets/onboardingThree.png
+    - assets/insightsIcon.png
+    - assets/terminalsIcon.png

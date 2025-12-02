@@ -164,6 +164,7 @@ class _DashboardState extends State<Dashboard> {
     // NEW: Load the custom marker icon
     _loadTerminalIcon(); 
     
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _fetchAndListenToMessages(); 
@@ -272,7 +273,7 @@ class _DashboardState extends State<Dashboard> {
     // Logger.info("Insight added, Firebase listener will refresh UI.");
   }
 
-  // FIX: Used null-aware assignment instead of if statement
+  // FIX 1: Using the now-available MapUtils.getAddressFromLatLng
   Future<void> _updateCurrentAddress({LatLng? location}) async {
     if (!mounted) return;
 
@@ -425,28 +426,22 @@ class _DashboardState extends State<Dashboard> {
       
       if (!mounted) return; // Guard against async gap
 
-      final routeDetails = await MapUtils.getRouteDetails(
-          origin: currentLocation,
-          destination: newPosition,
+      // FIX: Replace non-existent getRouteDetails with getRouteAndDetails
+      // This new function handles drawing the route and returns real-time driving details.
+      final routeDetails = await MapUtils.getRouteAndDetails(
+          item: item, 
           apiKey: _getMapApiKey(),
+          markers: _markers,
+          polylines: _polylines,
+          mapController: _mapController,
+          context: context,
       );
 
       if (!mounted) return; // Guard against async gap
 
       setState(() {
-        _markers.clear();
-        _polylines.clear(); 
-
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('destination_search'),
-            position: newPosition,
-            infoWindow: InfoWindow(title: name ?? 'Selected Location'),
-          ),
-        );
-        
         _currentSearchName = name;
-        if (routeDetails != null) {
+        if (routeDetails.isNotEmpty) {
             _currentSearchDetails = routeDetails;
             _showDetailsButton = true; 
         } else {
@@ -455,10 +450,7 @@ class _DashboardState extends State<Dashboard> {
             // Logger.error("Failed to fetch route details.");
         }
       });
-
-      await _mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(newPosition, 16.0),
-      );
+      // Camera animation handled inside MapUtils.getRouteAndDetails
     }
   }
 

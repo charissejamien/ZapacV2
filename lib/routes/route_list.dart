@@ -156,6 +156,7 @@ class _RouteListPageState extends State<RouteListPage> {
                 durationMinutes: durationMinutes,
                 totalFare: estimatedFare,
                 legs: transportModes,
+                rawRouteData: route,
               ));
             }
           }
@@ -491,6 +492,7 @@ class RouteOption {
   final int durationMinutes;
   final int totalFare;
   final List<String> legs;
+  final Map<String, dynamic> rawRouteData; 
 
   RouteOption({
     required this.depart,
@@ -498,6 +500,7 @@ class RouteOption {
     required this.durationMinutes,
     required this.totalFare,
     required this.legs,
+    required this.rawRouteData,
   });
 }
 

@@ -2,20 +2,19 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'routes_service.dart';
-import 'route_list.dart'; // Assuming this defines LatLngBounds
+import 'route_list.dart'; // Import RouteOption and LatLngBounds (if defined here, otherwise you need to import google_maps_flutter directly)
 import 'package:url_launcher/url_launcher.dart'; 
 import 'dart:io' show Platform; 
 
-// NOTE: Since the FavoriteRoute model is not provided, 
-// the map-specific data (bounds, polylinePoints) must be extracted from the API response.
+// NOTE: Ensure RouteOption is defined in route_list.dart and imported here.
 
 class RouteDetailPage extends StatefulWidget {
   final Map<String, dynamic>? origin;
   final Map<String, dynamic>? destination;
-  final dynamic routeOption;
+  final RouteOption routeOption; 
 
   const RouteDetailPage({
-    super.key, // Changed Key? key to super.key
+    super.key, 
     required this.origin,
     required this.destination,
     required this.routeOption,
@@ -26,32 +25,28 @@ class RouteDetailPage extends StatefulWidget {
 }
 
 class _RouteDetailPageState extends State<RouteDetailPage> {
-  Map<String, dynamic>? routeData;
-  bool loading = true;
-  String? errorMessage;
-
   // Map state
   late GoogleMapController _mapController;
   final Set<Marker> _markers = {};
   Set<Polyline> _polylines = {};
   
   // UI / fare state
+  bool loading = true;
+  String? errorMessage;
   String _distanceText = '';
   double _distanceKm = 0.0;
-  String _durationText = ''; // Changed from _durationMinutes to match original UI text format
+  String _durationText = ''; 
   Map<String, String> _estimatedFares = {};
   List<dynamic> _steps = [];
   String _startLabel = '';
   String _endLabel = '';
-  LatLngBounds? _bounds; // Map bounds
-  List<LatLng> _polylinePoints = []; // Route points
+  LatLngBounds? _bounds; 
+  List<LatLng> _polylinePoints = [];
   
   // Constants from routeDetail.dart
   static const int alpha179 = 179;
-  static const int alpha13 = 13;
   static const int alpha26 = 26;
   static const int alpha31 = 31;
-  static const int alpha204 = 204;
 
   final Color angkasBlue = const Color(0xFF14b2d8);
   final Color maximYellow = const Color(0xFFFDDB0A); 
@@ -59,6 +54,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   final Color grabGreen = const Color.fromARGB(255, 5, 199, 76);
   final Color joyrideBlue = const Color(0xFF1E21CD);
   
+  // App Links remain the same
   static const Map<String, dynamic> appLinks = {
     'Angkas': {
       'scheme': 'angkasrider://', 
@@ -67,7 +63,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     },
     'Maxim': {
       'scheme': 'taximaxim://',
-      'schemeWeb': 'https://taximaxim.page.link/app', // Added for better fallback if app is installed but scheme fails
+      'schemeWeb': 'https://taximaxim.page.link/app', 
       'androidPackage': 'com.taxsee.taxsee',
       'iosAppId': '597956747',
     },
@@ -91,96 +87,22 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   @override
   void initState() {
     super.initState();
-    loadRoute();
+    _extractDataFromRouteOption(); // Start by extracting data from the passed option
   }
   
-  // --- Data Extraction Helpers ---
-  double _toDoubleSafe(dynamic v) {
-    if (v == null) return 0.0;
-    if (v is double) return v;
-    if (v is int) return v.toDouble();
-    if (v is String) {
-      final cleaned = v.trim();
-      return double.tryParse(cleaned) ?? 0.0;
-    }
-    if (v is num) return v.toDouble();
-    return 0.0;
-  }
+  // --- Data Extraction Helpers from previous response ---
 
-  double _extractLat(Map<dynamic, dynamic>? m) {
-    if (m == null) return 0.0;
-    final candidates = [
-      m['latitude'],
-      m['lat'],
-      m['latLng']?['latitude'],
-      m['latLng']?['lat'],
-      m['location']?['lat'],
-      m['location']?['latitude'],
-    ];
-    for (final c in candidates) {
-      if (c != null) return _toDoubleSafe(c);
-    }
-    return 0.0;
-  }
-
-  double _extractLng(Map<dynamic, dynamic>? m) {
-    if (m == null) return 0.0;
-    final candidates = [
-      m['longitude'],
-      m['lng'],
-      m['latLng']?['longitude'],
-      m['latLng']?['lng'],
-      m['location']?['lng'],
-      m['location']?['longitude'],
-    ];
-    for (final c in candidates) {
-      if (c != null) return _toDoubleSafe(c);
-    }
-    return 0.0;
-  }
-
-  Map<String, dynamic> _extractFirstLeg(Map<String, dynamic> data) {
-    try {
-      final routes = data['routes'];
-      if (routes is List && routes.isNotEmpty) {
-        final legs = routes[0]['legs'];
-        if (legs is List && legs.isNotEmpty) {
-          return (legs[0] as Map<String, dynamic>);
-        }
-      }
-    } catch (_) {}
-    return <String, dynamic>{};
-  }
-
-  List<dynamic> _getStepsSafe(Map<String, dynamic>? data) {
-    if (data == null) return [];
-    try {
-      final routes = data['routes'];
-      if (routes is List && routes.isNotEmpty) {
-        final legs = routes[0]['legs'];
-        if (legs is List && legs.isNotEmpty) {
-          final steps = legs[0]['steps'];
-          if (steps is List) return steps;
-        }
-      }
-    } catch (_) {}
-    return [];
-  }
-  
   LatLngBounds? _getBoundsSafe(Map<String, dynamic>? data) {
     if (data == null) return null;
     try {
-      final routes = data['routes'];
-      if (routes is List && routes.isNotEmpty) {
-        final boundsData = routes[0]['bounds'] as Map<String, dynamic>;
-        final northeast = boundsData['northeast'] as Map<String, dynamic>;
-        final southwest = boundsData['southwest'] as Map<String, dynamic>;
-        
-        return LatLngBounds(
-          northeast: LatLng(northeast['lat'], northeast['lng']),
-          southwest: LatLng(southwest['lat'], southwest['lng']),
-        );
-      }
+      final boundsData = data['bounds'] as Map<String, dynamic>;
+      final northeast = boundsData['northeast'] as Map<String, dynamic>;
+      final southwest = boundsData['southwest'] as Map<String, dynamic>;
+      
+      return LatLngBounds(
+        northeast: LatLng(northeast['lat'], northeast['lng']),
+        southwest: LatLng(southwest['lat'], southwest['lng']),
+      );
     } catch (_) {}
     return null;
   }
@@ -222,35 +144,41 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   List<LatLng> _getPolylinePointsSafe(Map<String, dynamic>? data) {
     if (data == null) return [];
     try {
-      final routes = data['routes'];
-      if (routes is List && routes.isNotEmpty) {
-        final encodedPolyline = routes[0]['overview_polyline']?['points'] as String?;
-        if (encodedPolyline != null) {
-          return _decodePolyline(encodedPolyline);
-        }
+      final encodedPolyline = data['overview_polyline']?['points'] as String?;
+      if (encodedPolyline != null) {
+        return _decodePolyline(encodedPolyline);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  List<dynamic> _getStepsSafe(Map<String, dynamic>? data) {
+    if (data == null) return [];
+    try {
+      final legs = data['legs'];
+      if (legs is List && legs.isNotEmpty) {
+        final steps = legs[0]['steps'];
+        if (steps is List) return steps;
       }
     } catch (_) {}
     return [];
   }
   
   // --- Fare Estimation ---
-  Map<String, String> _estimateFares(double distanceKm) {
-    // basic fare estimates — adjust formulas to suit your app/region
+  Map<String, String> _estimateFaresFunc(double distanceKm) {
+    // Replicates the logic from the previous route_detail.dart
     final fares = <String, String>{};
 
-    // Moto Taxi (e.g., Angkas) - Base from routeDetail.dart logic for Moto Taxi
     final motoBase = 40;
     final motoPerKm = 12;
     final moto = (motoBase + (distanceKm * motoPerKm)).round();
     fares['Moto Taxi'] = '₱$moto';
 
-    // Taxi (meter-ish) - Base from routeDetail.dart logic for Taxi
     final taxiBase = 40;
     final taxiPerKm = 18;
     final taxi = (taxiBase + (distanceKm * taxiPerKm)).round();
     fares['Taxi'] = '₱$taxi';
 
-    // PUJ / Jeepney / Bus estimate (using simple public fare) - Base from routeDetail.dart logic for PUJ
     final puj = _calculatePublicFare(distanceKm);
     fares['PUJ / Bus'] = '₱$puj';
 
@@ -262,77 +190,34 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     return (15 + ((distanceKm - 4.0) * 2.5)).round();
   }
   
-  // --- API Call and State Update ---
-  Future<void> loadRoute() async {
-    if (widget.origin == null || widget.destination == null) {
-      setState(() {
-        loading = false;
-        errorMessage = 'Missing origin or destination data.';
-      });
-      return;
-    }
-
-    final originMap = widget.origin!;
-    final destMap = widget.destination!;
-
-    final originLat = _extractLat(originMap);
-    final originLng = _extractLng(originMap);
-    final destLat = _extractLat(destMap);
-    final destLng = _extractLng(destMap);
+  // --- Data Extraction and State Update for selected RouteOption ---
+  void _extractDataFromRouteOption() {
+    final Map<String, dynamic> rawRoute = widget.routeOption.rawRouteData;
 
     try {
-      final service = RoutesService();
-      final result = await service.getRouteDetails(
-        originLat: originLat,
-        originLng: originLng,
-        destLat: destLat,
-        destLng: destLng,
-      );
-
-      if (!mounted) return;
-
-      if (result == null) {
-        setState(() {
-          loading = false;
-          errorMessage = 'No route details returned from the API.';
-        });
-        return;
-      }
-
-      // extract summary info safely
-      final Map<String, dynamic> firstLeg = _extractFirstLeg(result);
-      _distanceText = (firstLeg['distance']?['text'] ??
-          firstLeg['distance'] ??
-          '')?.toString() ??
-          '';
-      final distanceMeters = (firstLeg['distance']?['value'] ?? 0) as num;
-      _distanceKm = (distanceMeters.toDouble() / 1000.0);
-      _durationText = (firstLeg['duration']?['text'] ?? 
-          firstLeg['duration'] ?? 
-          '')?.toString() ?? 
-          '';
-
-      // compute fares
-      _estimatedFares = _estimateFares(_distanceKm);
-
-      // extract steps
-      _steps = _getStepsSafe(result);
+      // 1. Extract Distance and Duration
+      final leg = (rawRoute['legs'] as List).first as Map<String, dynamic>;
       
-      // extract map data
-      _bounds = _getBoundsSafe(result);
-      _polylinePoints = _getPolylinePointsSafe(result);
+      _distanceText = leg['distance']?['text']?.toString() ?? '';
+      final distanceMeters = (leg['distance']?['value'] ?? 0) as num;
+      _distanceKm = (distanceMeters.toDouble() / 1000.0);
+      _durationText = leg['duration']?['text']?.toString() ?? '${widget.routeOption.durationMinutes} mins';
+      
+      // 2. Compute Fares (using the distance derived from the API response)
+      _estimatedFares = _estimateFaresFunc(_distanceKm);
 
-      // set addresses
-      _startLabel = firstLeg['start_address']?.toString() ??
-          widget.origin?['description']?.toString() ??
-          widget.origin?['name']?.toString() ??
-          'Start';
-      _endLabel = firstLeg['end_address']?.toString() ??
-          widget.destination?['description']?.toString() ??
-          widget.destination?['name']?.toString() ??
-          'Destination';
+      // 3. Extract Steps
+      _steps = _getStepsSafe(rawRoute);
+      
+      // 4. Extract Map Data (Bounds and Polyline)
+      _bounds = _getBoundsSafe(rawRoute);
+      _polylinePoints = _getPolylinePointsSafe(rawRoute);
+
+      // 5. Set Addresses
+      _startLabel = leg['start_address']?.toString() ?? widget.origin?['name']?.toString() ?? 'Start';
+      _endLabel = leg['end_address']?.toString() ?? widget.destination?['name']?.toString() ?? 'Destination';
           
-      // Set map markers and polylines
+      // 6. Set Map Markers and Polylines
       if (_polylinePoints.isNotEmpty) {
         _markers.add(Marker(
           markerId: const MarkerId('start'),
@@ -355,22 +240,19 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       }
 
       setState(() {
-        routeData = result;
         loading = false;
         errorMessage = null;
       });
     } catch (e, st) {
-      debugPrint('Error loading route details: $e\n$st');
-      if (mounted) {
-        setState(() {
-          loading = false;
-          errorMessage = 'Failed to load route details.';
-        });
-      }
+      debugPrint('Error extracting route data: $e\n$st');
+      setState(() {
+        loading = false;
+        errorMessage = 'Failed to process route data.';
+      });
     }
   }
 
-  // --- Map and App Launch Logic from routeDetail.dart ---
+  // --- Map and App Launch Logic ---
   
   LatLng _getCenter(LatLngBounds bounds) {
     return LatLng(
@@ -410,8 +292,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
     final appUri = Uri.parse(appScheme);
     final storeUri = Uri.parse(storeLink);
-    
-    // Maxim uses a dynamic link fallback
     final webScheme = data['schemeWeb'] != null ? Uri.parse(data['schemeWeb']) : null;
 
 
@@ -419,7 +299,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       await launchUrl(appUri, mode: LaunchMode.externalApplication);
     } 
     else if (webScheme != null && await canLaunchUrl(webScheme)) {
-      // Secondary attempt for apps like Maxim with web scheme/dynamic link
       await launchUrl(webScheme, mode: LaunchMode.externalApplication);
     }
     else if (await canLaunchUrl(storeUri)) {
@@ -476,8 +355,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   }
   
   Widget _buildFareOptionCard(ColorScheme cs, String transportName, String fare, String durationText) {
-    // Note: The original timeRange logic (10 am -> 10 am) is placeholder/static.
-    // Keeping it simple as no live time data is available here.
     const String timeRange = 'Today'; 
     
     Widget transportRow = Row(
@@ -572,9 +449,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
-  Widget _buildActionButton(ColorScheme cs, String appName, String imagePath, {required Color backgroundColor}) {
-    // NOTE: This assumes you have assets/angkas.png, assets/maxim.png, etc.
-    // If you don't have these, use a TextButton with the appName instead.
+  Widget _buildActionButton(ColorScheme cs, String appName, {required Color backgroundColor}) {
+    // Note: Removed imagePath and asset usage to simplify and prevent asset errors.
+    // If you use the Image.asset code, ensure the paths are correct.
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -588,22 +465,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             backgroundColor: backgroundColor, 
           ),
           child: Text(
-            appName, // Fallback to Text if image is missing
+            appName, 
             style: TextStyle(
               color: backgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
           ),
-          /* If you have the assets, uncomment the following and remove the Text widget:
-          child: Image.asset(
-            imagePath,
-            height: 24,
-            fit: BoxFit.contain,
-            color: backgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white, 
-            colorBlendMode: BlendMode.modulate, 
-          ),
-          */
         ),
       ),
     );
@@ -614,10 +482,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildActionButton(cs, 'Angkas', 'assets/angkas.png', backgroundColor: angkasBlue), 
-        _buildActionButton(cs, 'Maxim', 'assets/maxim.png', backgroundColor: maximYellow), 
-        _buildActionButton(cs, 'MoveIt', 'assets/moveit.png', backgroundColor: moveItRed), 
-        _buildActionButton(cs, 'JoyRide', 'assets/joyride.png', backgroundColor: joyrideBlue),
+        _buildActionButton(cs, 'Angkas', backgroundColor: angkasBlue), 
+        _buildActionButton(cs, 'Maxim', backgroundColor: maximYellow), 
+        _buildActionButton(cs, 'MoveIt', backgroundColor: moveItRed), 
+        _buildActionButton(cs, 'JoyRide', backgroundColor: joyrideBlue),
       ],
     );
   }
@@ -626,8 +494,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildActionButton(cs, 'Grab', 'assets/grab.png', backgroundColor: grabGreen),
-        _buildActionButton(cs, 'JoyRide', 'assets/joyride.png', backgroundColor: joyrideBlue),
+        _buildActionButton(cs, 'Grab', backgroundColor: grabGreen),
+        _buildActionButton(cs, 'JoyRide', backgroundColor: joyrideBlue),
       ],
     );
   }
@@ -658,7 +526,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             )
         );
       } else if (transportType == 'Taxi') {
-          // Assuming Grab/JoyRide also cover Taxi/Car-based ride-hailing
           fareWidgets.add(
               Padding(
               padding: const EdgeInsets.only(top: 0.0, bottom: 8.0, left: 16, right: 16),
@@ -667,7 +534,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         );
       }
       
-      // Add a small spacer between different transport type cards
       fareWidgets.add(const SizedBox(height: 10)); 
     });
 
@@ -685,7 +551,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             )
           ),
           const SizedBox(height: 10),
-          // Display the list of fare items and buttons
           ...fareWidgets,
         ],
       ),
@@ -788,6 +653,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
+
   // --- Main Build Method ---
   @override
   Widget build(BuildContext context) {
@@ -812,8 +678,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     return Scaffold(
       backgroundColor: cs.background,
       appBar: AppBar(
-        iconTheme: IconThemeData(color: cs.onPrimary), // Use Theme color for consistency
-        title: const Text("Route Details", style: TextStyle(color: Colors.white)), // Hardcoded white to match primary background
+        iconTheme: IconThemeData(color: cs.onPrimary), 
+        title: Text("Route Details", style: TextStyle(color: cs.onPrimary)),
         backgroundColor: cs.primary,
       ),
       body: SingleChildScrollView(
@@ -861,7 +727,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                             children: [
                               _buildStatColumn("Distance", _distanceText.isNotEmpty ? _distanceText : '${_distanceKm.toStringAsFixed(1)} km', textColor),
                               _buildStatColumn("Duration", _durationText, textColor),
-                              _buildStatColumn("", "", textColor), // Empty column to match the 3-column layout
+                              _buildStatColumn("", "", textColor), 
                             ],
                           ),
                           _buildFareList(cs, textColor),
@@ -874,7 +740,27 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                   _buildStepsList(cs),
 
                   const SizedBox(height: 24),
-
+                  // debug: raw JSON button
+                  TextButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text('Raw API Response'),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: SingleChildScrollView(
+                              child: Text(JsonEncoder.withIndent('  ').convert(widget.routeOption.rawRouteData)),
+                            ),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close')),
+                          ],
+                        ),
+                      );
+                    },
+                    child: const Text('Show raw API response'),
+                  ),
                 ],
               ),
             )

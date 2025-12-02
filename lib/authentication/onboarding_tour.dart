@@ -22,9 +22,12 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     super.initState();
     _pageController.addListener(() {
       if (_pageController.page != null) {
-        setState(() {
-          _currentPage = _pageController.page!.round();
-        });
+        // FIX: Added mounted check before setState, although generally safe here, it's good practice.
+        if (mounted) {
+          setState(() {
+            _currentPage = _pageController.page!.round();
+          });
+        }
       }
     });
   }
@@ -43,6 +46,8 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
       );
     } else {
       // Last page: Navigate to Dashboard
+      // FIX: The context usage here is before an await, but since it's navigating away, it's generally safe.
+      // However, we ensure the context is still available for the MaterialPageRoute builder.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const Dashboard()),
         (Route<dynamic> route) => false,
@@ -51,12 +56,16 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
   }
 
   Widget _buildPageIndicator(int index, ColorScheme cs) {
+    // 0.3 opacity ≈ alpha 77
+    final inactiveAlpha = 77;
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4.0),
       height: 8.0,
       width: _currentPage == index ? 24.0 : 8.0,
       decoration: BoxDecoration(
-        color: _currentPage == index ? cs.primary : cs.primary.withOpacity(0.3),
+        // FIX: Replaced .withOpacity(0.3) with .withAlpha(77)
+        color: _currentPage == index ? cs.primary : cs.primary.withAlpha(inactiveAlpha),
         borderRadius: BorderRadius.circular(12),
       ),
     );
@@ -68,6 +77,9 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     required String description,
     required ColorScheme cs,
   }) {
+    // 0.8 opacity ≈ alpha 204
+    final descriptionAlpha = 204;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 30.0),
       child: Column(
@@ -83,7 +95,8 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: cs.onBackground,
+              // FIX: Replaced cs.onBackground with cs.onSurface
+              color: cs.onSurface,
             ),
           ),
           // Subtitle (or second line of title)
@@ -93,7 +106,8 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: cs.onBackground,
+              // FIX: Replaced cs.onBackground with cs.onSurface
+              color: cs.onSurface,
             ),
           ),
           const SizedBox(height: 20.0),
@@ -104,7 +118,8 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
-              color: cs.onSurface.withOpacity(0.8),
+              // FIX: Replaced .withOpacity(0.8) with .withAlpha(204)
+              color: cs.onSurface.withAlpha(descriptionAlpha),
             ),
           ),
         ],
@@ -118,7 +133,8 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     final isLastPage = _currentPage == _numPages - 1;
 
     return Scaffold(
-      backgroundColor: cs.background,
+      // FIX: Replaced cs.background with cs.surface
+      backgroundColor: cs.surface,
       
       appBar: const OnboardingHeader(),
       

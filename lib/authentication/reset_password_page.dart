@@ -15,18 +15,25 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   String? _errorMessage;
   final AuthService _auth = AuthService();
 
-  void resetPassword(BuildContext context) async {
-    setState(() {
-      _errorMessage = null;
-    });
+  // FIX: Removed BuildContext from argument list to prevent async gap issues
+  void resetPassword() async {
+    // FIX: Guard setState with mounted check
+    if (mounted) {
+      setState(() {
+        _errorMessage = null;
+      });
+    }
 
     final email = emailController.text.trim();
     const String placeholderSentCode = "123456";
 
     if (email.isEmpty) {
-      setState(() {
-        _errorMessage = "Please enter your email.";
-      });
+      // FIX: Guard setState with mounted check
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Please enter your email.";
+        });
+      }
       return;
     }
 
@@ -34,29 +41,33 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     try {
       await _auth.resetPassword(email);
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => VerifyCodePage(
-            email: email,
-            sentCode: placeholderSentCode,
+      // FIX: Check mounted before navigating or updating UI after await
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VerifyCodePage(
+              email: email,
+              sentCode: placeholderSentCode,
+            ),
           ),
-        ),
-      );
+        );
+      }
     } catch (e) {
+      // FIX: Check mounted before updating state with the error message
+      if (mounted) {
+        setState(() {
+          final String errorString = e.toString().replaceFirst('Exception: ', '');
 
-      setState(() {
-        final String errorString = e.toString().replaceFirst('Exception: ', '');
+          if (errorString == 'No account found for this email.') {
+            _errorMessage = 'Account Not Found';
+          } else {
 
-        if (errorString == 'No account found for this email.') {
-          _errorMessage = 'Account Not Found';
-        } else {
-
-          _errorMessage = errorString;
-        }
-      });
+            _errorMessage = errorString;
+          }
+        });
+      }
     }
-
   }
 
 
@@ -156,7 +167,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       // Description Text
                       Text(
                         "Enter the email associated with your account and we’ll send a code to your email to reset your password.",
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.black,
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
@@ -211,7 +222,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
                       // Send Button
                       ElevatedButton(
-                        onPressed: () => resetPassword(context),
+                        // FIX: Updated to call the parameterless resetPassword method
+                        onPressed: resetPassword,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.colors.green,
                           minimumSize: const Size(double.infinity, 50),

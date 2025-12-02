@@ -13,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'app_constants.dart';
 import 'profile_header.dart';
 import 'profile_info_row.dart';
+import '../settings/settings_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -23,7 +24,6 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   User? _currentUser;
   bool _isLoading = true;
-  final int _selectedIndex = 2; // Fixed selected index for this page
 
   File? _profileImageFile;
   final ImagePicker _imagePicker = ImagePicker();
@@ -33,8 +33,6 @@ class _ProfilePageState extends State<ProfilePage> {
   String _initials = '?';
   String _userGender = 'Not provided';
   String _userDOB = 'Not provided';
-  static const String _userStatus = 'Daily Commuter';
-
 
   @override
   void initState() {
@@ -46,6 +44,8 @@ class _ProfilePageState extends State<ProfilePage> {
     _currentUser = FirebaseAuth.instance.currentUser;
 
     if (_currentUser == null) return;
+    
+    // FIX: Asserting non-null on _currentUser after null check
     _userEmail = _currentUser!.email ?? 'N/A';
     String potentialDisplayName = _currentUser!.displayName ?? '';
     if (potentialDisplayName.isEmpty && _currentUser!.email != null) {
@@ -71,13 +71,16 @@ class _ProfilePageState extends State<ProfilePage> {
       _profileImageFile = null;
     }
 
-    setState(() => _isLoading = false);
+    if (mounted) setState(() => _isLoading = false);
   }
 
   // FIRESTORE LOGIC: Update user comments when name/photo changes
   Future<void> _updateUserComments({required String newDisplayName, required String newPhotoUrl}) async {
       final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser?.uid == null) return;
+      
+      // FIX: Guard unconditional access to uid
+      final currentUserId = currentUser?.uid;
+      if (currentUserId == null) return;
 
       final firestore = FirebaseFirestore.instance;
       final batch = firestore.batch();
@@ -86,7 +89,7 @@ class _ProfilePageState extends State<ProfilePage> {
           .collection('public_data') 
           .doc('zapac_community')
           .collection('comments')
-          .where('senderUid', isEqualTo: currentUser!.uid)
+          .where('senderUid', isEqualTo: currentUserId) // Use guarded ID
           .get();
 
       for (var doc in querySnapshot.docs) {
@@ -97,18 +100,18 @@ class _ProfilePageState extends State<ProfilePage> {
       }
 
       await batch.commit();
-      print("Firestore Batch Update complete. ${querySnapshot.docs.length} comments updated.");
+      // Logger.info("Firestore Batch Update complete. ${querySnapshot.docs.length} comments updated.");
   }
 
 
   Future<void> _showEditFullNameSheet(BuildContext context, ColorScheme colorScheme) async {
-    // MODAL LOGIC FOR EDITING NAME (Kept here as it uses _currentUser and _updateUserComments)
-    if (_currentUser == null) return;
+    // FIX: Guard context usage at the start of async function
+    if (!context.mounted || _currentUser == null) return;
 
     final nameCtrl = TextEditingController(text: _displayName);
     bool isSaving = false;
 
-    final result = await showModalBottomSheet<String>(
+    await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -157,35 +160,41 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: isSaving || nameCtrl.text.trim().isEmpty
                         ? null
                         : () async {
-                          setSB(() => isSaving = true);
-                          final newName = nameCtrl.text.trim();
-                                                    try {
-                              await _currentUser!.updateDisplayName(newName);
+                              setSB(() => isSaving = true);
+                              final newName = nameCtrl.text.trim();
+                                              
+                              try {
+                                  await _currentUser!.updateDisplayName(newName);
 
-                              await _currentUser!.reload();
-                              _loadUserData();
-                              
-                              await _updateUserComments(
-                                  newDisplayName: newName, 
-                                  newPhotoUrl: _currentUser!.photoURL ?? ''
-                              ); 
+                                  await _currentUser!.reload();
+                                  _loadUserData();
+                                  
+                                  // Use sheetCtx.mounted check for interaction with a parent context's state/scaffold
+                                  if (sheetCtx.mounted) {
+                                    await _updateUserComments(
+                                        newDisplayName: newName, 
+                                        newPhotoUrl: _currentUser!.photoURL ?? ''
+                                    ); 
+                                  }
 
-                              if (context.mounted) {
-                                setState(() {});
-                                Navigator.of(sheetCtx).pop(newName);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Name and comments updated successfully!'), backgroundColor: accentGreen),
-                                );
+                                  if (sheetCtx.mounted) {
+                                    // Use context.mounted for global context functions like setState on the main widget
+                                    if (mounted) setState(() {});
+                                    
+                                    Navigator.of(sheetCtx).pop(newName);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Name and comments updated successfully!'), backgroundColor: accentGreen),
+                                    );
+                                  }
+                              } catch (e) {
+                                  if (sheetCtx.mounted) {
+                                    setSB(() => isSaving = false);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Failed to update name. Try logging in again.'), backgroundColor: Colors.red),
+                                    );
+                                  }
                               }
-                          } catch (e) {
-                              if (context.mounted) {
-                                setSB(() => isSaving = false);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Failed to update name. Try logging in again.'), backgroundColor: Colors.red),
-                                );
-                              }
-                          }
-                        },
+                            },
                     child: isSaving
                         ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(colorScheme.onPrimary)))
                         : Text("Save", style: TextStyle(color: colorScheme.onPrimary)),
@@ -203,15 +212,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // NAVIGATION LOGIC
   void _onItemTapped(int index) {
-    if (index == _selectedIndex) return;
     if (index == 0) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const Dashboard()),
       );
     } else if (index == 3) {
-      // Placeholder for navigating to SettingsPage if it were index 3
-      // Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SettingsPage())); 
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SettingsPage())); 
     }
   }
 
@@ -220,7 +227,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.background,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Theme.of(context).primaryColor,
         elevation: 0,
@@ -241,13 +248,13 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget _buildBody(ColorScheme colorScheme) {
     if (_isLoading) {
       return Center(
-          child: CircularProgressIndicator(color: colorScheme.onBackground));
+          child: CircularProgressIndicator(color: colorScheme.onSurface));
     }
     if (_currentUser == null) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text("User not logged in.",
-              style: TextStyle(color: colorScheme.onBackground)),
+              style: TextStyle(color: colorScheme.onSurface)),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: () => Navigator.of(context)
@@ -305,7 +312,8 @@ class _ProfilePageState extends State<ProfilePage> {
             label: 'Full name',
             value: _displayName,
             valueColor: colorScheme.onSurface,
-            onTap: () => _showEditFullNameSheet(context, colorScheme),
+            // FIX: Guard call with context.mounted (which is guaranteed by mounted check in outer widget lifecycle)
+            onTap: () async { if (mounted) await _showEditFullNameSheet(context, colorScheme); },
           ),
           const SizedBox(height: 10),
           ProfileInfoRow(
@@ -313,7 +321,8 @@ class _ProfilePageState extends State<ProfilePage> {
             label: 'Gender',
             value: _userGender,
             valueColor: colorScheme.onSurface,
-            onTap: () => _showEditGenderSheet(context, colorScheme),
+            // FIX: Guard call with context.mounted
+            onTap: () async { if (mounted) await _showEditGenderSheet(context, colorScheme); },
           ),
           const SizedBox(height: 10),
           ProfileInfoRow(
@@ -321,7 +330,8 @@ class _ProfilePageState extends State<ProfilePage> {
             label: 'Date of Birth',
             value: _userDOB,
             valueColor: colorScheme.onSurface,
-            onTap: () => _showEditDOBDialog(context, colorScheme),
+            // FIX: Guard call with context.mounted
+            onTap: () async { if (mounted) await _showEditDOBDialog(context, colorScheme); },
           ),
           const SizedBox(height: 10),
           ProfileInfoRow(
@@ -329,7 +339,8 @@ class _ProfilePageState extends State<ProfilePage> {
             label: 'Delete account',
             value: 'All your data will be permanently removed',
             valueColor: colorScheme.error,
-            onTap: () => _confirmDeleteAccount(colorScheme),
+            // FIX: Guard call with context.mounted
+            onTap: () async { if (mounted) await _confirmDeleteAccount(colorScheme); },
           ),
           const SizedBox(height: 10),
         ],
@@ -339,7 +350,8 @@ class _ProfilePageState extends State<ProfilePage> {
 
 
   Future<void> _onProfilePicTap() async {
-    // MODAL LOGIC FOR PROFILE PICTURE (Kept here as it uses all state/logic)
+    // FIX: Guard context usage at the start of async function
+    if (!mounted) return;
     final scheme = Theme.of(context).colorScheme;
     final prefs = await SharedPreferences.getInstance();
 
@@ -358,7 +370,8 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: accentGreen.withOpacity(0.15),
+                  // FIX: Replaced .withOpacity(0.15) with .withAlpha(38)
+                  color: accentGreen.withAlpha(38),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 padding: const EdgeInsets.all(8),
@@ -426,20 +439,23 @@ class _ProfilePageState extends State<ProfilePage> {
                       maxWidth: 900,
                       imageQuality: 90,
                     );
-                    if (picked != null) {
+                    
+                    // FIX: Check mounted before using context/setState
+                    if (picked != null && mounted) {
                       final file = File(picked.path);
-                      if (context.mounted) {
-                        setState(() => _profileImageFile = file);
-                        await prefs.setString('profile_pic_path', file.path);
-                        
-                        final currentUser = FirebaseAuth.instance.currentUser;
-                        if (currentUser != null) {
-                            await _updateUserComments(
-                                newDisplayName: _displayName,
-                                newPhotoUrl: currentUser.photoURL ?? ''
-                            );
-                        }
+                      setState(() => _profileImageFile = file);
+                      await prefs.setString('profile_pic_path', file.path);
+                      
+                      final currentUser = FirebaseAuth.instance.currentUser;
+                      if (currentUser != null) {
+                          await _updateUserComments(
+                              newDisplayName: _displayName,
+                              newPhotoUrl: currentUser.photoURL ?? ''
+                          );
+                      }
 
+                      // FIX: Use context from builder scope for navigation
+                      if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: const Text('Photo taken and profile updated!'), backgroundColor: accentGreen),
@@ -454,7 +470,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: accentGreen.withOpacity(0.12),
+                            // FIX: Replaced .withOpacity(0.12) with .withAlpha(31)
+                            color: accentGreen.withAlpha(31),
                             shape: BoxShape.circle,
                           ),
                           padding: const EdgeInsets.all(10),
@@ -485,20 +502,23 @@ class _ProfilePageState extends State<ProfilePage> {
                       maxWidth: 900,
                       imageQuality: 90,
                     );
-                    if (picked != null) {
+                    
+                    // FIX: Check mounted before using context/setState
+                    if (picked != null && mounted) {
                       final file = File(picked.path);
-                      if (context.mounted) {
-                        setState(() => _profileImageFile = file);
-                        await prefs.setString('profile_pic_path', file.path);
-                        
-                        final currentUser = FirebaseAuth.instance.currentUser;
-                        if (currentUser != null) {
-                            await _updateUserComments(
-                                newDisplayName: _displayName,
-                                newPhotoUrl: currentUser.photoURL ?? ''
-                            );
-                        }
+                      setState(() => _profileImageFile = file);
+                      await prefs.setString('profile_pic_path', file.path);
+                      
+                      final currentUser = FirebaseAuth.instance.currentUser;
+                      if (currentUser != null) {
+                          await _updateUserComments(
+                              newDisplayName: _displayName,
+                              newPhotoUrl: currentUser.photoURL ?? ''
+                          );
+                      }
 
+                      // FIX: Use context from builder scope for navigation
+                      if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: const Text('Profile photo and comments updated!'), backgroundColor: accentGreen),
@@ -512,7 +532,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: accentGreen.withOpacity(0.12),
+                            // FIX: Replaced .withOpacity(0.12) with .withAlpha(31)
+                            color: accentGreen.withAlpha(31),
                             shape: BoxShape.circle,
                           ),
                           padding: const EdgeInsets.all(10),
@@ -540,7 +561,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: InkWell(
                     onTap: () async {
                       // REMOVE LOCAL FILE PATH AND CLEAR UI STATE
-                      setState(() => _profileImageFile = null);
+                      // FIX: Check mounted before using setState
+                      if (mounted) setState(() => _profileImageFile = null);
                       await prefs.remove('profile_pic_path');
                       
                       final currentUser = FirebaseAuth.instance.currentUser;
@@ -551,7 +573,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           );
                       }
                       
-                      if (context.mounted) {
+                      // FIX: Use context from builder scope for navigation
+                      if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: const Text('Profile photo and comments updated!'), backgroundColor: scheme.error),
@@ -564,7 +587,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         children: [
                           Container(
                             decoration: BoxDecoration(
-                              color: accentYellow.withOpacity(0.18),
+                              // FIX: Replaced .withOpacity(0.18) with .withAlpha(46)
+                              color: accentYellow.withAlpha(46),
                               shape: BoxShape.circle,
                             ),
                             padding: const EdgeInsets.all(10),
@@ -598,11 +622,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _confirmDeleteAccount(ColorScheme colorScheme) async {
-    // MODAL LOGIC FOR DELETE ACCOUNT (Kept here as it performs final Auth/Nav)
+    // FIX: Guard context usage at the start of async function
+    if (!mounted) return;
     String? reason;
     bool acknowledged = false;
     final TextEditingController otherCtrl = TextEditingController();
-    final reasons = const [
+    final reasons = [
       "I am no longer using my account",
       "I don’t understand how to use it",
       "ZAPAC is not available in my city",
@@ -628,7 +653,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: accentYellow.withOpacity(0.18),
+                      // FIX: Replaced .withOpacity(0.18) with .withAlpha(46)
+                      color: accentYellow.withAlpha(46),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     padding: const EdgeInsets.all(8),
@@ -648,8 +674,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   IconButton(
                     splashRadius: 20,
                     onPressed: () {
-                      FocusScope.of(context).unfocus();
-                      final nav = Navigator.of(context, rootNavigator: true);
+                      FocusScope.of(ctx).unfocus(); 
+                      final nav = Navigator.of(ctx, rootNavigator: true);
                       if (nav.canPop()) {
                         nav.pop();
                       }
@@ -678,7 +704,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             if (ctx2.mounted) setSB(() => reason = v);
                           },
                           activeColor: accentGreen,
-                        )).toList(),
+                        )),
                     if (reason == 'Other') ...[
                       const SizedBox(height: 8),
                       TextField(
@@ -719,8 +745,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     foregroundColor: colorScheme.onSurface,
                   ),
                   onPressed: () {
-                    FocusScope.of(context).unfocus();
-                    final nav = Navigator.of(context, rootNavigator: true);
+                    FocusScope.of(ctx).unfocus(); 
+                    final nav = Navigator.of(ctx, rootNavigator: true);
                     if (nav.canPop()) {
                       nav.pop();
                     }
@@ -735,24 +761,27 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   onPressed: canDelete
                       ? () async {
-                          try {
-                            await _currentUser?.delete();
-                            await AuthService().signOut();
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(builder: (_) => const LoginPage()),
-                              (_) => false,
-                            );
-                            if (ctx.mounted) {
+                            try {
+                              await _currentUser?.delete();
+                              await AuthService().signOut();
+                              
+                              if (ctx.mounted) {
+                                Navigator.of(ctx).pushAndRemoveUntil(
+                                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                                  (_) => false,
+                                );
                                 ScaffoldMessenger.of(ctx).showSnackBar(
                                     const SnackBar(content: Text("Account successfully deleted."), backgroundColor: accentGreen)
                                 );
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(content: Text("Deletion failed. Please log in again and try.")),
+                                );
+                              }
                             }
-                          } catch (e) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(content: Text("Deletion failed. Please log in again and try.")),
-                            );
                           }
-                        }
                       : null,
                   child: const Text('Delete account'),
                 ),
@@ -767,7 +796,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _showEditGenderSheet(BuildContext context, ColorScheme colorScheme) async {
-    // MODAL LOGIC FOR EDIT GENDER (Kept here)
+    // FIX: Guard context usage at the start of async function
+    if (!mounted) return;
     String? choice = _userGender != 'Not provided' ? _userGender : null;
     final prefs = await SharedPreferences.getInstance();
 
@@ -814,6 +844,7 @@ class _ProfilePageState extends State<ProfilePage> {
       },
     );
 
+    // FIX: Check mounted again before using setState/async calls after dismissal
     if (result != null && mounted) {
       setState(() {
         _userGender = result ?? 'Not provided';
@@ -823,7 +854,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _showEditDOBDialog(BuildContext context, ColorScheme colorScheme) async {
-    // MODAL LOGIC FOR EDIT DOB (Kept here)
+    // FIX: Guard context usage at the start of async function
+    if (!mounted) return;
     DateTime initial = DateTime(2000);
     if (_userDOB != 'Not provided') {
         initial = DateTime.tryParse(_userDOB) ?? DateTime(2000);
@@ -846,6 +878,7 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       },
     );
+    // FIX: Check mounted again before using setState/async calls after dismissal
     if (picked != null && mounted) {
       final dobStr = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
       setState(() {

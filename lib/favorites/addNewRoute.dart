@@ -539,7 +539,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
       filled: true,
       fillColor: Color(0xFFF3EEE6),
       hintText: hintText,
-      hintStyle: TextStyle(color: cs.onSurface.withOpacity(0.6)),
+      hintStyle: TextStyle(color: cs.onSurface.withAlpha(153)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
         borderSide: BorderSide.none,
@@ -615,7 +615,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha(26),
                         blurRadius: 6.0,
                         offset: const Offset(0, 2),
                       ),
@@ -655,7 +655,7 @@ class _AddNewRoutePageState extends State<AddNewRoutePage> {
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withAlpha(26),
                         blurRadius: 6.0,
                         offset: const Offset(0, 2),
                       ),

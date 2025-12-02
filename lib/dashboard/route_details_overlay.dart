@@ -30,7 +30,7 @@ class RouteDetailsOverlay extends StatelessWidget {
             borderRadius: BorderRadius.circular(15),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withAlpha(51),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -114,7 +114,7 @@ class RouteDetailsOverlay extends StatelessWidget {
           children: [
             Text(
               label,
-              style: TextStyle(fontSize: 13, color: color.withOpacity(0.7)),
+              style: TextStyle(fontSize: 13, color: color.withAlpha(179)),
             ),
             // FIX: Use a ConstrainedBox with Text wrapping for long destination names
             ConstrainedBox(

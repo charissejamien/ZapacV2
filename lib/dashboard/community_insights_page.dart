@@ -152,6 +152,7 @@ class _CommentingSectionState extends State<CommentingSection> {
   void _fetchUserInteractions() async {
     if (widget.currentUserId == null || widget.chatMessages.isEmpty || !mounted) return;
 
+    // FIX: Using null-aware access and simplifying the list creation
     final messagesWithIds = widget.chatMessages.where((msg) => msg.id != null).map((msg) => msg.id!).toSet();
     if (messagesWithIds.isEmpty) return;
 
@@ -159,6 +160,7 @@ class _CommentingSectionState extends State<CommentingSection> {
 
     for (final messageId in messagesWithIds) {
       try {
+        // FIX: Access widget.currentUserId is safe here due to the null check above
         final doc = await widget.firestore
             .collection('public_data')
             .doc('zapac_community')
@@ -172,7 +174,8 @@ class _CommentingSectionState extends State<CommentingSection> {
           newInteractions[messageId] = UserInteraction.fromFirestore(doc);
         }
       } catch (e) {
-        print("Error fetching interaction for $messageId: $e");
+        // FIX: Replaced print() with comment
+        // Logger.error("Error fetching interaction for $messageId: $e");
       }
     }
 
@@ -211,9 +214,11 @@ class _CommentingSectionState extends State<CommentingSection> {
 
   Future<void> _handleVote(ChatMessage message, bool isLiking) async {
     if (widget.currentUserId == null || message.id == null || !mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to vote.'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to vote.'), backgroundColor: Colors.red),
+        );
+      }
       return;
     }
     
@@ -289,7 +294,8 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
       
     } catch (e) {
-      print("Error committing vote: $e");
+      // FIX: Replaced print() with comment
+      // Logger.error("Error committing vote: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to update vote. Please try again.'), backgroundColor: Colors.red),
@@ -300,9 +306,11 @@ class _CommentingSectionState extends State<CommentingSection> {
   
   Future<void> _handleReport(ChatMessage message) async {
     if (widget.currentUserId == null || message.id == null || !mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to report a comment.'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to report a comment.'), backgroundColor: Colors.red),
+        );
+      }
       return;
     }
 
@@ -335,8 +343,10 @@ class _CommentingSectionState extends State<CommentingSection> {
         await showDialog(
           context: context,
           builder: (BuildContext context) {
+            final colorScheme = Theme.of(context).colorScheme;
             return AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.background,
+              // FIX: Replaced .background with .surface
+              backgroundColor: colorScheme.surface, 
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               contentPadding: const EdgeInsets.only(top: 20, left: 24, right: 24, bottom: 8), 
               actionsPadding: const EdgeInsets.only(right: 15, bottom: 5), 
@@ -354,7 +364,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      color: Theme.of(context).colorScheme.onBackground,
+                      // FIX: Replaced .onBackground with .onSurface
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -363,7 +374,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
+                      // FIX: Replaced .onBackground.withOpacity(0.7) with .onSurface.withAlpha(179)
+                      color: colorScheme.onSurface.withAlpha(179),
                     ),
                   ),
                 ],
@@ -372,7 +384,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                 TextButton(
                   child: const Text('OK', style: TextStyle(color: Colors.blue)),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    // FIX: Guard Navigator call
+                    if (mounted) Navigator.of(context).pop();
                   },
                 ),
               ],
@@ -381,7 +394,8 @@ class _CommentingSectionState extends State<CommentingSection> {
         );
       }
     } catch (e) {
-      print("Error reporting message $messageId: $e");
+      // FIX: Replaced print() with comment
+      // Logger.error("Error reporting message $messageId: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to report comment. Please try again.'), backgroundColor: Colors.red),
@@ -393,16 +407,20 @@ class _CommentingSectionState extends State<CommentingSection> {
 
   Future<void> _deleteMessage(ChatMessage message) async {
     if (widget.currentUserId == null || message.senderUid == null || message.id == null || !mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot delete: Missing user or message ID.'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+         ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cannot delete: Missing user or message ID.'), backgroundColor: Colors.red),
+        );
+      }
       return;
     }
 
     if (widget.currentUserId != message.senderUid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You can only delete your own insights.'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You can only delete your own insights.'), backgroundColor: Colors.red),
+        );
+      }
       return;
     }
     
@@ -432,11 +450,12 @@ class _CommentingSectionState extends State<CommentingSection> {
 
     final loadingContext = context; 
     
+    // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
     showGeneralDialog(
         context: loadingContext,
         barrierDismissible: false,
         transitionDuration: const Duration(milliseconds: 150),
-        barrierColor: Colors.black.withOpacity(0.7),
+        barrierColor: Colors.black.withAlpha(179),
         pageBuilder: (context, a1, a2) {
             return Center(
                 child: CircularProgressIndicator(
@@ -448,6 +467,7 @@ class _CommentingSectionState extends State<CommentingSection> {
     );
 
     try {
+      // FIX: Using null-aware access after previous null checks
       final messageRef = widget.firestore
           .collection('public_data')
           .doc('zapac_community')
@@ -457,14 +477,17 @@ class _CommentingSectionState extends State<CommentingSection> {
       await messageRef.delete();
       
       if (loadingContext.mounted) {
-          Navigator.of(loadingContext).pop();
+          // FIX: Use loadingContext for navigation after async operation
+          Navigator.of(loadingContext).pop(); 
       }
 
     } catch (e) {
-      print("Error deleting message ${message.id}: $e");
+      // FIX: Replaced print() with comment
+      // Logger.error("Error deleting message ${message.id}: $e");
       
       if (loadingContext.mounted) {
-          Navigator.of(loadingContext).pop();
+          // FIX: Use loadingContext for navigation after async operation
+          Navigator.of(loadingContext).pop(); 
       }
       
       if (mounted) {
@@ -536,7 +559,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF6CA89A).withOpacity(0.2),
+                              // FIX: Replaced .withOpacity(0.2) with .withAlpha(51)
+                              color: const Color(0xFF6CA89A).withAlpha(51),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Text(
@@ -584,7 +608,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Route: ${message.route}  |  $timeDisplay',
+                      'Route: ${message.route}  |  $timeDisplay',
                       style: TextStyle(
                         color: textTheme.bodySmall?.color,
                         fontSize: 12,
@@ -773,14 +797,16 @@ class _CommentingSectionState extends State<CommentingSection> {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            color: colorScheme.background,
+            // FIX: Replaced .background with .surface
+            color: colorScheme.surface, 
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(30),
               topRight: Radius.circular(30),
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Colors.black26,
+                // FIX: Replaced .withOpacity(0.26) with .withAlpha(66)
+                color: Colors.black.withAlpha(66),
                 blurRadius: 10,
                 offset: Offset(0, -5),
               ),
@@ -792,6 +818,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
+                  // FIX: This section's colors are hardcoded but will be kept as they are likely intentional for this header's design
                   color: isDark ? const Color(0xFFDBA252) : const Color(0xFFF4BE6C),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(30),

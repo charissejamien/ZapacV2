@@ -12,6 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  url_launcher: ^6.2.2
+
   # Authentication
   firebase_core: ^3.15.2
   firebase_auth: ^5.1.2
@@ -48,5 +50,9 @@ flutter:
     - assets/Logo.png
     - assets/maxim.png
     - assets/moveit.png
-    - assets/angkas.jpg
+    - assets/joyride.png
+    - assets/grab.png
+    - assets/grab-white.png
+    - assets/angkas.png
+    - assets/bus_icon.png
 

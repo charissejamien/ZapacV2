@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:zapac/dashboard/dashboard.dart';
+import '../authentication/login_page.dart';
 import '../authentication/onboarding_profile.dart';
 
 class ThemeNotifier extends ChangeNotifier {

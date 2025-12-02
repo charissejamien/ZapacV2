@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'favorite_route.dart';
-// import 'favoriteRouteData.dart'; // REMOVED: Replaced by Firebase service
-
-// NEW IMPORTS for Firebase deletion
-import 'package:firebase_auth/firebase_auth.dart';
 import 'favorite_routes_service.dart';
+import 'package:url_launcher/url_launcher.dart'; 
+import 'dart:io' show Platform; 
 
 class RouteDetailPage extends StatefulWidget {
   final FavoriteRoute route;
@@ -20,8 +18,48 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   late GoogleMapController _mapController;
   final Set<Marker> _markers = {};
   Set<Polyline> _polylines = const {};
-  // NEW: Instantiate the service for deletion
   final FavoriteRoutesService _routesService = FavoriteRoutesService(); 
+
+  static const int alpha179 = 179;
+  static const int alpha13 = 13;
+  static const int alpha26 = 26;
+  static const int alpha31 = 31;
+  static const int alpha204 = 204;
+
+  final Color angkasBlue = const Color(0xFF14b2d8);
+  final Color maximYellow = const Color(0xFFFDDB0A); 
+  final Color moveItRed = const Color(0xFFBB3329); 
+  final Color grabGreen = const Color.fromARGB(255, 5, 199, 76);
+  final Color joyrideBlue = const Color(0xFF1E21CD);
+
+
+  static const Map<String, dynamic> appLinks = {
+    'Angkas': {
+      'scheme': 'angkasrider://', 
+      'androidPackage': 'com.angkas.rider',
+      'iosAppId': '1096417726', 
+    },
+    'Maxim': {
+      'scheme': 'taximaxim://',
+      'androidPackage': 'com.taxsee.taxsee',
+      'iosAppId': '597956747',
+    },
+    'MoveIt': {
+      'scheme': 'moveit://',
+      'androidPackage': 'com.moveitph.rider',
+      'iosAppId': '1465241038',
+    },
+    'JoyRide': {
+      'scheme': 'joyride://', 
+      'androidPackage': 'com.joyride.rider',
+      'iosAppId': '1467478148', 
+    },
+    'Grab': {
+      'scheme': 'grab://',
+      'androidPackage': 'com.grab.passenger',
+      'iosAppId': '643912198',
+    },
+  };
 
   LatLng _getCenter(LatLngBounds bounds) {
     return LatLng(
@@ -30,14 +68,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
   
-  // NEW: Helper function to map transport names to Icons
   IconData _getTransportIcon(String transportName) {
     final lowerName = transportName.toLowerCase();
     if (lowerName.contains('moto taxi')) return Icons.two_wheeler;
     if (lowerName.contains('grab')) return Icons.directions_car_filled; 
     if (lowerName.contains('taxi')) return Icons.local_taxi;
     if (lowerName.contains('puj') || lowerName.contains('bus')) return Icons.directions_bus_filled;
-    return Icons.directions_car; // Default fallback
+    return Icons.directions_car; 
   }
 
   @override
@@ -71,7 +108,46 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
   
-  // MODIFIED: Delete route using Firebase service
+  // --- App Launch Logic (Unchanged from previous fix) ---
+  Future<void> _launchAppOrStore(String appName) async {
+    final data = appLinks[appName];
+    if (data == null || !mounted) return;
+
+    final String appScheme = data['scheme'];
+    String storeLink;
+
+    if (Platform.isAndroid) {
+      storeLink = "https://play.google.com/store/apps/details?id=${data['androidPackage']}";
+    } else if (Platform.isIOS) {
+      storeLink = "https://apps.apple.com/app/id${data['iosAppId']}";
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('App redirection not supported on this platform.')),
+        );
+      }
+      return;
+    }
+
+    final appUri = Uri.parse(appScheme);
+    final storeUri = Uri.parse(storeLink);
+
+    if (await canLaunchUrl(appUri)) {
+      await launchUrl(appUri, mode: LaunchMode.externalApplication);
+    } 
+    else if (await canLaunchUrl(storeUri)) {
+      await launchUrl(storeUri, mode: LaunchMode.externalApplication);
+    } 
+    else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open $appName or app store.')),
+        );
+      }
+    }
+  }
+  // --------------------------------------------------------
+
   void _deleteRoute() async {
     final bool? confirm = await showDialog<bool>(
       context: context,
@@ -129,7 +205,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
+              Text(title, style: TextStyle(fontSize: 14, color: textColor.withAlpha(alpha179))),
               Text(content, style: TextStyle(fontSize: 16, color: textColor)),
             ],
           ),
@@ -141,17 +217,15 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   Widget _buildStatColumn(String label, String value, Color textColor) {
     return Column(
       children: [
-        Text(label, style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.7))),
+        Text(label, style: TextStyle(fontSize: 14, color: textColor.withAlpha(alpha179))),
         const SizedBox(height: 5),
         Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor)),
       ],
     );
   }
   
-  // MODIFIED: _buildTransportListItem to use Flexible and Spacer correctly
   Widget _buildTransportListItem(ColorScheme cs, Color textColor, String transportName, String fare, String duration) {
-    // Fixed placeholder for time range as requested
-    const String timeRange = '10 am \u2192 10 am'; // Arrow character: →
+    const String timeRange = '10 am \u2192 10 am'; 
     final IconData icon = _getTransportIcon(transportName);
 
     return Container(
@@ -162,7 +236,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: cs.onSurface.withOpacity(0.05),
+            color: cs.onSurface.withAlpha(alpha13),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -171,10 +245,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 1. LEFT SIDE: Icon + Transport Name (Wrapped in Flexible to avoid overflow)
           Icon(icon, size: 24, color: cs.secondary),
           const SizedBox(width: 10),
-          // Use Flexible to let the name take up remaining space until the spacer
           Flexible( 
             child: Text(
               transportName, 
@@ -183,20 +255,17 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             ),
           ),
           
-          Spacer(), // Pushes content to the right
+          const Spacer(),
           
-          // 2. MIDDLE-RIGHT: Time Range + Duration (Side-by-Side)
           Row(
-            mainAxisSize: MainAxisSize.min, // Ensure this group doesn't take unnecessary space
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Time Range
               Text(
                 timeRange, 
-                style: TextStyle(fontSize: 14, color: textColor.withOpacity(0.8))
+                style: TextStyle(fontSize: 14, color: textColor.withAlpha(alpha204))
               ),
               const SizedBox(width: 8), 
               
-              // Duration (in blue, beside Time Range)
               Text(
                 duration, 
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: cs.primary) 
@@ -204,9 +273,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             ],
           ),
           
-          const SizedBox(width: 15), // Separator before Fare
+          const SizedBox(width: 15),
           
-          // 3. FAR RIGHT: Estimated Fare
           Text(
             fare, 
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: cs.onSurface)
@@ -216,7 +284,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
-  // NEW: Widget to build a single fare option, using the exact UI structure provided by the user.
   Widget _buildFareOptionCard(ColorScheme cs, String transportName, String fare, String durationText) {
     const String timeRange = '10 am \u2192 10 am';
     
@@ -238,20 +305,19 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       elevation: 2,
-      shadowColor: cs.shadow.withOpacity(0.1),
+      shadowColor: cs.shadow.withAlpha(alpha26), 
       color: cs.surface,
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: () {
-          // Navigator.push... (Future detailed flow here)
+          // Future detailed flow here
         },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Time Row (Schedule Icon, Time Range, Duration Badge)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -259,7 +325,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      timeRange, // Fixed Time Range placeholder
+                      timeRange, 
                       style: TextStyle(
                         color: cs.onSurface,
                         fontSize: 16,
@@ -268,14 +334,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                     ),
                   ),
                   Container(
-                    // Duration Badge styling
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: cs.primary.withOpacity(0.12),
+                      color: cs.primary.withAlpha(alpha31), 
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
-                      durationText, // Route duration as placeholder
+                      durationText, 
                       style: TextStyle(
                         color: cs.primary,
                         fontWeight: FontWeight.w600,
@@ -286,21 +351,19 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
               ),
               const SizedBox(height: 12),
               
-              // 2. Transport Info (Replacing the Wrap of leg chips)
               transportRow,
               
               const SizedBox(height: 12),
               
-              // 3. Fare Row (Estimated Fare Label and Price)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     'Estimated fare',
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                    style: TextStyle(color: cs.onSurface.withAlpha(alpha179)),
                   ),
                   Text(
-                    fare, // Actual calculated fare
+                    fare, 
                     style: TextStyle(
                       color: cs.onSurface,
                       fontSize: 16,
@@ -316,71 +379,126 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
-  // MODIFIED: Helper for building individual logo buttons (no text)
-  Widget _buildActionButton(ColorScheme cs, String imagePath, VoidCallback onPressed) {
+  Widget _buildActionButton(ColorScheme cs, String appName, String imagePath, {required Color backgroundColor}) {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4.0),
         child: ElevatedButton(
-          onPressed: onPressed,
+          onPressed: () => _launchAppOrStore(appName),
           style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.all(12), // Adjust padding for image
+            padding: const EdgeInsets.all(8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 2,
-            minimumSize: const Size(0, 20), // Set minimum height for visibility
+            minimumSize: const Size(0, 20),
+            backgroundColor: backgroundColor, 
           ),
           child: Image.asset(
             imagePath,
-            height: 24, // Control image size
+            height: 24,
             fit: BoxFit.contain,
+            color: backgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white, 
+            colorBlendMode: BlendMode.modulate, 
           ),
         ),
       ),
     );
   }
 
-  // MODIFIED: _buildRideHailingButtonsRow now uses Image assets instead of icons/text
-  Widget _buildRideHailingButtonsRow(ColorScheme cs) {
+
+  Widget _buildMotoTaxiButtonsRow(ColorScheme cs) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        // Angkas: images.png
-        _buildActionButton(cs, 'assets/angkas.jng', () { /* Handle Angkas tap */ }), 
-        // Maxim: images.jpg
-        _buildActionButton(cs, 'assets/maxim.png', () { /* Handle Maxim tap */ }), 
-        // MoveIt: 1737959726Move It.png
-        _buildActionButton(cs, 'assets/moveit.png', () { /* Handle MoveIt tap */ }), 
+        // Angkas
+        _buildActionButton(
+          cs, 
+          'Angkas',
+          'assets/angkas.png',
+          backgroundColor: angkasBlue,
+        ), 
+        // Maxim
+        _buildActionButton(
+          cs, 
+          'Maxim',
+          'assets/maxim.png',
+          backgroundColor: maximYellow,
+        ), 
+        // MoveIt
+        _buildActionButton(
+          cs, 
+          'MoveIt',
+          'assets/moveit.png',
+          backgroundColor: moveItRed,
+        ), 
+        // JoyRide
+        _buildActionButton(
+          cs, 
+          'JoyRide',
+          'assets/joyride.png',
+          backgroundColor: joyrideBlue,
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildTaxiButtonsRow(ColorScheme cs) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        // Grab
+        _buildActionButton(
+          cs, 
+          'Grab',
+          'assets/grab.png',
+          backgroundColor: grabGreen,
+        ),
+        // JoyRide
+        _buildActionButton(
+          cs, 
+          'JoyRide',
+          'assets/joyride.png',
+          backgroundColor: joyrideBlue,
+        ),
       ],
     );
   }
 
-  // MODIFIED: _buildFareList now iterates and inserts the new card structure
+
   Widget _buildFareList(ColorScheme cs, Color textColor) {
     final List<Widget> fareWidgets = [];
 
     widget.route.estimatedFares.entries.forEach((entry) {
-      final isMotoTaxi = entry.key == 'Moto Taxi';
+      final transportType = entry.key; // e.g., 'Moto Taxi', 'Taxi', 'PUJ'
       
       // 1. Add the main fare card
       fareWidgets.add(
         _buildFareOptionCard(
           cs, 
-          entry.key, 
+          transportType, 
           entry.value, 
           widget.route.duration
         )
       );
 
       // 2. Conditionally add the ride-hailing buttons row below the card
-      if (isMotoTaxi) {
+      if (transportType == 'Moto Taxi') {
         fareWidgets.add(
-             Padding(
-              // Adds space between buttons and next card, but links buttons closely to the Moto Taxi card
+              Padding(
+              padding: const EdgeInsets.only(top: 0.0, bottom: 8.0, left: 8, right: 8),
+              child: _buildMotoTaxiButtonsRow(cs), // New Moto Taxi Row
+            )
+        );
+      } else if (transportType == 'Taxi') {
+          fareWidgets.add(
+              Padding(
               padding: const EdgeInsets.only(top: 0.0, bottom: 8.0, left: 16, right: 16),
-              child: _buildRideHailingButtonsRow(cs),
+              child: _buildTaxiButtonsRow(cs), // New Taxi Row
             )
         );
       }
+      
+      // Add a small divider or spacer between different transport type cards
+      fareWidgets.add(const SizedBox(height: 10)); 
     });
 
     return Padding(
@@ -417,7 +535,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         title: Text(widget.route.routeName, style: TextStyle(color: cs.onPrimary)),
         backgroundColor: cs.primary,
         actions: [
-          // Only allow deletion if a Firebase ID is available 
           if (widget.route.id != null) 
             IconButton(
               icon: const Icon(Icons.delete),
@@ -466,7 +583,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                               _buildStatColumn("", "", textColor), 
                             ],
                           ),
-                          // New section for the detailed fare list
                           _buildFareList(cs, textColor),
                         ],
                       ),

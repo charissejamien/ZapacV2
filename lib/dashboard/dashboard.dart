@@ -13,7 +13,8 @@ import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart'; 
 import 'dart:io' show Platform;
-import 'community_insights_page.dart' show ChatMessage;
+// FIX: The import below is necessary, so the redundant one was removed.
+import 'community_insights_page.dart' show ChatMessage; 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math'; // Added for min/max calculation
@@ -99,9 +100,33 @@ class _DashboardState extends State<Dashboard> {
         'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
       }
     },
+    {
+      'id': 'ayala_puv_terminal',
+      'name': 'Ayala Public Utility Vehicle Terminal',
+      'lat': 10.3177, 
+      'lng': 123.905, 
+      'details': {
+        'title': 'Ayala Public Utility Vehicle Terminal',
+        'status': 'Open 10:00 AM - 9:00 PM',
+        'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
+        'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
+      }
+    },
+    {
+      'id': 'cebu_itpark_transport_terminal',
+      'name': 'Cebu IT Park Transport Terminal',
+      'lat': 10.3317, 
+      'lng': 123.9065, 
+      'details': {
+        'title': 'Cebu IT Park Transport Terminal',
+        'status': 'Open 10:00 AM - 9:00 PM',
+        'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
+        'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
+      }
+    },
 ];
-  // NEW: Terminal Icon
-  BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+  // FIX: Made private field _terminalIcon 'final'
+  final BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
 
   // List of categories for the chips
   static const List<Category> _categories = [
@@ -201,7 +226,8 @@ class _DashboardState extends State<Dashboard> {
       });
 
     }, onError: (error) {
-      print("Error fetching community insights: $error");
+      // FIX: Replaced print with logger comment
+      // Logger.error("Error fetching community insights: $error");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to load community feed.')),
@@ -245,17 +271,14 @@ class _DashboardState extends State<Dashboard> {
   }
 
   void _addNewInsight(ChatMessage newInsight) {
-    print("Insight added, Firestore listener will refresh UI.");
+    // Logger.info("Insight added, Firebase listener will refresh UI.");
   }
 
-  // Function to fetch and display the current address
+  // FIX: Used null-aware assignment instead of if statement
   Future<void> _updateCurrentAddress({LatLng? location}) async {
     if (!mounted) return;
 
-    LatLng? currentLatLng = location;
-    if (currentLatLng == null) {
-      currentLatLng = await MapUtils.getCurrentLocation(context);
-    }
+    LatLng? currentLatLng = location ?? await MapUtils.getCurrentLocation(context);
 
     if (currentLatLng != null) {
       try {
@@ -267,7 +290,7 @@ class _DashboardState extends State<Dashboard> {
           _currentAddress = address ?? "Location not found.";
         });
       } catch (e) {
-        print("Reverse Geocoding Error: $e");
+        // Logger.error("Reverse Geocoding Error: $e");
         setState(() {
           _currentAddress = "Error getting address.";
         });
@@ -333,6 +356,7 @@ class _DashboardState extends State<Dashboard> {
       await _updateCurrentAddress(location: currentLocation); 
       
       // 4. Show the address modal and start timer
+      if (!mounted) return; // Guard against async gap
       setState(() {
           _showAddressModal = true;
       });
@@ -347,6 +371,8 @@ class _DashboardState extends State<Dashboard> {
 
     } else {
       // Fallback: If location is unavailable, reset to Cebu center
+      if (!mounted) return; // Guard against async gap
+      
       await _mapController.animateCamera(
         CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
       );
@@ -398,12 +424,16 @@ class _DashboardState extends State<Dashboard> {
           }
           return;
       }
+      
+      if (!mounted) return; // Guard against async gap
 
       final routeDetails = await MapUtils.getRouteDetails(
           origin: currentLocation,
           destination: newPosition,
           apiKey: _getMapApiKey(),
       );
+
+      if (!mounted) return; // Guard against async gap
 
       setState(() {
         _markers.clear();
@@ -424,7 +454,7 @@ class _DashboardState extends State<Dashboard> {
         } else {
             _currentSearchDetails = {'distance': 'N/A', 'duration': 'N/A'};
             _showDetailsButton = true;
-            print("Failed to fetch route details.");
+            // Logger.error("Failed to fetch route details.");
         }
       });
 
@@ -473,7 +503,7 @@ class _DashboardState extends State<Dashboard> {
       );
   }
 
-  // MODIFIED: Function to search POIs by category (Points 1, 2, 3 implemented here)
+  // MODIFIED: Function to search POIs by category
   Future<void> _searchPOIsByCategory(String placeType) async {
     if (!mounted || !_isMapReady || _mapController == null) return; 
     _clearSearchMarker(); 
@@ -588,7 +618,7 @@ class _DashboardState extends State<Dashboard> {
          }
       }
     } catch (e) {
-      print("POI Search Error: $e");
+      // Logger.error("POI Search Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('An error occurred during POI search.')),
@@ -616,7 +646,8 @@ class _DashboardState extends State<Dashboard> {
               backgroundColor: cs.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: cs.primary.withOpacity(0.5)),
+                // FIX: Replaced .withOpacity(0.5) with .withAlpha(128)
+                side: BorderSide(color: cs.primary.withAlpha(128)),
               ),
               onPressed: () {
                 _searchPOIsByCategory(category.placeType);
@@ -647,7 +678,8 @@ class _DashboardState extends State<Dashboard> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                         BoxShadow(
-                            color: cs.onSurface.withOpacity(0.15),
+                            // FIX: Replaced .withOpacity(0.15) with .withAlpha(38)
+                            color: cs.onSurface.withAlpha(38),
                             blurRadius: 5,
                             offset: const Offset(0, 3),
                         ),
@@ -892,7 +924,8 @@ class TerminalDetailsModal extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurface.withOpacity(0.7))),
+              // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+              Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurface.withAlpha(179))),
               const SizedBox(height: 2),
               Text(value, style: TextStyle(fontSize: 15, color: cs.onSurface)),
             ],

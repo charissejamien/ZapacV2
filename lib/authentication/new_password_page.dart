@@ -17,36 +17,52 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
 
   Future<void> _resetPassword() async {
     final newPassword = passwordController.text.trim();
+    
     if (newPassword.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 6 characters')),
-      );
+      // FIX: Guard context usage before async gap (though sync, good practice)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password must be at least 6 characters')),
+        );
+      }
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
 
     try {
-      // Sign in anonymously to update password for this demo
+      // Note: In a real app, this updatePassword call should be preceded by a re-authentication flow (like using the verification code).
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await user.updatePassword(newPassword);
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password updated successfully')),
-      );
+      // FIX: Check mounted before using context for SnackBar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password updated successfully')),
+        );
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+        // FIX: Check mounted before using context for Navigator
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error resetting password')),
-      );
+      // FIX: Check mounted before using context for SnackBar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error resetting password')),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      // FIX: Guard setState
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

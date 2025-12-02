@@ -60,11 +60,13 @@ class _FavoriteRoutesPageState extends State<FavoriteRoutesPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.lock, size: 60, color: cs.secondary.withOpacity(0.6)),
+                // FIX: Replaced .withOpacity(0.6) with .withAlpha(153)
+                Icon(Icons.lock, size: 60, color: cs.secondary.withAlpha(153)),
                 const SizedBox(height: 16),
                 Text(
                   'Please log in to view your favorite routes.',
-                  style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontSize: 16),
+                  // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+                  style: TextStyle(color: cs.onSurface.withAlpha(179), fontSize: 16),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -95,16 +97,19 @@ class _FavoriteRoutesPageState extends State<FavoriteRoutesPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.directions_bus, size: 60, color: cs.primary.withOpacity(0.6)),
+                      // FIX: Replaced .withOpacity(0.6) with .withAlpha(153)
+                      Icon(Icons.directions_bus, size: 60, color: cs.primary.withAlpha(153)),
                       const SizedBox(height: 16),
                       Text(
                         'No favorite routes saved yet.',
-                        style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontSize: 16),
+                        // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+                        style: TextStyle(color: cs.onSurface.withAlpha(179), fontSize: 16),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         'Tap the "+" icon to add a new route.',
-                        style: TextStyle(color: cs.onSurface.withOpacity(0.5), fontSize: 14),
+                        // FIX: Replaced .withOpacity(0.5) with .withAlpha(128)
+                        style: TextStyle(color: cs.onSurface.withAlpha(128), fontSize: 14),
                       ),
                     ],
                   ),
@@ -126,11 +131,16 @@ class _FavoriteRoutesPageState extends State<FavoriteRoutesPage> {
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('From: ${route.startAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 13)),
-                          Text('To: ${route.endAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 13)),
+                          // FIX: Used withAlpha(204) for consistency with 0.8 opacity
+                          Text('From: ${route.startAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withAlpha(204), fontSize: 13)),
+                          Text('To: ${route.endAddress.split(',').first}', 
+                            // FIX: Replaced .withOpacity(0.8) with .withAlpha(204)
+                            style: TextStyle(color: cs.onSurface.withAlpha(204), fontSize: 13)
+                          ),
                           Text(
                             '${route.distance} | ${route.duration}',
-                            style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 12),
+                            // FIX: Replaced .withOpacity(0.8) with .withAlpha(204)
+                            style: TextStyle(color: cs.onSurface.withAlpha(204), fontSize: 12),
                           ),
                         ],
                       ),
@@ -163,35 +173,6 @@ class _FavoriteRoutesPageState extends State<FavoriteRoutesPage> {
             );
           }
         },
-      ),
-    );
-  }
-  
-  // NEW: Helper function to show a confirmation dialog before deleting
-  void _confirmDeleteRoute(BuildContext context, FavoriteRoute route) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Route'),
-        content: Text('Are you sure you want to delete "${route.routeName}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (route.id != null) {
-                _routesService.deleteFavoriteRoute(route.id!);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${route.routeName} deleted.')),
-                );
-              }
-            },
-            child: const Text('Delete'),
-          ),
-        ],
       ),
     );
   }

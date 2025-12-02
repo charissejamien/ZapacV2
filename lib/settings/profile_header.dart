@@ -80,7 +80,7 @@ class ProfileHeader extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 42,
-                    backgroundColor: colorScheme.onPrimary.withOpacity(0.15),
+                    backgroundColor: colorScheme.onPrimary.withAlpha(38),
                     child: CircleAvatar(
                       radius: 38,
                       // Set fallback color for initials avatar
@@ -93,7 +93,7 @@ class ProfileHeader extends StatelessWidget {
                     right: -2,
                     bottom: -2,
                     child: Material(
-                      color: colorScheme.onPrimary.withOpacity(0.95),
+                      color: colorScheme.onPrimary.withAlpha(242),
                       shape: const CircleBorder(),
                       child: InkWell(
                         customBorder: const CircleBorder(),
@@ -112,7 +112,7 @@ class ProfileHeader extends StatelessWidget {
             Text(
               'PROFILE PHOTO',
               style: TextStyle(
-                color: colorScheme.onPrimary.withOpacity(0.9),
+                color: colorScheme.onPrimary.withAlpha(230),
                 fontSize: 11,
                 letterSpacing: 1.1,
                 fontWeight: FontWeight.w600,
@@ -132,9 +132,9 @@ class ProfileHeader extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
+             Text(
               userStatus,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 13,
               ),
@@ -147,7 +147,7 @@ class ProfileHeader extends StatelessWidget {
                   child: Text(
                     userEmail,
                     style: TextStyle(
-                      color: colorScheme.onPrimary.withOpacity(0.95),
+                      color: colorScheme.onPrimary.withAlpha(242),
                       fontSize: 13,
                     ),
                     overflow: TextOverflow.ellipsis,

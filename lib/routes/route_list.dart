@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import '../routes/route_detail.dart';
 
 class RouteListPage extends StatefulWidget {
   final Map<String, dynamic>? destination;
@@ -23,10 +24,26 @@ class _RouteListPageState extends State<RouteListPage> {
   // Replace with your actual API key
   final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc";
 
+  Map<String, dynamic>? _getResolvedOriginMap() {
+  if (_originCoords != null) {
+    return {
+      "lat": _originCoords!['latitude'], // 'lat' matches what Detail Page expects
+      "lng": _originCoords!['longitude'],
+      "latitude": _originCoords!['latitude'], // Keep both just in case
+      "longitude": _originCoords!['longitude'],
+      "name": "Current Location"
+    };
+  }
+  return widget.origin; 
+}
+
   @override
   void initState() {
     super.initState();
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
     _fetchRoutes();
+  });
   }
 
   Future<void> _fetchRoutes() async {
@@ -363,7 +380,12 @@ class _RouteListPageState extends State<RouteListPage> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final opt = options[index];
-        return _RouteCard(option: opt);
+        return _RouteCard(
+            option: opt,
+            origin: _getResolvedOriginMap(),
+            destination: widget.destination,
+);
+
       },
     );
   }
@@ -481,7 +503,14 @@ class RouteOption {
 
 class _RouteCard extends StatelessWidget {
   final RouteOption option;
-  const _RouteCard({required this.option});
+  final Map<String, dynamic>? origin;
+  final Map<String, dynamic>? destination;
+
+  const _RouteCard({
+    required this.option,
+    required this.origin,
+    required this.destination,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -496,8 +525,19 @@ class _RouteCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: () {
-          // TODO: hook into route detail flow
-        },
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => RouteDetailPage(
+        origin: origin,
+        destination: destination,
+        routeOption: option,
+      ),
+    ),
+  );
+},
+
+
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

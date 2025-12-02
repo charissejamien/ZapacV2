@@ -223,10 +223,16 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
 
     // push RouteListPage and pass the selected destination
     if (!mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
-    );
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => RouteListPage(
+      origin: null,
+      destination: place,
+    ),
+  ),
+);
+
   }
 
 
@@ -328,8 +334,14 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
                 if (!mounted) return;
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
+                  MaterialPageRoute(
+                    builder: (_) => RouteListPage(
+                      origin: null,
+                      destination: place,
+                    ),
+                  ),
                 );
+
               },
               child: Card(
                 margin: const EdgeInsets.only(right: 12),
@@ -442,8 +454,14 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
               if (!mounted) return;
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
+                MaterialPageRoute(
+                  builder: (_) => RouteListPage(
+                    origin: null,
+                    destination: place,
+                  ),
+                ),
               );
+
             },
           ),
         );

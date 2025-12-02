@@ -13,6 +13,7 @@ import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart'; 
 import 'dart:io' show Platform;
+
 // FIX: The import below is necessary, so the redundant one was removed.
 import 'community_insights_page.dart' show ChatMessage; 
 import 'dart:convert';

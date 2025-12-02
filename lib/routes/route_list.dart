@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import '../routes/route_step_detail.dart';
+import '../routes/stepDetail.dart';
 
 class RouteListPage extends StatefulWidget {
   final Map<String, dynamic>? destination;
@@ -17,7 +19,6 @@ class _RouteListPageState extends State<RouteListPage> {
   List<RouteOption> options = [];
   bool _isLoading = true;
   String? _errorMessage;
-  // SortBy _sortBy = SortBy.time;
   Map<String, double>? _originCoords;
 
   // Replace with your actual API key
@@ -47,11 +48,9 @@ class _RouteListPageState extends State<RouteListPage> {
       final origin = await _resolveOrigin();
       if (!mounted) return;
 
-      // Get origin coordinates (current location or provided origin)
       final originLat = origin['latitude'] ?? 10.3157; // Default to Cebu
       final originLng = origin['longitude'] ?? 123.8854;
 
-      // Get destination coordinates
       final destLat = _toDouble(widget.destination!['latitude']);
       final destLng = _toDouble(widget.destination!['longitude']);
 
@@ -63,111 +62,147 @@ class _RouteListPageState extends State<RouteListPage> {
         return;
       }
 
-      // Build the Directions API URL
-      final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/directions/json'
-        '?origin=$originLat,$originLng'
-        '&destination=$destLat,$destLng'
-        '&mode=transit'
-        '&alternatives=true'
-        '&key=$apiKey'
+      final uri = Uri.https(
+        'maps.googleapis.com',
+        '/maps/api/directions/json',
+        {
+          'origin': '$originLat,$originLng',
+          'destination': '$destLat,$destLng',
+          'mode': 'transit',
+          'alternatives': 'true',
+          'departure_time': (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString(),
+          'key': apiKey,
+        },
       );
 
-      print('Fetching routes from: $url');
+      print('Fetching routes from: $uri');
 
-      final response = await http.get(url);
+      final response = await http.get(uri).timeout(const Duration(seconds: 12));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        if (data['status'] == 'OK' && data['routes'] != null) {
-          final List<RouteOption> fetchedRoutes = [];
-
-          for (var route in data['routes']) {
-            if (route['legs'] != null && route['legs'].isNotEmpty) {
-              final leg = route['legs'][0];
-              
-              // Extract departure and arrival times
-              final departureTime = leg['departure_time']?['text'] ?? 
-                                   DateTime.now().toString().substring(11, 16);
-              final arrivalTime = leg['arrival_time']?['text'] ?? 'N/A';
-              
-              // Extract duration in minutes
-              final durationValue = leg['duration']?['value'] ?? 0;
-              final durationMinutes = (durationValue / 60).round();
-              
-              // Calculate estimated fare based on distance
-              final distanceValue = leg['distance']?['value'] ?? 0;
-              final distanceKm = distanceValue / 1000;
-              final estimatedFare = _calculateFare(distanceKm);
-              
-              // Extract transport modes
-              final List<String> transportModes = [];
-              if (leg['steps'] != null) {
-                for (var step in leg['steps']) {
-                  final travelMode = step['travel_mode']?.toString().toLowerCase() ?? '';
-                  final transitDetails = step['transit_details'];
-                  
-                  if (travelMode == 'walking') {
-                    if (!transportModes.contains('walk')) {
-                      transportModes.add('walk');
-                    }
-                  } else if (travelMode == 'transit' && transitDetails != null) {
-                    final vehicleType = transitDetails['line']?['vehicle']?['type']?.toString().toLowerCase() ?? '';
-                    
-                    if (vehicleType.contains('bus') && !transportModes.contains('bus')) {
-                      transportModes.add('bus');
-                    } else if ((vehicleType.contains('rail') || vehicleType.contains('train')) 
-                              && !transportModes.contains('train')) {
-                      transportModes.add('train');
-                    } else if (!transportModes.contains('jeep')) {
-                      // Default to jeep for other transit types (common in Philippines)
-                      transportModes.add('jeep');
-                    }
-                  }
-                }
-              }
-              
-              // Ensure at least one transport mode
-              if (transportModes.isEmpty) {
-                transportModes.add('jeep');
-              }
-
-              fetchedRoutes.add(RouteOption(
-                depart: departureTime,
-                arrive: arrivalTime,
-                durationMinutes: durationMinutes,
-                totalFare: estimatedFare,
-                legs: transportModes,
-              ));
-            }
-          }
-
-          if (fetchedRoutes.isEmpty) {
-            setState(() {
-              _errorMessage = "No transit routes found for this destination";
-              _isLoading = false;
-            });
-            return;
-          }
-
-          setState(() {
-            options = fetchedRoutes;
-            _isLoading = false;
-          });
-        } else {
-          final status = data['status'] ?? 'UNKNOWN';
-          setState(() {
-            _errorMessage = "API Error: $status";
-            _isLoading = false; 
-          });
-        }
-      } else {
+      if (response.statusCode != 200) {
         setState(() {
           _errorMessage = "Failed to fetch routes: ${response.statusCode}";
           _isLoading = false;
         });
+        return;
       }
+
+      final data = json.decode(response.body) as Map<String, dynamic>;
+
+      final status = (data['status'] ?? '').toString();
+      if (status == 'ZERO_RESULTS') {
+        setState(() {
+          _errorMessage = "No transit routes found for this destination";
+          _isLoading = false;
+        });
+        return;
+      }
+      if (status != 'OK') {
+        setState(() {
+          _errorMessage = "API Error: $status";
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final List<RouteOption> fetchedRoutes = [];
+
+      final routes = (data['routes'] as List<dynamic>?) ?? [];
+      for (var route in routes) {
+        final legs = (route['legs'] as List<dynamic>?) ?? [];
+        if (legs.isEmpty) continue;
+        final leg = legs[0] as Map<String, dynamic>;
+
+        final departureTime = leg['departure_time']?['text'] ?? DateTime.now().toString().substring(11, 16);
+        final arrivalTime = leg['arrival_time']?['text'] ?? 'N/A';
+        final durationValue = (leg['duration']?['value'] ?? 0) as int;
+        final durationMinutes = (durationValue / 60).round();
+        final distanceValue = (leg['distance']?['value'] ?? 0) as int;
+        final distanceText = leg['distance']?['text']?.toString() ?? '';
+        final distanceKm = distanceValue / 1000.0;
+        final estimatedFare = _calculateFare(distanceKm);
+
+        // Build detailed steps (with startEpoch)
+        final List<StepDetail> steps = [];
+        int cumulativeSec = 0;
+        final legDepartureEpoch = (leg['departure_time'] != null && leg['departure_time']['value'] != null)
+            ? (leg['departure_time']['value'] as int)
+            : DateTime.now().millisecondsSinceEpoch ~/ 1000;
+
+        final legSteps = (leg['steps'] as List<dynamic>?) ?? [];
+        for (var step in legSteps) {
+          final stepMap = (step as Map<String, dynamic>);
+          final travelModeRaw = (stepMap['travel_mode'] ?? '').toString();
+          final travelMode = travelModeRaw.toLowerCase() == 'walking' ? 'walk' : (travelModeRaw.toLowerCase() == 'transit' ? 'transit' : travelModeRaw.toLowerCase());
+          final htmlInstr = stepMap['html_instructions']?.toString() ?? '';
+          final instruction = htmlInstr.replaceAll(RegExp(r'<[^>]*>'), '');
+          final stepDistanceText = stepMap['distance']?['text']?.toString() ?? '';
+          final stepDurationSec = (stepMap['duration']?['value'] ?? 0) as int;
+          final stepDurationText = stepMap['duration']?['text']?.toString() ?? '';
+
+          final stepStartEpoch = legDepartureEpoch + cumulativeSec;
+          cumulativeSec += stepDurationSec;
+
+          Map<String, dynamic>? transitInfo;
+          if (stepMap['transit_details'] != null) {
+            final t = stepMap['transit_details'] as Map<String, dynamic>;
+            transitInfo = {
+              'line_name': t['line']?['short_name'] ?? t['line']?['name'] ?? '',
+              'vehicle': t['line']?['vehicle']?['type'] ?? '',
+              'num_stops': t['num_stops'] ?? 0,
+              'departure_stop': t['departure_stop']?['name'] ?? '',
+              'arrival_stop': t['arrival_stop']?['name'] ?? '',
+              'headsign': t['headsign'] ?? '',
+            };
+          }
+
+          steps.add(StepDetail(
+            travelMode: travelMode,
+            instruction: instruction,
+            distanceText: stepDistanceText,
+            durationText: stepDurationText,
+            durationSeconds: stepDurationSec,
+            transitInfo: transitInfo,
+            startEpoch: stepStartEpoch,
+          ));
+        }
+
+        // Extract transport modes for summary
+        final List<String> transportModes = [];
+        for (final s in steps) {
+          if (s.travelMode == 'walk' && !transportModes.contains('walk')) transportModes.add('walk');
+          if (s.travelMode == 'transit' && s.transitInfo != null) {
+            final v = (s.transitInfo!['vehicle'] ?? '').toString().toLowerCase();
+            if (v.contains('bus') && !transportModes.contains('bus')) transportModes.add('bus');
+            else if ((v.contains('rail') || v.contains('train')) && !transportModes.contains('train')) transportModes.add('train');
+            else if (!transportModes.contains('jeep')) transportModes.add('jeep');
+          }
+        }
+        if (transportModes.isEmpty) transportModes.add('jeep');
+
+        fetchedRoutes.add(RouteOption(
+          depart: departureTime,
+          arrive: arrivalTime,
+          durationMinutes: durationMinutes,
+          totalFare: estimatedFare,
+          legs: transportModes,
+          steps: steps,
+          distanceText: distanceText,
+        ));
+      }
+
+      if (fetchedRoutes.isEmpty) {
+        setState(() {
+          _errorMessage = "No transit routes found for this destination";
+          _isLoading = false;
+        });
+        return;
+      }
+
+      setState(() {
+        options = fetchedRoutes;
+        _isLoading = false;
+      });
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
       print('Error fetching routes: $message');
@@ -238,15 +273,12 @@ class _RouteListPageState extends State<RouteListPage> {
   }
 
   int _calculateFare(double distanceKm) {
-    // Basic fare calculation for PH jeepney/transit
-    // Minimum fare: 15 PHP for first 4km, then 2.5 PHP per km
     if (distanceKm <= 4.0) {
       return 15;
     } else {
       return (15 + ((distanceKm - 4.0) * 2.5)).round();
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -289,10 +321,8 @@ class _RouteListPageState extends State<RouteListPage> {
               _HeaderChips(originLabel: originLabel, destLabel: destLabel),
               const SizedBox(height: 16),
               const SizedBox(height: 12),
-              
-              // Loading, Error, or Route List
               Expanded(
-                child: _buildRouteContent(colorScheme),
+                child: _buildRouteContent(colorScheme, originLabel, destLabel),
               ),
             ],
           ),
@@ -301,7 +331,7 @@ class _RouteListPageState extends State<RouteListPage> {
     );
   }
 
-  Widget _buildRouteContent(ColorScheme colorScheme) {
+  Widget _buildRouteContent(ColorScheme colorScheme, String originLabel, String destLabel) {
     if (_isLoading) {
       return Center(
         child: Column(
@@ -363,7 +393,27 @@ class _RouteListPageState extends State<RouteListPage> {
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final opt = options[index];
-        return _RouteCard(option: opt);
+        return _RouteCard(
+          option: opt,
+          onTap: () {
+            if (opt.steps.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No step details available for this route.')));
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RouteStepDetailPage(
+                  originLabel: originLabel,
+                  destLabel: destLabel,
+                  steps: opt.steps,
+                  totalDurationMinutes: opt.durationMinutes,
+                  distanceText: opt.distanceText,
+                ),
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -372,7 +422,6 @@ class _RouteListPageState extends State<RouteListPage> {
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }
-
 
 class _HeaderChips extends StatelessWidget {
   final String originLabel;
@@ -463,25 +512,10 @@ class _HeaderChips extends StatelessWidget {
   }
 }
 
-class RouteOption {
-  final String depart;
-  final String arrive;
-  final int durationMinutes;
-  final int totalFare;
-  final List<String> legs;
-
-  RouteOption({
-    required this.depart,
-    required this.arrive,
-    required this.durationMinutes,
-    required this.totalFare,
-    required this.legs,
-  });
-}
-
 class _RouteCard extends StatelessWidget {
   final RouteOption option;
-  const _RouteCard({required this.option});
+  final VoidCallback? onTap;
+  const _RouteCard({required this.option, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -495,9 +529,7 @@ class _RouteCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 4),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () {
-          // TODO: hook into route detail flow
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

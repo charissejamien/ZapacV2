@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'addNewRoute.dart';
 import 'package:zapac/favorites/favorite_route.dart';
-import 'routeDetail.dart';
+import '../routes/routeDetail.dart';
 import 'favoriteRouteData.dart';
 import 'package:zapac/core/widgets/bottomNavBar.dart';
 import 'package:zapac/dashboard/dashboard.dart'; 

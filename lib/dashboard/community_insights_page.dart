@@ -24,9 +24,6 @@ String timeAgoSinceDate(Timestamp? timestamp) {
   } else if (diff.inDays < 30) {
     final weeks = (diff.inDays / 7).floor();
     return '$weeks week${weeks == 1 ? '' : 's'} ago';
-  } else if (diff.inDays < 365) {
-    final months = (diff.inDays / 30).floor();
-    return '$months month${months == 1 ? '' : 's'} ago';
   } else {
     final years = (diff.inDays / 365).floor();
     return '$years year${years == 1 ? '' : 's'} ago';
@@ -116,6 +113,8 @@ class CommentingSection extends StatefulWidget {
   final ValueSetter<bool>? onExpansionChanged;
   final List<ChatMessage> chatMessages; 
   final String? currentUserId; 
+  // NEW: Accept hardcoded terminals
+  final List<Map<String, dynamic>> hardcodedTerminals; 
   
   final FirebaseFirestore firestore = FirebaseFirestore.instance; 
 
@@ -124,6 +123,7 @@ class CommentingSection extends StatefulWidget {
     this.onExpansionChanged,
     required this.chatMessages,
     this.currentUserId, 
+    required this.hardcodedTerminals, // <--- NEW REQUIRED PROP
   });
 
   @override
@@ -135,6 +135,8 @@ class _CommentingSectionState extends State<CommentingSection> {
   
   bool _isSheetFullyExpanded = false;
   String _selectedFilter = 'All';
+  // NEW: State to track which view is active in the sheet
+  String _currentView = 'Insights'; // 'Insights' or 'Terminals'
 
   Map<String, UserInteraction> _userInteractions = {};
 
@@ -174,7 +176,6 @@ class _CommentingSectionState extends State<CommentingSection> {
           newInteractions[messageId] = UserInteraction.fromFirestore(doc);
         }
       } catch (e) {
-        // FIX: Replaced print() with comment
         // Logger.error("Error fetching interaction for $messageId: $e");
       }
     }
@@ -294,7 +295,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
       
     } catch (e) {
-      // FIX: Replaced print() with comment
       // Logger.error("Error committing vote: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -394,7 +394,6 @@ class _CommentingSectionState extends State<CommentingSection> {
         );
       }
     } catch (e) {
-      // FIX: Replaced print() with comment
       // Logger.error("Error reporting message $messageId: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -482,7 +481,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
 
     } catch (e) {
-      // FIX: Replaced print() with comment
       // Logger.error("Error deleting message ${message.id}: $e");
       
       if (loadingContext.mounted) {
@@ -697,11 +695,142 @@ class _CommentingSectionState extends State<CommentingSection> {
           : null,
     );
   }
+  
+  // MODIFIED: _buildTabButton now accepts an iconPath string
+  Widget _buildTabButton(String label, String view, String iconPath, ColorScheme cs) {
+    final bool isSelected = _currentView == view;
+    const Color buttonBackgroundColor = Color.fromARGB(255, 223, 171, 93); 
+    
+    final BorderSide border = isSelected 
+      ? const BorderSide(color: Colors.white, width: 1.0)
+      : const BorderSide(color: buttonBackgroundColor, width: 2.0);
+
+    return SizedBox(
+      width: 120, 
+      height: 40, 
+      child: TextButton(
+        onPressed: () {
+          if (!mounted) return;
+          setState(() {
+            _currentView = view;
+          });
+        },
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          backgroundColor: buttonBackgroundColor, 
+          shape: RoundedRectangleBorder(
+             borderRadius: BorderRadius.circular(8),
+             side: border,
+          ),
+          minimumSize: Size.zero, 
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        // NEW: Use Row to place the image asset and text side-by-side
+        child: Row( 
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // **NOTE: Replace 'assets/icons/...' with your actual image paths**
+            Image.asset(
+              iconPath,
+              width: 18, 
+              height: 18,
+              // Use color to tint the image white if it's a monochrome icon
+              color: Colors.white, 
+            ),
+            const SizedBox(width: 8), 
+            Text(
+              label,
+              style: const TextStyle( 
+                fontWeight: FontWeight.bold,
+                color: Colors.white, 
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // NEW: Widget to display a single Terminal Card
+  Widget _buildTerminalCard(Map<String, dynamic> terminal, ColorScheme cs) {
+    final details = terminal['details'] as Map<String, String>;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cs.surfaceVariant, // Use a slight off-white/grey for card background
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Colors.grey.shade300, 
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              details['title'] ?? 'Terminal',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: cs.primary,
+              ),
+            ),
+            const Divider(height: 12),
+            _buildTerminalDetailRow(Icons.access_time, 'Status', details['status'] ?? 'N/A', cs),
+            _buildTerminalDetailRow(Icons.route, 'Routes', details['routes'] ?? 'N/A', cs),
+            _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] ?? 'N/A', cs),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Helper for Terminal Detail Row
+  Widget _buildTerminalDetailRow(IconData icon, String label, String value, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: cs.secondary),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: cs.onSurface,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                color: cs.onSurface.withAlpha(179),
+              ),
+              softWrap: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     
     final List<ChatMessage> currentMessages = widget.chatMessages.map((msg) {
         if (msg.id != null && _userInteractions.containsKey(msg.id)) {
@@ -729,6 +858,7 @@ class _CommentingSectionState extends State<CommentingSection> {
 
       switch (_selectedFilter) {
         case 'Warning':
+          // ... (filter logic for Warning)
           return messageLower.contains('traffic') ||
                  messageLower.contains('accident') ||
                  messageLower.contains('danger') ||
@@ -756,6 +886,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('bangga');
                  
         case 'Shortcuts':
+          // ... (filter logic for Shortcuts)
           return messageLower.contains('shortcut') ||
                  messageLower.contains('faster') ||
                  messageLower.contains('route') ||
@@ -764,6 +895,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('dali');
                  
         case 'Fare Tips':
+          // ... (filter logic for Fare Tips)
           return messageLower.contains('fare') ||
                  messageLower.contains('price') ||
                  messageLower.contains('cost') ||
@@ -776,6 +908,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('bayad');
                  
         case 'Driver Reviews':
+          // ... (filter logic for Driver Reviews)
           return messageLower.contains('driver') ||
                  messageLower.contains('reckless') ||
                  messageLower.contains('rude') ||
@@ -814,69 +947,76 @@ class _CommentingSectionState extends State<CommentingSection> {
           ),
           child: Column(
             children: [
+              // MODIFIED: Header Container with custom background color and centered buttons
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  // FIX: This section's colors are hardcoded but will be kept as they are likely intentional for this header's design
-                  color: isDark ? const Color(0xFFDBA252) : const Color(0xFFF4BE6C),
-                  borderRadius: const BorderRadius.only(
+                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                // NEW: Use F4BE6C background color
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF4BE6C), 
+                  borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(30),
                     topRight: Radius.circular(30),
                   ),
                 ),
-                child: Center(
-                  child: RichText(
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: isDark ? Colors.black : Colors.black,
-                        fontFamily: 'Roboto',
-                      ),
-                      children: [
-                        const TextSpan(text: 'Taga '),
-                        TextSpan(
-                          text: 'ZAPAC',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: colorScheme.primary,
-                          ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // MODIFIED: Pass the icon path for Terminals
+                    _buildTabButton('Terminals', 'Terminals', 'assets/terminalsIcon.png', colorScheme),
+                    const SizedBox(width: 16),
+                    // MODIFIED: Pass the icon path for Insights
+                    _buildTabButton('Insights', 'Insights', 'assets/insightsIcon.png', colorScheme),
+                  ],
+                ),
+              ),
+
+              // NEW: Conditional content rendering for Insights view (Filter Chips are only for Insights)
+              if (_currentView == 'Insights')
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Row(
+                          children: [
+                            _buildFilterChip('All'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Warning'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Shortcuts'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Fare Tips'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Driver Reviews'),
+                          ],
                         ),
-                        const TextSpan(text: ' says...'),
-                      ],
+                      ),
                     ),
-                  ),
+                    Divider(height: 1, color: Colors.grey[300]!),
+                  ],
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    children: [
-                      _buildFilterChip('All'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Warning'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Shortcuts'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Fare Tips'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Driver Reviews'),
-                    ],
-                  ),
-                ),
-              ),
-              Divider(height: 1, color: Theme.of(context).dividerColor),
+                
               Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: filteredMessages.length,
-                  itemBuilder: (context, index) {
-                    return _buildInsightCard(filteredMessages[index]);
-                  },
-                ),
+                child: _currentView == 'Insights'
+                    ? ListView.builder(
+                        controller: scrollController,
+                        itemCount: filteredMessages.length,
+                        itemBuilder: (context, index) {
+                          return _buildInsightCard(filteredMessages[index]);
+                        },
+                      )
+                    // NEW: Display the Terminal List when the Terminals tab is selected
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: widget.hardcodedTerminals.length,
+                        itemBuilder: (context, index) {
+                          return _buildTerminalCard(widget.hardcodedTerminals[index], colorScheme);
+                        },
+                      ),
               ),
             ],
           ),

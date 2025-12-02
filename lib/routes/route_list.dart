@@ -311,7 +311,7 @@ class _RouteListPageState extends State<RouteListPage> {
             const SizedBox(height: 16),
             Text(
               'Fetching routes...',
-              style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+              style: TextStyle(color: colorScheme.onSurface.withAlpha(179)),
             ),
           ],
         ),
@@ -351,7 +351,7 @@ class _RouteListPageState extends State<RouteListPage> {
       return Center(
         child: Text(
           'No routes available right now.',
-          style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+          style: TextStyle(color: colorScheme.onSurface.withAlpha(179)),
         ),
       );
     }
@@ -397,7 +397,7 @@ class _HeaderChips extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: textColor.withOpacity(0.8),
+                    color: textColor.withAlpha(204),
                     fontSize: 12,
                     letterSpacing: 0.4,
                   ),
@@ -427,13 +427,13 @@ class _HeaderChips extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [
             colorScheme.primary,
-            colorScheme.primaryContainer.withOpacity(0.95),
+            colorScheme.primaryContainer.withAlpha(242),
           ],
         ),
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.primary.withOpacity(0.25),
+            color: colorScheme.primary.withAlpha(64),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -445,7 +445,7 @@ class _HeaderChips extends StatelessWidget {
           Text(
             'Trip summary',
             style: TextStyle(
-              color: textColor.withOpacity(0.9),
+              color: textColor.withAlpha(230),
               fontSize: 13,
               letterSpacing: 0.4,
               fontWeight: FontWeight.w500,
@@ -454,7 +454,7 @@ class _HeaderChips extends StatelessWidget {
           const SizedBox(height: 12),
           buildRow('Your Location', originLabel, Icons.radio_button_checked),
           const SizedBox(height: 12),
-          Divider(color: textColor.withOpacity(0.2), height: 1),
+          Divider(color: textColor.withAlpha(51), height: 1),
           const SizedBox(height: 12),
           buildRow('Destination', destLabel, Icons.location_on_rounded),
         ],
@@ -490,7 +490,7 @@ class _RouteCard extends StatelessWidget {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       elevation: 2,
-      shadowColor: colorScheme.shadow.withOpacity(0.1),
+      shadowColor: colorScheme.shadow.withAlpha(26),
       color: colorScheme.surface,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       child: InkWell(
@@ -521,7 +521,7 @@ class _RouteCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.12),
+                      color: colorScheme.primary.withAlpha(31),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Text(
@@ -548,7 +548,7 @@ class _RouteCard extends StatelessWidget {
                 children: [
                   Text(
                     'Estimated fare',
-                    style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+                    style: TextStyle(color: colorScheme.onSurface.withAlpha(179)),
                   ),
                   Text(
                     '₱${option.totalFare}',
@@ -571,7 +571,7 @@ class _RouteCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: colorScheme.secondary.withOpacity(0.12),
+        color: colorScheme.secondary.withAlpha(31),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

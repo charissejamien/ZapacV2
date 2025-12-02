@@ -101,7 +101,7 @@ class _SignUpPageState extends State<SignUpPage> {
     showDialog(
       context: context,
       barrierDismissible: false, 
-      barrierColor: Colors.black.withOpacity(0.2),
+      barrierColor: Colors.black.withAlpha(51),
       builder: (BuildContext context) {
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),

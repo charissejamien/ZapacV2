@@ -5,6 +5,7 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
+import 'dart:io' show Platform;
 
 class MapUtils {
   // -------------------------
@@ -34,7 +35,7 @@ class MapUtils {
     markers.removeWhere((marker) => marker.markerId.value == 'current_location_marker');
     markers.removeWhere((marker) => marker.markerId.value == 'start');
     markers.removeWhere((marker) => marker.markerId.value == 'end');
-    print('Cleared all relevant markers and polylines.');
+    // Logger.info('Cleared all relevant markers and polylines.');
   }
 
   // -------------------------
@@ -65,11 +66,32 @@ class MapUtils {
       }
     }
 
+    // Define LocationSettings for high accuracy based on platform
+    LocationSettings locationSettings;
+    if (Platform.isAndroid) {
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 0,
+        forceLocationManager: true,
+      );
+    } else if (Platform.isIOS || Platform.isMacOS) {
+      locationSettings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.other,
+        allowBackgroundLocationUpdates: false,
+        distanceFilter: 0,
+      );
+    } else {
+      locationSettings = const LocationSettings(accuracy: LocationAccuracy.high);
+    }
+
+
     try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      // Use locationSettings instead of deprecated desiredAccuracy
+      Position position = await Geolocator.getCurrentPosition(locationSettings: locationSettings);
       return LatLng(position.latitude, position.longitude);
     } catch (e) {
-      print('Error getting location: $e');
+      // Logger.error('Error getting location: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not get current location.')),
@@ -99,22 +121,22 @@ class MapUtils {
         }
       }
     } catch (e) {
-      print("Error fetching address: $e");
+      // Logger.error("Error fetching address: $e");
     }
     return null;
   }
 
+  // FIX: Removed the empty optional parameter block {} to fix the "Expected an identifier" error
   static Future<void> getCurrentLocationAndMarker(
     Set<Marker> markers,
     GoogleMapController mapController,
-    BuildContext context, {
-    required bool Function() isMounted,
-  }) async {
-    if (!isMounted()) return;
+    BuildContext context,
+  ) async {
+    if (!context.mounted) return;
 
     LatLng? currentLatLng = await getCurrentLocation(context);
     
-    if (currentLatLng != null && isMounted()) {
+    if (currentLatLng != null && context.mounted) {
       mapController.animateCamera(CameraUpdate.newLatLngZoom(currentLatLng, 18.0)); 
     }
   }
@@ -146,7 +168,7 @@ class MapUtils {
         }
       }
     } catch (e) {
-      print("Error fetching route details: $e");
+      // Logger.error("Error fetching route details: $e");
     }
     return null;
   }
@@ -178,11 +200,11 @@ class MapUtils {
         final data = json.decode(response.body);
         return data['predictions'];
       } else {
-        print('Failed to load predictions: ${response.statusCode}');
+        // Logger.warning('Failed to load predictions: ${response.statusCode}');
         return [];
       }
     } catch (e) {
-      print('Error getting predictions: $e');
+      // Logger.error('Error getting predictions: $e');
       return [];
     }
   }
@@ -209,7 +231,10 @@ class MapUtils {
 
         final url = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey';
         final response = await http.get(Uri.parse(url));
-        if (!context.mounted || response.statusCode != 200) return {};
+        
+        if (!context.mounted) return {};
+        
+        if (response.statusCode != 200) return {};
         
         final data = json.decode(response.body);
         if (data['status'] == 'OK') {
@@ -236,6 +261,7 @@ class MapUtils {
     // Directions API Call
     String url = 'https://maps.googleapis.com/maps/api/directions/json?origin=${originLatLng.latitude},${originLatLng.longitude}&destination=${destinationLatLng.latitude},${destinationLatLng.longitude}&key=$apiKey';
     var response = await http.get(Uri.parse(url));
+    
     if (!context.mounted) return {};
 
     if (response.statusCode == 200) {

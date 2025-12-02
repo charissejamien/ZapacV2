@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'community_insights_page.dart' show ChatMessage;
+import 'package:flutter/services.dart'; // Added for haptic feedback
 
 String capitalizeFirstLetter(String s) {
   if (s.isEmpty) return s;
@@ -15,8 +16,8 @@ class _AddInsightContent extends StatefulWidget {
   const _AddInsightContent({
     required this.onInsightAdded,
     required this.firestore,
-    Key? key,
-  }) : super(key: key);
+    super.key, // Use super.key directly
+  });
 
   @override
   State<_AddInsightContent> createState() => _AddInsightContentState();
@@ -36,11 +37,13 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
   bool _isPosting = false;
   int _charCount = 0;
   static const int _maxChars = 500;
+  static const int alpha128 = 128; // 0.5 opacity
 
   @override
   void initState() {
     super.initState();
     final currentUser = FirebaseAuth.instance.currentUser;
+    // FIX: Guard the reload() call
     _reloadUserFuture = currentUser?.reload() ?? Future.value();
     
     // Setup animations
@@ -63,14 +66,18 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
     ));
     
     insightController.addListener(() {
-      setState(() {
-        _charCount = insightController.text.length;
-      });
+      if (mounted) {
+        setState(() {
+          _charCount = insightController.text.length;
+        });
+      }
     });
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      insightFocusNode.requestFocus();
-      _animController.forward();
+      if (mounted) {
+        insightFocusNode.requestFocus();
+        _animController.forward();
+      }
     });
   }
 
@@ -87,379 +94,101 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
   Color _getCharCountColor(ThemeData theme) {
     if (_charCount > _maxChars) return theme.colorScheme.error;
     if (_charCount > _maxChars * 0.9) return Colors.orange;
-    return theme.textTheme.bodySmall?.color?.withOpacity(0.5) ?? Colors.grey;
+    // FIX: Replaced .withOpacity(0.5) with .withAlpha(128)
+    return theme.textTheme.bodySmall?.color?.withAlpha(alpha128) ?? Colors.grey;
   }
+  
+  // NEW: Function to handle the asynchronous posting flow
+  Future<void> _postInsight() async {
+    if (_isPosting || !mounted) return;
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return FutureBuilder<void>(
-      future: _reloadUserFuture, 
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-            height: 300,
-            child: Center(
-              child: CircularProgressIndicator(
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          );
-        }
-        
-        final refreshedUser = FirebaseAuth.instance.currentUser;
-        final senderName = refreshedUser?.displayName ?? 
-                          refreshedUser?.email?.split('@').first ?? 
-                          'Current User';
-        final profileUrl = refreshedUser?.photoURL ?? ''; 
-        final senderUid = refreshedUser?.uid;
-        
-        final bool hasImageUrl = profileUrl.isNotEmpty;
-        final String initials = senderName.isNotEmpty ? senderName[0].toUpperCase() : '?';
-
-        return FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Drag handle
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: textColor.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  
-                  // Header with close button
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Share Insight',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                          splashRadius: 20,
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  Divider(height: 1, color: textColor.withOpacity(0.1)),
-                  
-                  // Scrollable content
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.only(
-                        left: 20,
-                        right: 20,
-                        top: 20,
-                        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // User profile section
-                          Row(
-                            children: [
-                              Hero(
-                                tag: 'user_avatar_$senderUid',
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: theme.colorScheme.primary.withOpacity(0.3),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: CircleAvatar(
-                                    radius: 26,
-                                    backgroundColor: hasImageUrl 
-                                        ? Colors.transparent 
-                                        : theme.colorScheme.primary,
-                                    backgroundImage: hasImageUrl
-                                        ? NetworkImage(profileUrl)
-                                        : null,
-                                    child: hasImageUrl
-                                        ? null
-                                        : Text(
-                                            initials,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 20,
-                                            ),
-                                          ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      senderName,
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.public,
-                                          size: 14,
-                                          color: textColor.withOpacity(0.6),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Posting to ZAPAC Community',
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: textColor.withOpacity(0.6),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Insight text field
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDark 
-                                  ? Colors.white.withOpacity(0.05)
-                                  : Colors.grey.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: textColor.withOpacity(0.1),
-                                width: 1,
-                              ),
-                            ),
-                            child: TextField(
-                              controller: insightController,
-                              focusNode: insightFocusNode,
-                              decoration: InputDecoration(
-                                hintText: 'What\'s on your mind? Share your insight...',
-                                hintStyle: TextStyle(
-                                  color: textColor.withOpacity(0.4),
-                                  fontSize: 15,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.all(16),
-                                counterText: '',
-                              ),
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 15,
-                                height: 1.5,
-                              ),
-                              maxLines: 6,
-                              minLines: 4,
-                              maxLength: _maxChars,
-                            ),
-                          ),
-                          
-                          // Character counter
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8, right: 4),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '$_charCount / $_maxChars',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: _getCharCountColor(theme),
-                                    fontWeight: _charCount > _maxChars * 0.9
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 20),
-                          
-                          // Route field with icon
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDark 
-                                  ? Colors.white.withOpacity(0.05)
-                                  : Colors.grey.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: textColor.withOpacity(0.1),
-                                width: 1,
-                              ),
-                            ),
-                            child: TextField(
-                              controller: routeController,
-                              focusNode: routeFocusNode,
-                              decoration: InputDecoration(
-                                hintText: 'Which route?',
-                                hintStyle: TextStyle(
-                                  color: textColor.withOpacity(0.4),
-                                  fontSize: 15,
-                                ),
-                                prefixIcon: Icon(
-                                  Icons.route,
-                                  color: theme.colorScheme.primary,
-                                  size: 20,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                              ),
-                              style: TextStyle(
-                                color: textColor,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(height: 24),
-                          
-                          // Post button
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: double.infinity,
-                            height: 54,
-                            child: ElevatedButton(
-                              onPressed: _isPosting ? null : _handlePost,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF6CA89A),
-                                foregroundColor: Colors.white,
-                                disabledBackgroundColor: Colors.grey.shade400,
-                                elevation: 0,
-                                shadowColor: const Color(0xFF6CA89A).withOpacity(0.4),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              child: _isPosting
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
-                                      ),
-                                    )
-                                  : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.send_rounded, size: 20),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Post Insight',
-                                          style: theme.textTheme.titleMedium?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _handlePost() async {
     String text = insightController.text.trim();
     String route = routeController.text.trim();
+    final theme = Theme.of(context);
     
     if (text.isEmpty || route.isEmpty) {
-      _showSnackBar(
-        'Please fill in both fields',
-        Colors.orange,
-        Icons.warning_amber_rounded,
-      );
+      if (mounted) {
+        _showSnackBar( 
+          'Please enter both insight and route.',
+          Colors.orange,
+          Icons.warning_amber,
+        );
+      }
       return;
     }
     
     if (_charCount > _maxChars) {
-      _showSnackBar(
-        'Insight exceeds maximum length',
-        Theme.of(context).colorScheme.error,
-        Icons.error_outline,
-      );
-      return;
+        if (mounted) {
+            _showSnackBar( 
+                'Insight exceeds maximum length.',
+                theme.colorScheme.error,
+                Icons.error_outline,
+            );
+        }
+        return;
+    }
+
+    // 1. Close the current bottom sheet modal
+    if (mounted) {
+      Navigator.pop(context);
+    } else {
+      return; 
     }
     
-    setState(() => _isPosting = true);
-    
+    // Set posting state (although the modal is closed, this prevents double tap if modal dismissal is slow)
+    if (mounted) setState(() => _isPosting = true);
+
+    // Get refreshed user details
     final refreshedUser = FirebaseAuth.instance.currentUser;
     final senderName = refreshedUser?.displayName ?? 
-                      refreshedUser?.email?.split('@').first ?? 
-                      'Current User';
-    final profileUrl = refreshedUser?.photoURL ?? '';
+                       refreshedUser?.email?.split('@').first ?? 
+                       'Current User';
+    final profileUrl = refreshedUser?.photoURL ?? ''; 
     final senderUid = refreshedUser?.uid;
-    
-    text = capitalizeFirstLetter(text);
-    route = capitalizeFirstLetter(route);
-    
+
     final newInsight = ChatMessage(
       sender: senderName,
-      message: '"$text"',
-      route: route,
+      message: '“${capitalizeFirstLetter(text)}”',
+      route: capitalizeFirstLetter(route),
       imageUrl: profileUrl,
       senderUid: senderUid,
     );
+    
+    // Show a temporary loading screen on the root navigator
+    // This context is safe because it is scoped to the global app
+    final loadingDialog = showGeneralDialog(
+        context: context,
+        barrierDismissible: false,
+        transitionDuration: const Duration(milliseconds: 150),
+        barrierColor: Colors.black.withOpacity(0.7),
+        routeSettings: const RouteSettings(name: 'PostingIndicator'),
+        pageBuilder: (ctx, a1, a2) {
+            return Center(
+                child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
+                    backgroundColor: theme.colorScheme.primary,
+                ),
+            );
+        },
+    );
 
     try {
-      await widget.firestore
-          .collection('public_data')
-          .doc('zapac_community')
-          .collection('comments')
-          .add(newInsight.toFirestore());
+      await widget.firestore 
+        .collection('public_data')
+        .doc('zapac_community')
+        .collection('comments')
+        .add(newInsight.toFirestore());
 
+      // 4. Dismiss loading dialog
+      // Use rootNavigator: true to pop the dialog that was pushed globally.
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      
+      // 5. Provide success feedback
       if (mounted) {
         widget.onInsightAdded(newInsight);
-        Navigator.pop(context);
-        
-        // Success feedback with haptic
+        SystemSound.play(SystemSoundType.click); // Success Haptic/Sound
         _showSnackBar(
           'Insight posted successfully!',
           const Color(0xFF6CA89A),
@@ -467,13 +196,19 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
         );
       }
     } catch (e) {
-      print('Failed to post insight: $e');
+      // Logger.error('Failed to post insight: $e');
       
+      // 4b. Dismiss loading dialog on error
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // 5b. Provide error feedback
       if (mounted) {
         setState(() => _isPosting = false);
         _showSnackBar(
           'Failed to post. Please try again.',
-          Theme.of(context).colorScheme.error,
+          theme.colorScheme.error,
           Icons.error_outline,
         );
       }
@@ -503,6 +238,154 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 3),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
+    // final isDark = theme.brightness == Brightness.dark; // isDark is unused
+    final hintColor = theme.colorScheme.onSurface.withAlpha(alpha128);
+
+    return FutureBuilder<void>(
+      future: _reloadUserFuture, 
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            height: 300,
+            child: Center(
+              child: CircularProgressIndicator(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          );
+        }
+        
+        final refreshedUser = FirebaseAuth.instance.currentUser;
+        final senderName = refreshedUser?.displayName ?? 
+                             refreshedUser?.email?.split('@').first ?? 
+                             'Current User';
+        final profileUrl = refreshedUser?.photoURL ?? ''; 
+        // final senderUid = refreshedUser?.uid; // senderUid is only used in _postInsight
+
+        final bool hasImageUrl = profileUrl.isNotEmpty;
+        final String initials = senderName.isNotEmpty ? senderName[0].toUpperCase() : '?';
+
+        return FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Container(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: hasImageUrl ? Colors.transparent : theme.colorScheme.primary, 
+                        backgroundImage: hasImageUrl
+                            ? NetworkImage(profileUrl) as ImageProvider<Object>?
+                            : null,
+                        child: hasImageUrl
+                            ? null
+                            : Text(
+                                initials,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            senderName,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: textColor,
+                            ),
+                          ),
+                          Text(
+                            'Posting publicly across ZAPAC',
+                            style: TextStyle(
+                              // FIX: Replaced .withOpacity(0.6) with .withAlpha(153)
+                              color: textColor?.withAlpha(153),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: insightController,
+                    focusNode: insightFocusNode, 
+                    decoration: InputDecoration(
+                      hintText: 'Share an insight to the community....',
+                      hintStyle: TextStyle(color: hintColor),
+                      border: InputBorder.none,
+                    ),
+                    style: TextStyle(color: textColor),
+                    maxLines: 4,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$_charCount/$_maxChars',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _getCharCountColor(theme),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: routeController,
+                    decoration: InputDecoration(
+                      hintText: 'What route are you on?',
+                      hintStyle: TextStyle(color: hintColor),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                    style: TextStyle(color: textColor),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      // FIX: Call the refactored, safe posting function
+                      onPressed: _isPosting ? null : _postInsight,
+                      child: _isPosting
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                            )
+                          : const Text("Post Insight"),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

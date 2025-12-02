@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:zapac/dashboard/dashboard.dart';
 import 'package:zapac/core/widgets/onboardHeader.dart';
 import 'package:zapac/core/widgets/onboardFooter.dart'; 
 import 'onboarding_tour.dart'; 
@@ -24,10 +23,12 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
   void _selectProfile(UserProfile profile) {
     if (_isRedirecting) return;
 
-    setState(() {
-      _selectedProfile = profile;
-      _isRedirecting = true;
-    });
+    if (mounted) {
+      setState(() {
+        _selectedProfile = profile;
+        _isRedirecting = true;
+      });
+    }
 
     // Simulate checkmark highlight for 1 second, then navigate
     Future.delayed(const Duration(milliseconds: 1000), () {
@@ -47,6 +48,12 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
     final bool isSelected = _selectedProfile == profile;
     final bool isFinished = isSelected && _isRedirecting;
 
+    // Alpha conversions:
+    // 0.1 opacity ≈ alpha 26
+    // 0.2 opacity ≈ alpha 51
+    const int alpha26 = 26;
+    const int alpha51 = 51;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Stack(
@@ -56,12 +63,16 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
             width: double.infinity,
             height: 60,
             child: OutlinedButton(
-              onPressed: () => _selectProfile(profile),
+              onPressed: _isRedirecting ? null : () => _selectProfile(profile),
               style: OutlinedButton.styleFrom(
-                backgroundColor: isSelected ? cs.primary.withOpacity(0.1) : cs.surface,
+                // FIX: Replaced .withOpacity(0.1) with .withAlpha(26)
+                backgroundColor: isSelected ? cs.primary.withAlpha(alpha26) : cs.surface,
                 foregroundColor: cs.primary,
                 side: BorderSide(
-                  color: isSelected ? cs.primary : cs.onSurface.withOpacity(0.2),
+                  color: isSelected 
+                    // FIX: Replaced .withOpacity(0.2) with .withAlpha(51)
+                    ? cs.primary 
+                    : cs.onSurface.withAlpha(alpha51),
                   width: 2,
                 ),
                 shape: RoundedRectangleBorder(
@@ -85,6 +96,7 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
               top: 8,
               right: 8,
               child: AnimatedOpacity(
+                // This opacity value is 1.0, which is fine, but for consistency:
                 opacity: isFinished ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
                 child: Container(
@@ -92,9 +104,10 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
                   decoration: BoxDecoration(
                     color: cs.primary,
                     shape: BoxShape.circle,
-                    border: Border.all(color: cs.background, width: 2),
+                    // FIX: Replaced cs.background with cs.surface
+                    border: Border.all(color: cs.surface, width: 2),
                   ),
-                  child: const Icon(Icons.check, size: 16, color: Colors.white),
+                  child: Icon(Icons.check, size: 16, color: Colors.white),
                 ),
               ),
             ),
@@ -106,14 +119,16 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    
+    // Alpha conversion: 0.7 opacity ≈ alpha 179
+    const int alpha179 = 179;
 
     return Scaffold(
-      backgroundColor: cs.background,
+      // FIX: Replaced cs.background with cs.surface
+      backgroundColor: cs.surface,
       
-      // APPLIED NEW PLAIN HEADER
       appBar: const OnboardingHeader(),
       
-      // APPLIED FOOTER
       bottomNavigationBar: const AuthFooter(),
 
       body: SafeArea(
@@ -140,7 +155,8 @@ class _OnboardingProfilePageState extends State<OnboardingProfilePage> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
-                  color: cs.onSurface.withOpacity(0.7),
+                  // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+                  color: cs.onSurface.withAlpha(alpha179),
                 ),
               ),
               

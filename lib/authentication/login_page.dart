@@ -344,7 +344,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildSocialButtons(Color darkBgColor, Color darkFgColor, bool isGoogleLoading) {
-    final double screenWidth = MediaQuery.of(context).size.width;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     final googleBgLight = isDarkMode ? darkBgColor : const Color.fromARGB(255, 24, 24, 24);

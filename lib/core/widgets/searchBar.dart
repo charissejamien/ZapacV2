@@ -116,7 +116,7 @@ class _SearchBarState extends State<SearchBar> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(70)),
         shadows: [
           BoxShadow(
-            color: const Color(0xFF4A6FA5).withOpacity(0.4),
+            color: const Color(0xFF4A6FA5).withAlpha(102),
             blurRadius: 6.8,
             offset: const Offset(2, 5),
           ),

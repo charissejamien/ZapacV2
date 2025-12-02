@@ -104,5 +104,10 @@
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
         </intent>
+        <package android:name="com.angkas.rider" />
+        <package android:name="com.taxsee.taxsee" />
+        <package android:name="com.moveitph.rider" />
+        <package android:name="com.joyride.rider" />
+        <package android:name="com.grab.passenger" />
     </queries>
 </manifest>

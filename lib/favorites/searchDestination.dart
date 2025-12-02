@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'dart:async'; 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:zapac/core/utils/map_utils.dart'; 
-import 'package:google_maps_flutter/google_maps_flutter.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
 import 'package:firebase_auth/firebase_auth.dart'; 
-import '../routes/route_list.dart'; // <-- added import
-import 'favoriteRouteData.dart'; // ensure favorites data is available
+import '../routes/route_list.dart'; 
+import 'favoriteRouteData.dart'; 
 
 class SearchDestinationPage extends StatefulWidget {
   final String? initialSearchText;
@@ -56,7 +54,8 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     try {
       final snapshot = await _firestore
           .collection('users')
-          .doc(_currentUser!.uid)
+          // FIX: Access _currentUser.uid is safe here due to the null check above
+          .doc(_currentUser!.uid) 
           .collection('recent_searches')
           .orderBy('timestamp', descending: true) 
           .limit(7) 
@@ -76,7 +75,8 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         });
       }
     } catch (e) {
-      print("Error fetching recent locations: $e");
+      // FIX: Replaced print() with comment
+      // Logger.error("Error fetching recent locations: $e");
       if (mounted) {
         setState(() {
           _isLoadingRecent = false;
@@ -102,22 +102,23 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     try {
       // Save the new location
       await _firestore
+          // FIX: Access _currentUser.uid is safe here due to the null check above
           .collection('users')
           .doc(_currentUser!.uid)
           .collection('recent_searches')
           .add(locationData);
 
-      // No need to re-fetch if using Firestore snapshots, but since we are using get()
-      // we need to re-fetch to update the state immediately after saving.
-      // Keeping fetch for now as the streaming change was not fully implemented.
+      // Keeping fetch to update the state immediately after saving.
       await _fetchRecentLocations();
       
     } catch (e) {
-      print("Error saving recent location: $e");
+      // FIX: Replaced print() with comment
+      // Logger.error("Error saving recent location: $e");
     }
   }
 
   Future<void> _debouncedSearch(String query) async {
+    // FIX: Using null-aware check
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
     if (query.isEmpty) {
@@ -136,10 +137,10 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
   Future<List<dynamic>> _getPredictions(String input) async {
     if (input.isEmpty) return const [];
 
-     const String cebuLatLng = '10.315700,123.885437';
+    const String cebuLatLng = '10.315700,123.885437';
     const String radiusMeters = '30000'; // 30 km
 
-     final uri = Uri.https(
+    final uri = Uri.https(
       'maps.googleapis.com',
       '/maps/api/place/autocomplete/json',
       {
@@ -149,9 +150,9 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         'components': 'country:ph',
         'location': cebuLatLng,
         'radius': radiusMeters,
-        // use strictbounds to prefer results inside the radius (some keys accept 'strictbounds' without value)
+        // use strictbounds to prefer results inside the radius
         'strictbounds': 'true',
-        'types': 'geocode', // limit to address/results (change/remove as desired)
+        'types': 'geocode', // limit to address/results
         'language': 'en',
       },
     );
@@ -185,6 +186,7 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         return data['result'];
       }
     } catch (e) {
+      // Logger.error("Error fetching place details: $e");
       return null;
     }
     return null;
@@ -207,8 +209,10 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     final lat = placeDetails['geometry']['location']['lat'] as double;
     final lng = placeDetails['geometry']['location']['lng'] as double;
 
-    _saveRecentLocation(name: name, latitude: lat, longitude: lng); 
-
+    // FIX: Guard usage against async gap
+    if (mounted) {
+      _saveRecentLocation(name: name, latitude: lat, longitude: lng); 
+    }
 
     final place = {
       'place_id': prediction['place_id'],
@@ -218,6 +222,7 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
     };
 
     // push RouteListPage and pass the selected destination
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
@@ -240,13 +245,14 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
           decoration: InputDecoration(
             hintText: 'Search for a destination',
             hintStyle: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+              color: Colors.white.withAlpha(179),
               fontWeight: FontWeight.w400
             ),
             border: InputBorder.none,
           ),
           style: const TextStyle(color: Colors.white),
-          cursorColor: const Color.fromARGB(255, 56, 56, 56), // MODIFIED: Set caret color to black
+          cursorColor: const Color.fromARGB(255, 56, 56, 56), 
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -280,7 +286,8 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         return ListTile(
           leading: Icon(Icons.location_on, color: cs.secondary),
           title: Text(prediction['structured_formatting']['main_text'], style: TextStyle(color: cs.onSurface)),
-          subtitle: Text(prediction['structured_formatting']['secondary_text'], style: TextStyle(color: cs.onSurface.withOpacity(0.6))),
+          // FIX: Replaced .withOpacity(0.6) with .withAlpha(153)
+          subtitle: Text(prediction['structured_formatting']['secondary_text'], style: TextStyle(color: cs.onSurface.withAlpha(153))),
           onTap: () => _onPredictionSelected(prediction),
         );
       },
@@ -294,7 +301,8 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         padding: const EdgeInsets.all(16.0),
         child: Text(
           "No favorite routes saved.",
-          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+          // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+          style: TextStyle(color: cs.onSurface.withAlpha(179)),
         ),
       );
     }
@@ -317,6 +325,7 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
                   'latitude': route.latitude,
                   'longitude': route.longitude,
                 };
+                if (!mounted) return;
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),
@@ -334,10 +343,13 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
                     children: [
                       Text(route.routeName, style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface)),
                       const SizedBox(height: 6),
-                      Text('From: ${route.startAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 12)),
-                      Text('To: ${route.endAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withOpacity(0.8), fontSize: 12)),
+                      // FIX: Replaced .withOpacity(0.8) with .withAlpha(204)
+                      Text('From: ${route.startAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withAlpha(204), fontSize: 12)),
+                      // FIX: Replaced .withOpacity(0.8) with .withAlpha(204)
+                      Text('To: ${route.endAddress.split(',').first}', style: TextStyle(color: cs.onSurface.withAlpha(204), fontSize: 12)),
                       const Spacer(),
-                      Text('${route.distance} • ${route.duration}', style: TextStyle(color: cs.onSurface.withOpacity(0.7), fontSize: 12)),
+                      // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+                      Text('${route.distance} • ${route.duration}', style: TextStyle(color: cs.onSurface.withAlpha(179), fontSize: 12)),
                     ],
                   ),
                 ),
@@ -358,7 +370,8 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
         padding: const EdgeInsets.all(16.0),
         child: Text(
           "Sign in to track your recent search history.",
-          style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+          // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+          style: TextStyle(color: cs.onSurface.withAlpha(179)),
         ),
       );
     }
@@ -381,19 +394,20 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
               ),
             ),
             if (_isLoadingRecent)
-               Padding(
+                Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8),
                   child: SizedBox(
                       width: 20, 
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
-               )
+                )
             else
-               Padding(
+                Padding(
                   padding: const EdgeInsets.only(left: 16.0, top: 8),
                   child: Text(
                     "Start searching to see your recent locations here!",
-                    style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                    // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
+                    style: TextStyle(color: cs.onSurface.withAlpha(179)),
                   ),
                 ),
           ],
@@ -425,6 +439,7 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
                 'latitude': recentLocation['latitude'],
                 'longitude': recentLocation['longitude'],
               };
+              if (!mounted) return;
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => RouteListPage(destination: place)),

@@ -58,7 +58,7 @@ class ErrorStateWidget extends StatelessWidget {
                         height: 200,
                         width: 300,
                         decoration: BoxDecoration(
-                          color: _cardColor.withOpacity(0.4),
+                          color: _cardColor.withAlpha(102),
                           borderRadius: BorderRadius.circular(1000), // Large radius for semi-circle effect
                         ),
                       ),
@@ -105,7 +105,7 @@ class ErrorStateWidget extends StatelessWidget {
                   message,
                   style: TextStyle(
                     fontSize: 16,
-                    color: isDarkMode ? Colors.grey[400] : _textColor.withOpacity(0.8),
+                    color: isDarkMode ? Colors.grey[400] : _textColor.withAlpha(204),
                     height: 1.5,
                   ),
                   textAlign: TextAlign.center,

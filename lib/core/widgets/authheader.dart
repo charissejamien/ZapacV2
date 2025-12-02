@@ -27,7 +27,7 @@ class AuthHeader extends StatelessWidget implements PreferredSizeWidget {
   // 💥 REMOVED 'destinationPage' ARGUMENT 💥
   Widget _buildTab(BuildContext context, {required String text, required bool isActive}) { 
     final activeColor = Colors.white;
-    final inactiveColor = Colors.white.withOpacity(0.85);
+    final inactiveColor = Colors.white.withAlpha(217);
 
     return GestureDetector(
       onTap: () {

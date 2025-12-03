@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/authentication/login_page.dart';
 import 'package:zapac/app/main.dart';
 import 'profile_page.dart';
+// 1. ADD THIS IMPORT for the new page
+import 'help_feedback_page.dart';
+import 'about_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -181,8 +184,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: 'Help & Feedback',
                   icon: Icons.help_outline_rounded,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Help center coming soon!')),
+                    // 2. NAVIGATE to the HelpAndFeedbackPage
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HelpAndFeedbackPage()),
                     );
                   },
                 ),
@@ -190,8 +195,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: 'About',
                   icon: Icons.info_outline_rounded,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('About page coming soon!')),
+                    // 2. NAVIGATE to the HelpAndFeedbackPage
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AboutPage()),
                     );
                   },
                 ),

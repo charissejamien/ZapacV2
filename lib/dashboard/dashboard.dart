@@ -19,15 +19,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math'; // Added for min/max calculation
 
-// Category Model for the Chips
-class Category {
-  final String label;
-  final IconData icon;
-  final String placeType; // Google Place Type identifier
-
-  const Category({required this.label, required this.icon, required this.placeType});
-}
-
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
@@ -128,15 +119,6 @@ class _DashboardState extends State<Dashboard> {
   // MODIFIED: Initial value for the icon is a default, will be updated in initState
   BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
 
-  // List of categories for the chips
-  static const List<Category> _categories = [
-    Category(label: 'Terminal', icon: Icons.tram, placeType: 'bus_station'), // Use bus_station for PUV terminals
-    Category(label: 'Mall', icon: Icons.shopping_bag, placeType: 'shopping_mall'),
-    Category(label: 'Grocery', icon: Icons.local_grocery_store, placeType: 'supermarket'),
-    Category(label: 'Gasoline', icon: Icons.local_gas_station, placeType: 'gas_station'),
-    Category(label: 'School', icon: Icons.school, placeType: 'school'),
-    Category(label: 'Hospital', icon: Icons.local_hospital, placeType: 'hospital'),
-  ];
   
   String _getMapApiKey() {
     if (Platform.isIOS) {
@@ -493,162 +475,6 @@ class _DashboardState extends State<Dashboard> {
       );
   }
 
-  // MODIFIED: Function to search POIs by category
-  Future<void> _searchPOIsByCategory(String placeType) async {
-    if (!mounted || !_isMapReady || _mapController == null) return; 
-    _clearSearchMarker(); 
-
-    // Handle hardcoded terminals separately
-    if (placeType == 'bus_station') {
-      _markers.clear();
-      
-      // Variables for bounds calculation (Point 2)
-      double minLat = 90.0, maxLat = -90.0;
-      double minLng = 180.0, maxLng = -180.0;
-
-      for (var terminal in _hardcodedTerminals) {
-        final lat = terminal['lat'] as double;
-        final lng = terminal['lng'] as double;
-        
-        // Calculate bounds
-        minLat = min(minLat, lat);
-        maxLat = max(maxLat, lat);
-        minLng = min(minLng, lng);
-        maxLng = max(maxLng, lng);
-
-        _markers.add(
-          Marker(
-            markerId: MarkerId(terminal['id'] as String),
-            position: LatLng(lat, lng),
-            infoWindow: InfoWindow(title: terminal['name'] as String),
-            icon: _terminalIcon, // <--- NOW USES THE CUSTOM LOADED ICON
-            onTap: () => _handleTerminalTapped(terminal['id'] as String),
-          ),
-        );
-      }
-      
-      if (mounted) {
-        setState(() {
-          _showDetailsButton = false;
-        });
-        // REMOVED: Snackbar notification (Point 1)
-      }
-      
-      // Zoom to fit all terminal locations (Point 2)
-      if (_hardcodedTerminals.isNotEmpty) {
-          final bounds = LatLngBounds(
-              southwest: LatLng(minLat, minLng),
-              northeast: LatLng(maxLat, maxLng),
-          );
-          // 50.0 padding is added for better visual spacing around the markers
-          _mapController.animateCamera(
-              CameraUpdate.newLatLngBounds(bounds, 50.0), 
-          );
-      }
-      return; // Exit here to use hardcoded markers for terminals
-    }
-
-    // Existing Google Places API logic for other categories
-    try {
-      // Use getVisibleRegion() and calculate center from bounds
-      final LatLngBounds bounds = await _mapController.getVisibleRegion();
-      final LatLng mapCenter = LatLng(
-        (bounds.northeast.latitude + bounds.southwest.latitude) / 2,
-        (bounds.northeast.longitude + bounds.southwest.longitude) / 2,
-      );
-      
-      final String apiKey = _getMapApiKey();
-
-      final String url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${mapCenter.latitude},${mapCenter.longitude}&radius=5000&type=$placeType&key=$apiKey';
-
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        if (data['status'] == 'OK' && data['results'] != null) {
-          final List<dynamic> results = data['results'];
-          _markers.clear();
-          
-          for (var result in results) {
-            final lat = result['geometry']['location']['lat'];
-            final lng = result['geometry']['location']['lng'];
-            final name = result['name'];
-            
-            _markers.add(
-              Marker(
-                markerId: MarkerId(result['place_id']),
-                position: LatLng(lat, lng),
-                infoWindow: InfoWindow(title: name),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-              ),
-            );
-          }
-
-          if (mounted) {
-            setState(() {
-              _showDetailsButton = false;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Found ${results.length} ${placeType.replaceAll("_", " ")}s nearby.')),
-            );
-          }
-        } else {
-           if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('No results found for this category nearby.')),
-              );
-          }
-        }
-      } else {
-         if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Failed to fetch POI data from Google Places.')),
-            );
-         }
-      }
-    } catch (e) {
-      // Logger.error("POI Search Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('An error occurred during POI search.')),
-        );
-      }
-    }
-  }
-
-  // Widget to build the horizontal list of category chips
-  Widget _buildCategoryChips(ColorScheme cs) {
-    return Container(
-      height: 48, // Fixed height for the horizontal list
-      margin: const EdgeInsets.only(top: 8.0),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: _categories.length,
-        itemBuilder: (context, index) {
-          final category = _categories[index];
-          return Padding(
-            padding: EdgeInsets.only(right: index == _categories.length - 1 ? 0 : 8.0),
-            child: ActionChip(
-              avatar: Icon(category.icon, size: 18, color: cs.primary),
-              label: Text(category.label, style: TextStyle(color: cs.onSurface)),
-              backgroundColor: cs.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                // FIX: Replaced .withOpacity(0.5) with .withAlpha(128)
-                side: BorderSide(color: cs.primary.withAlpha(128)),
-              ),
-              onPressed: () {
-                _searchPOIsByCategory(category.placeType);
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   // MODIFIED: Widget for the temporary, address modal, constrained width/height, non-full-width
   Widget _buildAddressModal(ColorScheme cs) {
     return AnimatedOpacity(
@@ -660,8 +486,9 @@ class _DashboardState extends State<Dashboard> {
             maintainState: true,
             maintainSize: true,
             child: Container(
-                width: 300, // Increased width
-                constraints: const BoxConstraints(minHeight: 60), // Minimum height for alignment
+                width: 250, // MODIFIED: Changed width from 300 to 250
+                // MODIFIED: Changed minHeight from 60 to 56.0 (standard FAB height)
+                constraints: const BoxConstraints(minHeight: 56.0), 
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                     color: cs.surface,
@@ -683,21 +510,21 @@ class _DashboardState extends State<Dashboard> {
                         Text(
                             "CURRENTLY AT",
                             style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 9, // MODIFIED: Reduced font size for better fit
                                 fontWeight: FontWeight.bold,
                                 color: cs.secondary,
                             ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1), // MODIFIED: Reduced spacing
                         // Text should flow, max 2 lines to maintain compact height
                         Text( 
                             _currentAddress, // State variable
                             style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 11, // MODIFIED: Reduced font size for better fit
                                 fontWeight: FontWeight.w500,
                                 color: cs.onSurface,
                             ),
-                            maxLines: 3, // Constrain lines to fit
+                            maxLines: 2, // Constrain lines to fit the smaller height
                             overflow: TextOverflow.ellipsis,
                         ),
                     ],
@@ -744,9 +571,9 @@ class _DashboardState extends State<Dashboard> {
               hardcodedTerminals: _hardcodedTerminals, // <--- NEW PROP
             ),
             
-            // Contains SearchBar and Category Chips
+            // Contains SearchBar 
             Positioned(
-              top: 8,
+              top: 15,
               left: 0, 
               right: 0,
               child: Column(
@@ -760,11 +587,6 @@ class _DashboardState extends State<Dashboard> {
                       onPlaceSelected: _handlePlaceSelected,
                       onSearchCleared: _clearSearchMarker,
                     ),
-                  ),
-                  // Category Chips
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildCategoryChips(cs), 
                   ),
                 ],
               ),
@@ -799,8 +621,8 @@ class _DashboardState extends State<Dashboard> {
                duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 right: _isCommunityInsightExpanded ? 16 :10,
-                bottom: _isCommunityInsightExpanded ? 10 : 520,
-                top: _isCommunityInsightExpanded ? null : 50,
+                bottom: _isCommunityInsightExpanded ? 10 : null, 
+                top: _isCommunityInsightExpanded ? null : 80, 
 
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 800),
@@ -836,23 +658,6 @@ class _DashboardState extends State<Dashboard> {
                         children: [
                             FloatingButton(
                               isCommunityInsightExpanded: _isCommunityInsightExpanded,
-                              onAddInsightPressed: () {
-                                final currentUserId = _auth.currentUser?.uid;
-                                if (!mounted) return;
-
-                                if (currentUserId == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please sign in to post an insight.'), backgroundColor: Colors.red),
-                                  );
-                                  return;
-                                }
-
-                                showAddInsightModal(
-                                  context: context,
-                                  firestore: _firestore,
-                                  onInsightAdded: _addNewInsight,
-                                );
-                              },
                               onMyLocationPressed: _handleMyLocationPressed, 
                             ),
                         ],
@@ -935,13 +740,13 @@ class TerminalDetailsModal extends StatelessWidget {
 // This is added to fix the compilation error in the build method.
 class FloatingButton extends StatelessWidget {
   final bool isCommunityInsightExpanded;
-  final VoidCallback onAddInsightPressed;
+  // Removed final VoidCallback onAddInsightPressed;
   final VoidCallback onMyLocationPressed;
 
   const FloatingButton({
     super.key,
     required this.isCommunityInsightExpanded,
-    required this.onAddInsightPressed,
+    // Removed required this.onAddInsightPressed,
     required this.onMyLocationPressed,
   });
 
@@ -951,20 +756,13 @@ class FloatingButton extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        FloatingActionButton(
-          heroTag: 'add_insight',
-          onPressed: onAddInsightPressed,
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-          mini: true,
-          child: const Icon(Icons.comment),
-        ),
-        const SizedBox(height: 10),
+        // Removed FloatingActionButton for 'add_insight' and the following SizedBox
         FloatingActionButton(
           heroTag: 'my_location',
           onPressed: onMyLocationPressed,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          // CHANGED: Set background color to 0xFF6CA89A
+          backgroundColor: const Color(0xFF6CA89A), 
+          foregroundColor: Colors.white, // Set foreground color for contrast
           child: const Icon(Icons.my_location),
         ),
       ],

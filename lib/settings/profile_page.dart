@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zapac/authentication/authentication.dart';
-import 'package:zapac/core/widgets/bottomNavBar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/dashboard/dashboard.dart';
 import 'package:zapac/authentication/login_page.dart';
@@ -237,10 +236,6 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       body: SafeArea(
         child: _buildBody(colorScheme)
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: 2,
-        onItemTapped: _onItemTapped,
       ),
     );
   }

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:zapac/core/widgets/bottomNavBar.dart';
-import 'package:zapac/dashboard/dashboard.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/authentication/login_page.dart';
 import 'package:zapac/app/main.dart';
@@ -422,17 +420,6 @@ class _SettingsPageState extends State<SettingsPage> {
             child: _buildResponsiveSettingsList(),
           ),
         ],
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: 2,
-        onItemTapped: (index) {
-          if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const Dashboard()),
-            );
-          }
-        },
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:zapac/dashboard/dashboard.dart';
 import 'reset_password_page.dart';
 import 'signup_page.dart';
 import 'package:zapac/core/widgets/authheader.dart';
+import 'package:zapac/app/main_shell.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -49,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard()));
+        Navigator.pushReplacementNamed(context, '/app');
       }
     } catch (e) {
       String message = e.toString().replaceFirst('Exception: ', '');
@@ -62,30 +63,6 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
-  
-  // Implemented Facebook Login Handler
-  // Future<void> _onFacebookLogin() async {
-  //   setState(() {
-  //     _isFacebookLoading = true;
-  //     _errorMessage = null;
-  //   });
-
-  //   try {
-  //     final user = await _authService.signInWithFacebook();
-  //     if (user != null && mounted) {
-  //       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const Dashboard()));
-  //     }
-  //   } catch (e) {
-  //     String message = e.toString().replaceFirst('Exception: ', '');
-  //     if (message.contains('Facebook sign-in failed')) {
-  //       _setLocalError('Facebook sign-in failed. Please try again.');
-  //     } else {
-  //       _setLocalError(message);
-  //     }
-  //   } finally {
-  //     if (mounted) setState(() => _isFacebookLoading = false);
-  //   }
-  // }
 
 
   Future<void> _handleLogin() async {
@@ -114,10 +91,7 @@ class _LoginPageState extends State<LoginPage> {
       await _authService.signInWithEmail(email, password);
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const Dashboard()),
-        );
+        Navigator.pushReplacementNamed(context, '/app');
       }
     } catch (e) {
       String message = e.toString().replaceFirst('Exception: ', '');

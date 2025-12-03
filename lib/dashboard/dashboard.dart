@@ -3,9 +3,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:zapac/core/widgets/bottomNavBar.dart';
-import 'package:zapac/settings/settings_page.dart';
-import 'package:zapac/settings/profile_page.dart';
 import 'package:zapac/dashboard/route_details_overlay.dart'; 
 import 'community_insights_page.dart';
 import '../core/widgets/searchBar.dart';
@@ -43,7 +40,6 @@ class _DashboardState extends State<Dashboard> {
   final LatLng _initialCameraPosition = const LatLng(10.314481680817886, 123.88813209917954);
 
   bool _isCommunityInsightExpanded = false;
-  int _selectedIndex = 0;
   bool _isMapReady = false; 
 
   List<ChatMessage> _liveChatMessages = [];
@@ -249,18 +245,6 @@ class _DashboardState extends State<Dashboard> {
     await _updateCurrentAddress(location: _initialCameraPosition); 
   }
 
-  void _onItemTapped(int index) {
-    if (!mounted) return;
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    if (index == 3) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage())); 
-    } else if (index == 2) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); 
-    }
-  }
 
   void _onCommunityInsightExpansionChanged(bool isExpanded) {
     if (!mounted) return;
@@ -714,11 +698,6 @@ class _DashboardState extends State<Dashboard> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: _selectedIndex,
-        onItemTapped: _onItemTapped,
-      ),
-
       body: SafeArea(
         child: Stack(
           children: [

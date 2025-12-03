@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:zapac/dashboard/dashboard.dart';
 import 'package:zapac/favorites/favoriteRoutes.dart';
 import 'package:zapac/settings/settings_page.dart';
+// import 'package:zapac/app/main_shell.dart'
 
 class BottomNavBar extends StatefulWidget {
   final int selectedIndex;
@@ -95,12 +96,6 @@ class _BottomNavBarState extends State<BottomNavBar> with SingleTickerProviderSt
                   indicatorColor: indicatorColor,
                   onTap: () {
                     widget.onItemTapped(0);
-                    if (ModalRoute.of(context)?.settings.name != '/') {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const Dashboard()),
-                      );
-                    }
                   },
                 ),
                 _buildNavItem(
@@ -114,10 +109,6 @@ class _BottomNavBarState extends State<BottomNavBar> with SingleTickerProviderSt
                   indicatorColor: indicatorColor,
                   onTap: () {
                     widget.onItemTapped(1);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const FavoriteRoutesPage()),
-                    );
                   },
                 ),
                 _buildNavItem(
@@ -131,10 +122,6 @@ class _BottomNavBarState extends State<BottomNavBar> with SingleTickerProviderSt
                   indicatorColor: indicatorColor,
                   onTap: () {
                     widget.onItemTapped(2);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SettingsPage()),
-                    );
                   },
                 ),
               ],

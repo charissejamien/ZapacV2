@@ -699,7 +699,7 @@ class _CommentingSectionState extends State<CommentingSection> {
   // MODIFIED: _buildTabButton now accepts an iconPath string
   Widget _buildTabButton(String label, String view, String iconPath, ColorScheme cs) {
     final bool isSelected = _currentView == view;
-    const Color buttonBackgroundColor = Color.fromARGB(255, 223, 171, 93); 
+    const Color buttonBackgroundColor = Color(0xFFE6A84B); 
     
     final BorderSide border = isSelected 
       ? const BorderSide(color: Colors.white, width: 1.0)

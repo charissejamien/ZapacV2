@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:io' show Platform; 
 import '../core/utils/map_utils.dart'; // Import map utilities
 import 'favoriteRouteData.dart'; 
+import 'dart:async'; // 1. IMPORT dart:async FOR TIMER
 
 class RouteDetailPage extends StatefulWidget {
   final FavoriteRoute route;
@@ -25,7 +26,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   // State to hold real-time durations
   Map<String, String> _transportDurations = {};
   
-  // State to manage visibility of ride-hailing buttons
+  // State to manage visibility of ride-hailing buttons (Used inside the Moto/Grab expansion)
   Map<String, bool> _isExpandedMap = {
     'Moto Taxi': false,
     'Grab (4-seater)': false,
@@ -34,8 +35,15 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   // State to hold route codes (Jeepney/Bus codes)
   Map<String, String> _transportRouteCodes = {};
 
+  // --- NEW INLINE TOOLTIP STATE MANAGEMENT ---
+  // State to track which fare card's discount info is expanded (Inline Fix)
+  Map<String, bool> _isDiscountTooltipVisible = {};
+  // 2. TIMER FIELD
+  Timer? _discountTimer; 
+  // ------------------------------------------
 
   // --- TRANSPORT ORDER & IDENTIFIERS ---
+  // The master order is still needed, but primarily used inside grouping.
   final List<String> _transportOrder = const [
     'Moto Taxi',
     'Grab (4-seater)',
@@ -45,6 +53,24 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     'Non Aircon Bus',
     'Aircon Bus',
   ];
+  
+  // NEW: State to manage which main transport category is expanded
+  Map<String, bool> _expansionState = {
+    'Moto Taxi': false,
+    'Grab': false,
+    'PUJ': false,
+    'Bus': false,
+    'Taxi': false,
+  };
+  
+  // NEW: Groupings of individual transports by category
+  final Map<String, List<String>> _transportGroups = const {
+    'Moto Taxi': ['Moto Taxi'],
+    'Grab': ['Grab (4-seater)'],
+    'PUJ': ['Traditional PUJ', 'Modern PUJ'],
+    'Bus': ['Non Aircon Bus', 'Aircon Bus'],
+    'Taxi': ['Taxi'],
+  };
   
   // --- COLOR AND ALPHA CONSTANTS ---
   static const int alpha179 = 179;
@@ -62,6 +88,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
 
   // --- DEEP LINKING CONSTANTS ---
+// ... (appLinks constant remains the same)
   static const Map<String, dynamic> appLinks = {
     'Angkas': {
       'scheme': 'angkasrider://', 
@@ -296,73 +323,30 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     return '₱${fare.toStringAsFixed(2)}';
   }
 
-
-  // Function to show discount information using a constrained Tooltip/Speech Bubble
-  void _showDiscountInfoTooltip(BuildContext context, Color primaryColor, GlobalKey key) {
-    final RenderBox? renderBox = key.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null || !mounted) return;
-
-    final offset = renderBox.localToGlobal(Offset.zero);
-    final screenWidth = MediaQuery.of(context).size.width;
+  // 3. MODIFIED: Simple function to toggle inline tooltip visibility and set a 3-second timer
+  void _showDiscountInfoTooltip(String transportName) {
+    // Cancel any existing timer before state change
+    _discountTimer?.cancel();
+    _discountTimer = null;
     
-    // Card padding is 20 (from Scaffold padding) + 8 (from Card padding) = 28.
-    const double leftMargin = 28.0; 
-    
-    // Position below the bottom edge of the icon container + a small margin
-    final top = offset.dy + renderBox.size.height + 4; 
-    
-    // Start the tooltip on the left margin for a clean drop-down alignment
-    final left = leftMargin; 
-    
-    // Max width: Screen width - left margin - right margin
-    final double maxTooltipWidth = screenWidth - (leftMargin + 20.0); 
+    setState(() {
+      // If we click the same one, close it immediately.
+      if (_isDiscountTooltipVisible[transportName] == true) {
+        _isDiscountTooltipVisible[transportName] = false;
+      } else {
+        // Close all others and open the selected one.
+        _isDiscountTooltipVisible.updateAll((key, value) => false);
+        _isDiscountTooltipVisible[transportName] = true;
 
-    const String message = 
-        "20% fare discount applies to Senior Citizens, PWDs, and Students as mandated by Philippine Law.\n(RA 9994 | RA 9442 | RA 11314)";
-
-    OverlayEntry? overlayEntry;
-    
-    overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        left: left,
-        top: top,
-        child: Material(
-          color: Colors.transparent,
-          child: ConstrainedBox(
-            // Constrain the width of the tooltip
-            constraints: BoxConstraints(
-              maxWidth: maxTooltipWidth,
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: const Text(
-                message,
-                style: TextStyle(color: Colors.white, fontSize: 12),
-                softWrap: true,
-                textAlign: TextAlign.justify, 
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    // Insert the overlay and remove it after 5 seconds
-    Overlay.of(context).insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 5), () {
-      if (overlayEntry != null && overlayEntry!.mounted) {
-        overlayEntry!.remove();
+        // Start 3-second timer to auto-hide the tooltip
+        _discountTimer = Timer(const Duration(seconds: 3), () {
+          if (mounted) { // Check if widget is still mounted before calling setState
+            setState(() {
+              _isDiscountTooltipVisible[transportName] = false;
+              _discountTimer = null; // Clear timer reference
+            });
+          }
+        });
       }
     });
   }
@@ -456,8 +440,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   @override
   void initState() {
     super.initState();
-    // Assuming 'favoriteRouteData.dart' defines necessary models/data structures
-    // Ensure all necessary imports and initialization steps are maintained
     _markers.add(Marker(
       markerId: const MarkerId('start'),
       position: widget.route.polylinePoints.first,
@@ -479,6 +461,16 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     };
     
     _fetchRealTimeDurations(); // Start fetching durations and codes on load
+    
+    // Initialize expansion state for all groups
+    _transportGroups.keys.forEach((key) => _expansionState[key] = false);
+  }
+  
+  // 4. DISPOSE: Cancel the timer to prevent memory leaks
+  @override
+  void dispose() {
+    _discountTimer?.cancel();
+    super.dispose();
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -580,7 +572,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         }
       } else {
         // Fallback for local deletion if ID is missing
-         if (mounted) {
+          if (mounted) {
           // This relies on the 'favoriteRouteData.dart' import which is not in the shared project structure, but is assumed here.
           // favoriteRoutes.removeWhere((r) => r.routeName == widget.route.routeName); 
           Navigator.pop(context); 
@@ -622,6 +614,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
   
+  // Renders the individual fare cards inside the expansion panel
   Widget _buildFareOptionCard(ColorScheme cs, String transportName, String fare) {
     
     final discountedFare = _calculateDiscountedFare(fare); 
@@ -652,19 +645,22 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       ],
     );
     
-    // Global key for positioning the tooltip next to the info icon
-    final GlobalKey infoIconKey = GlobalKey();
-
     // Check if the discount row should be visible (Taxi, PUJ, Bus are eligible)
-    final bool showDiscount = !(transportName == 'Moto Taxi' || transportName == 'Grab (4-seater)');
+    final bool showDiscount = !(transportName.contains('Moto Taxi') || transportName.contains('Grab'));
+    
+    // Check the state map for inline tooltip visibility
+    final bool isTooltipVisible = _isDiscountTooltipVisible[transportName] == true;
+    const String tooltipMessage = 
+        "20% fare discount applies to Senior Citizens, PWDs, and Students as mandated by Philippine Law.\n(RA 9994 | RA 9442 | RA 11314)";
+
 
     return Card(
+      // Keep the card for individual transport types
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      elevation: 2,
+      elevation: 1, // Reduced elevation since it's inside an expansion tile
       shadowColor: cs.shadow.withAlpha(alpha26), 
       color: cs.surface,
       margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
-      // Removed InkWell covering the whole card
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Column(
@@ -765,49 +761,92 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             
             const SizedBox(height: 0), 
             
-            // 4. Discounted Fare Row (20% less) - RENDER ONLY IF eligible
+            // 4. Discounted Fare Section (Row + Inline Tooltip)
             if (showDiscount)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column( // Column to hold the discounted row and the inline message
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Discounted', // Simplified text
-                        style: TextStyle(
-                          color: cs.onSurface.withAlpha(alpha179),
-                          fontSize: 11,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Discounted', // Simplified text
+                            style: TextStyle(
+                              color: cs.onSurface.withAlpha(alpha179),
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            // MODIFIED: Use the new toggle function
+                            onTap: () => _showDiscountInfoTooltip(transportName), 
+                            child: Icon(
+                              // Show filled icon if visible
+                              isTooltipVisible ? Icons.info : Icons.info_outline, 
+                              size: 14,
+                              // Highlight icon if the info is showing
+                              color: isTooltipVisible 
+                                  ? cs.primary 
+                                  : cs.onSurface.withAlpha(alpha179),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        key: infoIconKey, // Assign key for positioning
-                        onTap: () => _showDiscountInfoTooltip(context, cs.primary, infoIconKey), // Triggers tooltip
-                        child: Icon(
-                          Icons.info_outline,
-                          size: 14,
-                          color: cs.onSurface.withAlpha(alpha179),
+                      Text(
+                        discountedFare, 
+                        style: TextStyle(
+                          color: cs.secondary, 
+                          fontSize: 14, 
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                  Text(
-                    discountedFare, 
-                    style: TextStyle(
-                      color: cs.secondary, 
-                      fontSize: 14, 
-                      fontWeight: FontWeight.w600,
+                  
+                  // NEW: Inline Discount Tooltip (attached to the card, scrolls with it)
+                  Visibility(
+                    visible: isTooltipVisible,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withOpacity(0.9), // Darker primary color for contrast
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          tooltipMessage,
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          textAlign: TextAlign.justify,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
+              
+            // 5. Conditionally add the collapsible buttons row below the card
+            // FIX: Removed curly braces to ensure valid widget assignment in the Column's children List.
+            if (transportName == 'Moto Taxi')
+                _buildCollapsibleButtons(
+                  cs, 
+                  transportName, 
+                  _buildMotoTaxiButtonsRow(cs)
+                ),
+            if (transportName == 'Grab (4-seater)')
+                _buildCollapsibleButtons(
+                  cs, 
+                  transportName, 
+                  _buildGrabButtonsRow(cs)
+                ),
           ],
         ),
       ),
     );
   }
 
-  // Collapsible buttons section
+  // MODIFIED: _buildCollapsibleButtons now only handles the ride-hailing app list (Inner Collapsible)
   Widget _buildCollapsibleButtons(ColorScheme cs, String transportType, Widget buttonsRow) {
     final bool isExpanded = _isExpandedMap[transportType] ?? false;
 
@@ -816,6 +855,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Removed "View available transportations" button
           InkWell(
             onTap: () {
               setState(() {
@@ -841,7 +881,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             ),
           ),
           AnimatedSize(
-            duration: const Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 100),
             curve: Curves.easeInOut,
             child: Visibility(
               visible: isExpanded,
@@ -936,54 +976,95 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
+  // NEW: Builds the ExpansionTile for a single transport category (e.g., "PUJ")
+  Widget _buildFareCategoryPanel(ColorScheme cs, String categoryName, List<String> transportTypes) {
+    
+    // Default header values (will be calculated dynamically if needed)
+    String headerFare = 'N/A';
+    String headerDuration = 'N/A';
+    
+    // Try to find the most favorable fare/duration to display in the header
+    // In this simple model, we'll just show the first one's info if available.
+    if (transportTypes.isNotEmpty) {
+      final firstType = transportTypes.first;
+      headerFare = widget.route.estimatedFares[firstType] ?? _getCalculatedFare(widget.route.distance, widget.route.duration, firstType);
+      headerDuration = _transportDurations[firstType] ?? '...';
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
+        shadowColor: cs.shadow.withAlpha(alpha26),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          // MODIFIED: Use the correct state property for expansion
+          initiallyExpanded: _expansionState[categoryName] ?? false, 
+          onExpansionChanged: (isExpanded) {
+            setState(() {
+              _expansionState[categoryName] = isExpanded;
+            });
+          },
+          // HEADER
+          title: Text(
+            categoryName,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: cs.onSurface,
+            ),
+          ),
+          // HEADER TRAILING (FARES/DURATION SUMMARY)
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                headerFare == 'N/A' ? 'N/A' : headerFare, 
+                style: TextStyle(
+                  color: cs.primary, 
+                  fontWeight: FontWeight.bold, 
+                  fontSize: 15
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Use the default Flutter chevron icon
+            ],
+          ),
+          // EXPANDED BODY (Contains individual fare cards)
+          children: transportTypes.map((transportType) {
+            
+            // Get the fare, calculating it if the original route data is missing
+            String fare = widget.route.estimatedFares[transportType] ?? 
+                          _getCalculatedFare(widget.route.distance, widget.route.duration, transportType);
+            
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 0),
+              child: _buildFareOptionCard(cs, transportType, fare),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
 
-  // Renders all items in _transportOrder, using calculated/default fare if missing.
+
+  // MODIFIED: Main list now iterates over categories and builds ExpansionTiles
   Widget _buildFareList(ColorScheme cs, Color textColor) {
+    
     final List<Widget> fareWidgets = [];
-    final availableFares = widget.route.estimatedFares;
-
-    for (var transportType in _transportOrder) {
-      
-      // Get the fare, defaulting to 'N/A' if the actual fare is missing.
-      String fare = availableFares[transportType] ?? 'N/A';
-        
-      // MODIFIED: Calculate specialized fare if the original data is missing for public transport/taxi.
-      if (fare == 'N/A') {
-          // Pass route distance, duration, and the specific transport type to the comprehensive calculator
-          fare = _getCalculatedFare(widget.route.distance, widget.route.duration, transportType);
-      }
-        
-      // 1. Add the main fare card
-      fareWidgets.add(
-        _buildFareOptionCard(
-          cs, 
-          transportType, 
-          fare, 
-        )
-      );
-
-      // 2. Conditionally add the collapsible buttons row below the card
-      if (transportType == 'Moto Taxi') {
+    
+    // The fixed order of categories as requested by the user's focus (Moto Taxi, Grab, PUJ, Bus, Taxi)
+    final List<String> categoryOrder = ['Moto Taxi', 'Grab', 'PUJ', 'Bus', 'Taxi'];
+    
+    for (var categoryName in categoryOrder) {
+      final transportTypes = _transportGroups[categoryName];
+      if (transportTypes != null && transportTypes.isNotEmpty) {
         fareWidgets.add(
-            _buildCollapsibleButtons(
-              cs, 
-              transportType, 
-              _buildMotoTaxiButtonsRow(cs)
-            )
-        );
-      } else if (transportType == 'Grab (4-seater)') {
-          fareWidgets.add(
-            _buildCollapsibleButtons(
-              cs, 
-              transportType, 
-              _buildGrabButtonsRow(cs)
-            )
+          _buildFareCategoryPanel(cs, categoryName, transportTypes)
         );
       }
-      
-      // Increased spacing between transport types to 20
-      fareWidgets.add(const SizedBox(height: 20)); 
-      
     }
 
     return Padding(
@@ -1000,7 +1081,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             )
           ),
           const SizedBox(height: 10),
-          ...fareWidgets,
+          ...fareWidgets, // fareWidgets is List<Widget>
         ],
       ),
     );
@@ -1063,11 +1144,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               _buildStatColumn("Distance", widget.route.distance, textColor),
-                              _buildStatColumn("Duration", widget.route.duration, textColor), 
-                              _buildStatColumn("", "", textColor), 
+                              _buildStatColumn("Duration", widget.route.duration, textColor),
                             ],
                           ),
-                          _buildFareList(cs, textColor),
+                          _buildFareList(cs, textColor), // Use the new list builder
                         ],
                       ),
                     ),

@@ -44,8 +44,9 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
         curve: Curves.easeInOut,
       );
     } else {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const Dashboard()),
+      // CHANGED: Navigate to the MainShell via '/app' route
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/app',
         (Route<dynamic> route) => false,
       );
     }
@@ -53,8 +54,9 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
 
   // Helper function for navigating directly to Dashboard
   void _onSkipPressed() {
-     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const Dashboard()),
+     // CHANGED: Navigate to the MainShell via '/app' route
+     Navigator.of(context).pushNamedAndRemoveUntil(
+      '/app',
       (Route<dynamic> route) => false,
     );
   }

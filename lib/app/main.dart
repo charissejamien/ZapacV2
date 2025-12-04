@@ -96,6 +96,7 @@ class ZapacApp extends StatelessWidget {
           initialRoute: '/login',
           routes: {
             '/login': (context) => const LoginPage(),
+            '/onboarding/profile': (context) => const OnboardingProfilePage(), // NEW ROUTE
             '/app': (context) => const MainShell(),
           },
         );

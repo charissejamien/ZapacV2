@@ -107,7 +107,10 @@ class _CommentingSectionState extends State<CommentingSection> {
       _isDragging = true;
     }
 
-    final bool isExpandedNow = _sheetController.size >= 0.85;
+    // MODIFIED: Change the threshold from max (0.85) to a mid-point (0.45)
+    final double fabSwitchThreshold = 0.55;
+    final bool isExpandedNow = _sheetController.size >= fabSwitchThreshold;
+    
     if (isExpandedNow != _isSheetFullyExpanded) {
       if (mounted) {
         setState(() {
@@ -448,7 +451,8 @@ class _CommentingSectionState extends State<CommentingSection> {
   
   // Widget to display a single Terminal Card
   Widget _buildTerminalCard(Map<String, dynamic> terminal, ColorScheme cs) {
-    final details = terminal['details'] as Map<String, String>;
+    // FIX: Change Map<String, String> to Map<String, dynamic>
+    final details = terminal['details'] as Map<String, dynamic>;
     return GestureDetector(
       onTap: () {
         // Call the parent handler to switch to detail view
@@ -477,7 +481,7 @@ class _CommentingSectionState extends State<CommentingSection> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                details['title'] ?? 'Terminal',
+                details['title'] as String? ?? 'Terminal', // FIX: Add safe casting
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
@@ -485,9 +489,10 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
               ),
               const Divider(height: 12),
-              _buildTerminalDetailRow(Icons.access_time, 'Status', details['status'] ?? 'N/A', cs),
-              _buildTerminalDetailRow(Icons.route, 'Routes', details['routes'] ?? 'N/A', cs),
-              _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] ?? 'N/A', cs),
+              // FIX: Add safe casting
+              _buildTerminalDetailRow(Icons.access_time, 'Status', details['status'] as String? ?? 'N/A', cs),
+              _buildTerminalDetailRow(Icons.route, 'Routes', details['routes'] as String? ?? 'N/A', cs),
+              _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] as String? ?? 'N/A', cs),
               const SizedBox(height: 8),
               Align(
                   alignment: Alignment.centerRight,
@@ -520,7 +525,7 @@ class _CommentingSectionState extends State<CommentingSection> {
       children: [
         // Title
         Text(
-          details['title'] ?? 'Terminal Details',
+          details['title'] as String? ?? 'Terminal Details', // FIX: Add safe casting
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 24,
@@ -530,11 +535,12 @@ class _CommentingSectionState extends State<CommentingSection> {
         const SizedBox(height: 16),
         
         // General Details (Status, Routes, Facilities)
-        _buildTerminalDetailRow(Icons.access_time_filled, 'Status', details['status'] ?? 'N/A', cs),
+        // FIX: Add safe casting
+        _buildTerminalDetailRow(Icons.access_time_filled, 'Status', details['status'] as String? ?? 'N/A', cs),
         const SizedBox(height: 10),
-        _buildTerminalDetailRow(Icons.directions_bus, 'Primary Routes', details['routes'] ?? 'N/A', cs),
+        _buildTerminalDetailRow(Icons.directions_bus, 'Primary Routes', details['routes'] as String? ?? 'N/A', cs),
         const SizedBox(height: 10),
-        _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] ?? 'N/A', cs),
+        _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] as String? ?? 'N/A', cs),
         
         // NEW SECTION: Routes & Fares
         const SizedBox(height: 30),
@@ -775,52 +781,11 @@ class _CommentingSectionState extends State<CommentingSection> {
 
           child: Column(
             children: [
-              // Header Container to include back button
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF4BE6C), 
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    // Back button visible only if showing terminals AND viewing a specific terminal
-                    if (widget.isShowingTerminals && widget.selectedTerminalId != null)
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: widget.onBackToTerminals,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    
-                    if (widget.isShowingTerminals && widget.selectedTerminalId != null)
-                      const SizedBox(width: 8),
-
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          headerTitle, // Conditional title
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontSize: 18,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                    
-                    // Spacer to balance the back button size if needed (48px = icon + padding)
-                    if (widget.isShowingTerminals && widget.selectedTerminalId != null)
-                      const SizedBox(width: 48), 
-                  ],
-              // MODIFIED: Header Container with custom background color and centered buttons
-                GestureDetector(
+              
+              // CORRECTED HEADER LOGIC (Single Title or Back Button + Title)
+              GestureDetector(
                 onTap: () {
+                  // Existing snap logic on tap (if the user taps the header bar)
                   final target =
                       _sheetController.size > 0.5 ? 0.25 : 0.85;
 
@@ -832,7 +797,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF4BE6C),
                     borderRadius: BorderRadius.only(
@@ -841,17 +806,41 @@ class _CommentingSectionState extends State<CommentingSection> {
                     ),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildTabButton("Terminals", "Terminals",
-                          "assets/terminalsIcon.png", colorScheme),
-                      const SizedBox(width: 12),
-                      _buildTabButton("Insights", "Insights",
-                          "assets/insightsIcon.png", colorScheme),
-                    ],
+                        children: [
+                          // Back button visible only if viewing a specific terminal
+                          if (widget.selectedTerminalId != null)
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back, color: Colors.white),
+                              onPressed: widget.onBackToTerminals,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          
+                          if (widget.selectedTerminalId != null)
+                            const SizedBox(width: 8),
+
+                          Expanded(
+                            child: Center(
+                              child: Text(
+                                headerTitle, // "Terminals", "Taga ZAPAC Says...", or Terminal Name
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                          
+                          // Spacer to balance the back button size if needed
+                          if (widget.selectedTerminalId != null)
+                            const SizedBox(width: 48), 
+                        ],
+                    ),
                   ),
                 ),
-              ),
+
 
               // Filter Chips (Only visible for Insights)
               if (!widget.isShowingTerminals)

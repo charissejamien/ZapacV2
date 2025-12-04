@@ -19,6 +19,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math'; // Added for min/max calculation
 
+// Dark Map Style JSON (Night/Aubergine inspired)
+const String _darkMapStyleJson = r'''
+[{"elementType":"geometry","stylers":[{"color":"#242f3e"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},{"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},{"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263e"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},{"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263e"}]}]
+''';
+
+
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
@@ -180,6 +186,19 @@ class _DashboardState extends State<Dashboard> {
       }
     });
   }
+
+  // NEW: Handle theme changes after map is created
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    if (_isMapReady) {
+      final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+      // Set map style to dark JSON string if dark mode is active, or "[]" for default (light) style
+      final mapStyle = isDarkMode ? _darkMapStyleJson : "[]";
+      _mapController.setMapStyle(mapStyle);
+    }
+  }
   
   // MODIFIED: Function to load the custom image asset as a BitmapDescriptor with larger size
   Future<void> _loadTerminalIcon() async {
@@ -243,15 +262,60 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
+  // MODIFIED: Logic to center map on current location AND apply map style
   void _onMapCreated(GoogleMapController controller) async { 
     _mapController = controller;
     _isMapReady = true;
+
+    // Apply initial map style based on current theme brightness
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    if (isDarkMode) {
+      _mapController.setMapStyle(_darkMapStyleJson);
+    } else {
+      _mapController.setMapStyle("[]"); // Explicitly setting to default style
+    }
     
+    // 1. Try to get current location
+    final LatLng? currentLocation = await MapUtils.getCurrentLocation(context);
+    LatLng targetLocation;
+    double targetZoom;
+    
+    if (currentLocation != null) {
+      targetLocation = currentLocation;
+      targetZoom = 16.0; // Zoom in closer for current location
+    } else {
+      // 2. Fallback to hardcoded position
+      targetLocation = _initialCameraPosition;
+      targetZoom = 14.0;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get current location. Showing default area.')),
+        );
+      }
+    }
+    
+    // 3. Animate camera to the determined location
     _mapController.animateCamera(
-      CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
+      CameraUpdate.newLatLngZoom(targetLocation, targetZoom),
     );
     
-    await _updateCurrentAddress(location: _initialCameraPosition); 
+    // 4. Update address display for the determined location
+    await _updateCurrentAddress(location: targetLocation); 
+    
+    // 5. Show the address modal briefly if we used current location
+    if (currentLocation != null && mounted) {
+        setState(() {
+            _showAddressModal = true;
+        });
+
+        _addressTimer = Timer(const Duration(seconds: 5), () {
+            if(mounted) {
+                setState(() {
+                    _showAddressModal = false;
+                });
+            }
+        });
+    }
   }
 
   void _onCommunityInsightExpansionChanged(bool isExpanded) {
@@ -403,7 +467,7 @@ class _DashboardState extends State<Dashboard> {
               context: context,
               builder: (BuildContext context) {
                   return TerminalDetailsModal(
-                      details: terminal['details'] as Map<String, String>,
+                      details: terminal['details'] as Map<String, dynamic>,
                       cs: Theme.of(context).colorScheme,
                   );
               },
@@ -770,7 +834,8 @@ class _DashboardState extends State<Dashboard> {
 // =========================================================================
 
 class TerminalDetailsModal extends StatelessWidget {
-  final Map<String, dynamic> details;
+  // FIX: Change to Map<String, dynamic> to handle nested lists in details
+  final Map<String, dynamic> details; 
   final ColorScheme cs;
 
   const TerminalDetailsModal({super.key, required this.details, required this.cs});
@@ -778,17 +843,18 @@ class TerminalDetailsModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(details['title'] ?? 'Terminal Details', style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary)),
+      title: Text(details['title'] as String? ?? 'Terminal Details', style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary)),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildDetailRow(context, 'Status', details['status'] ?? 'N/A', Icons.access_time_filled, cs),
+            // FIX: Add safe casting for string fields
+            _buildDetailRow(context, 'Status', details['status'] as String? ?? 'N/A', Icons.access_time_filled, cs),
             const SizedBox(height: 10),
-            _buildDetailRow(context, 'Primary Routes', details['routes'] ?? 'N/A', Icons.directions_bus, cs),
+            _buildDetailRow(context, 'Primary Routes', details['routes'] as String? ?? 'N/A', Icons.directions_bus, cs),
             const SizedBox(height: 10),
-            _buildDetailRow(context, 'Facilities', details['facilities'] ?? 'N/A', Icons.local_convenience_store, cs),
+            _buildDetailRow(context, 'Facilities', details['facilities'] as String? ?? 'N/A', Icons.local_convenience_store, cs),
           ],
         ),
       ),

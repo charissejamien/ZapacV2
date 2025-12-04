@@ -70,39 +70,6 @@ class AboutPage extends StatelessWidget {
             ),
             
             const SizedBox(height: 24),
-
-            // --- Legal Section ---
-            Text(
-              'Legal Information',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildLegalTile(
-              context,
-              title: 'Privacy Policy',
-              onTap: () => _launchURL('https://zapac.ph/privacy'), // Placeholder link
-            ),
-            _buildLegalTile(
-              context,
-              title: 'Terms of Service',
-              onTap: () => _launchURL('https://zapac.ph/terms'), // Placeholder link
-            ),
-            _buildLegalTile(
-              context,
-              title: 'Licenses',
-              onTap: () {
-                showLicensePage(
-                  context: context,
-                  applicationName: 'Zapac',
-                  applicationVersion: '1.0.0',
-                  applicationIcon: Icon(Icons.near_me_rounded, color: cs.primary),
-                );
-              },
-            ),
           ],
         ),
       ),

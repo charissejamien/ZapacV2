@@ -34,7 +34,11 @@ class _DashboardState extends State<Dashboard> {
   final LatLng _initialCameraPosition = const LatLng(10.314481680817886, 123.88813209917954);
 
   bool _isCommunityInsightExpanded = false;
+  bool _isShowingTerminals = false; 
   bool _isMapReady = false; 
+  
+  // NEW STATE: Tracks the ID of the terminal being viewed in detail in the sheet.
+  String? _selectedTerminalId; 
 
   List<ChatMessage> _liveChatMessages = [];
   StreamSubscription? _chatSubscription;
@@ -52,7 +56,6 @@ class _DashboardState extends State<Dashboard> {
   bool _showAddressModal = false;
   Timer? _addressTimer; 
 
-  // Hardcoded terminal data (USED BY CommentingSection)
   final List<Map<String, dynamic>> _hardcodedTerminals = const [
     {
       'id': 'cebu_south_terminal',
@@ -64,6 +67,12 @@ class _DashboardState extends State<Dashboard> {
         'status': 'Open 24/7',
         'routes': 'Southern Cebu (Oslob, Moalboal, Carcar)',
         'facilities': 'Restrooms, Ticketing Counters, Food Stalls',
+        'routes_fares': [
+            {'route': 'Cebu City to Oslob (via Bato)', 'fare': 'P 250 - P 300'},
+            {'route': 'Cebu City to Moalboal', 'fare': 'P 180 - P 220'},
+            {'route': 'Cebu City to Carcar City', 'fare': 'P 50 - P 70'},
+            {'route': 'Cebu City to Liloan (Santander)', 'fare': 'P 350 - P 400'},
+        ],
       }
     },
     {
@@ -76,6 +85,11 @@ class _DashboardState extends State<Dashboard> {
         'status': 'Open 4:00 AM - 10:00 PM',
         'routes': 'Northern Cebu (Bogo, Daanbantayan, Danao)',
         'facilities': 'Waiting Area, Ticket Booths, Vending Machines',
+        'routes_fares': [
+            {'route': 'Cebu City to Bogo City', 'fare': 'P 150 - P 200'},
+            {'route': 'Cebu City to Daanbantayan', 'fare': 'P 250 - P 350'},
+            {'route': 'Cebu City to Danao City', 'fare': 'P 50 - P 75'},
+        ],
       }
     },
     {
@@ -88,6 +102,11 @@ class _DashboardState extends State<Dashboard> {
         'status': 'Open 10:00 AM - 9:00 PM',
         'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
         'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
+        'routes_fares': [
+            {'route': 'SM City to IT Park (01K)', 'fare': 'P 15 - P 25'},
+            {'route': 'SM City to Ayala Center (03B)', 'fare': 'P 15 - P 25'},
+            {'route': 'SM City to Fuente Osmeña (04H)', 'fare': 'P 20 - P 30'},
+        ],
       }
     },
     {
@@ -100,6 +119,11 @@ class _DashboardState extends State<Dashboard> {
         'status': 'Open 10:00 AM - 9:00 PM',
         'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
         'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
+        'routes_fares': [
+            {'route': 'Ayala to SM City (03B)', 'fare': 'P 15 - P 25'},
+            {'route': 'Ayala to IT Park (01K)', 'fare': 'P 15 - P 25'},
+            {'route': 'Ayala to Mango Ave', 'fare': 'P 13 - P 20'},
+        ],
       }
     },
     {
@@ -112,10 +136,14 @@ class _DashboardState extends State<Dashboard> {
         'status': 'Open 10:00 AM - 9:00 PM',
         'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
         'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
+        'routes_fares': [
+            {'route': 'IT Park to SM City (01K)', 'fare': 'P 15 - P 25'},
+            {'route': 'IT Park to Colon St', 'fare': 'P 20 - P 30'},
+            {'route': 'IT Park to Mandaue', 'fare': 'P 18 - P 28'},
+        ],
       }
     },
 ];
-  // MODIFIED: Initial value for the icon is a default, will be updated in initState
   BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
 
   
@@ -142,7 +170,6 @@ class _DashboardState extends State<Dashboard> {
       }
     });
 
-    // NEW: Load the custom marker icon
     _loadTerminalIcon(); 
     
     
@@ -154,11 +181,11 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
-  // NEW: Function to load the custom image asset as a BitmapDescriptor
+  // MODIFIED: Function to load the custom image asset as a BitmapDescriptor with larger size
   Future<void> _loadTerminalIcon() async {
-      // **NOTE: Change 'assets/images/bus_terminal_pin.png' to your actual asset path.**
+      // Increased the logical size to 80x80 dp for a bigger icon.
       final newIcon = await BitmapDescriptor.fromAssetImage(
-          const ImageConfiguration(size: Size(48, 48)),
+          const ImageConfiguration(size: Size(80, 80)),
           'assets/insightsIcon.png', 
       );
       if (mounted) {
@@ -216,25 +243,26 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
-  // Map is set to Cebu - no automatic location detection
   void _onMapCreated(GoogleMapController controller) async { 
     _mapController = controller;
     _isMapReady = true;
     
-    // Ensure map stays centered on Cebu
     _mapController.animateCamera(
       CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
     );
     
-    // Attempt to get and display the initial address
     await _updateCurrentAddress(location: _initialCameraPosition); 
   }
-
 
   void _onCommunityInsightExpansionChanged(bool isExpanded) {
     if (!mounted) return;
     setState(() {
       _isCommunityInsightExpanded = isExpanded;
+      // When the sheet is collapsed, revert to the default (Insights) view
+      if (!isExpanded) {
+          _isShowingTerminals = false;
+          _selectedTerminalId = null; // Clear detail view on collapse
+      }
     });
   }
 
@@ -242,11 +270,9 @@ class _DashboardState extends State<Dashboard> {
     // Logger.info("Insight added, Firebase listener will refresh UI.");
   }
   
-  // NEW FUNCTION: Handler for the Add Insight FAB
   void _handleAddInsightPressed() {
     if (!mounted) return;
     
-    // Calls the modal function from addInsight.dart
     showAddInsightModal(
       context: context,
       firestore: _firestore,
@@ -254,7 +280,89 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  // FIX 1: Using the now-available MapUtils.getAddressFromLatLng
+  // NEW FUNCTION: Handler when a terminal is clicked in the sheet list
+  void _handleTerminalCardSelected(String terminalId) {
+    if (!mounted) return;
+    setState(() {
+      _selectedTerminalId = terminalId;
+      _isCommunityInsightExpanded = true; // Ensure the sheet is expanded to show details
+    });
+  }
+  
+  // NEW FUNCTION: Handler for the back button in the detail view
+  void _handleBackToTerminals() {
+    if (!mounted) return;
+    setState(() {
+      _selectedTerminalId = null; // Go back to the list view
+      // The sheet remains expanded, showing the full list.
+    });
+  }
+  
+  void _handleTerminalsPressed() {
+    if (!mounted || !_isMapReady) return;
+    
+    setState(() {
+        _isCommunityInsightExpanded = false; 
+        _isShowingTerminals = true; 
+        _selectedTerminalId = null; // Ensure we start at the list view
+    });
+
+    _markers.clear();
+    _polylines.clear();
+    _addressTimer?.cancel(); 
+    
+    setState(() {
+        _showDetailsButton = false;
+        _currentSearchDetails = {};
+        _showAddressModal = false;
+    });
+
+    final Set<Marker> terminalMarkers = {};
+    final List<LatLng> positions = [];
+
+    for (var terminal in _hardcodedTerminals) {
+        final position = LatLng(terminal['lat'] as double, terminal['lng'] as double);
+        positions.add(position);
+        
+        terminalMarkers.add(
+            Marker(
+                markerId: MarkerId(terminal['id'] as String),
+                position: position,
+                icon: _terminalIcon, 
+                infoWindow: InfoWindow(
+                    title: terminal['name'] as String,
+                    snippet: terminal['details']['status'] as String,
+                ),
+                onTap: () => _handleTerminalTapped(terminal['id'] as String),
+            ),
+        );
+    }
+    
+    setState(() {
+        _markers.addAll(terminalMarkers);
+    });
+    
+    if (positions.isNotEmpty) {
+        double minLat = positions.map((p) => p.latitude).reduce(min);
+        double maxLat = positions.map((p) => p.latitude).reduce(max);
+        double minLng = positions.map((p) => p.longitude).reduce(min);
+        double maxLng = positions.map((p) => p.longitude).reduce(max);
+        
+        final bounds = LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
+        );
+        
+        _mapController.animateCamera(
+            CameraUpdate.newLatLngBounds(bounds, 50.0),
+        );
+    } else {
+        _mapController.animateCamera(
+            CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
+        );
+    }
+  }
+
   Future<void> _updateCurrentAddress({LatLng? location}) async {
     if (!mounted) return;
 
@@ -283,15 +391,14 @@ class _DashboardState extends State<Dashboard> {
   }
 
 
-  // Handler for when a hardcoded terminal marker is tapped
   void _handleTerminalTapped(String terminalId) {
       final terminal = _hardcodedTerminals.firstWhere(
           (t) => t['id'] == terminalId,
           orElse: () => <String, dynamic>{}, 
       );
 
-      // Add check to ensure terminal is not the empty fallback map
       if (terminal.isNotEmpty && mounted) {
+          // Keep the existing dialog for marker taps on the map
           showDialog(
               context: context,
               builder: (BuildContext context) {
@@ -305,38 +412,32 @@ class _DashboardState extends State<Dashboard> {
   }
 
 
-  // MODIFIED: _handleMyLocationPressed to collapse sheet, center on actual location and manage modal visibility
   Future<void> _handleMyLocationPressed() async {
     if (!mounted || !_isMapReady) return;
     
-    // Collapse the Community Insights Sheet if it is expanded
-    if (_isCommunityInsightExpanded) {
+    if (_isCommunityInsightExpanded || _isShowingTerminals) {
         setState(() {
             _isCommunityInsightExpanded = false; // THIS LINE COLLAPSES THE SHEET
+            _isShowingTerminals = false; // Reset view to default (insights)
+            _selectedTerminalId = null; // Clear detail view
         });
         await Future.delayed(const Duration(milliseconds: 350)); 
     }
     
-    // Clear any existing timer
     _addressTimer?.cancel(); 
     
-    // Clear previous search/route markers
     _markers.clear();
     _polylines.clear(); 
     
-    // 1. Fetch the user's actual current location
     final LatLng? currentLocation = await MapUtils.getCurrentLocation(context);
 
     if (currentLocation != null) {
-      // 2. Animate the camera to the current location (GPS)
       await _mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(currentLocation, 16.0), // Use a closer zoom level
+        CameraUpdate.newLatLngZoom(currentLocation, 16.0), 
       );
-      // 3. Update address based on new location
       await _updateCurrentAddress(location: currentLocation); 
       
-      // 4. Show the address modal and start timer
-      if (!mounted) return; // Guard against async gap
+      if (!mounted) return;
       setState(() {
           _showAddressModal = true;
       });
@@ -350,8 +451,7 @@ class _DashboardState extends State<Dashboard> {
       });
 
     } else {
-      // Fallback: If location is unavailable, reset to Cebu center
-      if (!mounted) return; // Guard against async gap
+      if (!mounted) return;
       
       await _mapController.animateCamera(
         CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0),
@@ -361,7 +461,6 @@ class _DashboardState extends State<Dashboard> {
           const SnackBar(content: Text('Could not get current location. Check permissions.')),
         );
       }
-      // Update address to the fallback location
       await _updateCurrentAddress(location: _initialCameraPosition);
     }
     
@@ -403,10 +502,8 @@ class _DashboardState extends State<Dashboard> {
           return;
       }
       
-      if (!mounted) return; // Guard against async gap
+      if (!mounted) return;
 
-      // FIX: Replace non-existent getRouteDetails with getRouteAndDetails
-      // This new function handles drawing the route and returns real-time driving details.
       final routeDetails = await MapUtils.getRouteAndDetails(
           item: item, 
           apiKey: _getMapApiKey(),
@@ -416,7 +513,7 @@ class _DashboardState extends State<Dashboard> {
           context: context,
       );
 
-      if (!mounted) return; // Guard against async gap
+      if (!mounted) return;
 
       setState(() {
         _currentSearchName = name;
@@ -428,31 +525,32 @@ class _DashboardState extends State<Dashboard> {
             _showDetailsButton = true;
             // Logger.error("Failed to fetch route details.");
         }
+        _isShowingTerminals = false; 
+        _selectedTerminalId = null; // Clear detail view
       });
-      // Camera animation handled inside MapUtils.getRouteAndDetails
     }
   }
 
   void _clearSearchMarker() {
-      // Hide the temporary address modal when searching/clearing
       _addressTimer?.cancel();
       setState(() {
           _showAddressModal = false;
       });
       
-      if (_markers.isNotEmpty || _polylines.isNotEmpty || _showDetailsButton) {
+      if (_markers.isNotEmpty || _polylines.isNotEmpty || _showDetailsButton || _isShowingTerminals) {
           setState(() {
               _markers.clear();
               _polylines.clear();
               _showDetailsButton = false;
               _currentSearchDetails = {};
               _currentSearchName = null;
+              _isShowingTerminals = false; 
+              _selectedTerminalId = null; // Clear detail view
           });
           _mapController.animateCamera(
             CameraUpdate.newLatLngZoom(_initialCameraPosition, 14.0), 
           );
       }
-      // Re-fetch current address when markers are cleared
       _updateCurrentAddress();
   }
 
@@ -472,7 +570,6 @@ class _DashboardState extends State<Dashboard> {
       );
   }
 
-  // MODIFIED: Widget for the temporary, address modal, constrained width/height, non-full-width
   Widget _buildAddressModal(ColorScheme cs) {
     return AnimatedOpacity(
         opacity: _showAddressModal ? 1.0 : 0.0,
@@ -483,8 +580,7 @@ class _DashboardState extends State<Dashboard> {
             maintainState: true,
             maintainSize: true,
             child: Container(
-                width: 250, // MODIFIED: Changed width from 300 to 250
-                // MODIFIED: Changed minHeight from 60 to 56.0 (standard FAB height)
+                width: 250, 
                 constraints: const BoxConstraints(minHeight: 56.0), 
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
@@ -492,7 +588,6 @@ class _DashboardState extends State<Dashboard> {
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                         BoxShadow(
-                            // FIX: Replaced .withOpacity(0.15) with .withAlpha(38)
                             color: cs.onSurface.withAlpha(38),
                             blurRadius: 5,
                             offset: const Offset(0, 3),
@@ -501,27 +596,26 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center, // Center content vertically
+                    mainAxisAlignment: MainAxisAlignment.center, 
                     mainAxisSize: MainAxisSize.min,
                     children: [
                         Text(
                             "CURRENTLY AT",
                             style: TextStyle(
-                                fontSize: 9, // MODIFIED: Reduced font size for better fit
+                                fontSize: 9, 
                                 fontWeight: FontWeight.bold,
                                 color: cs.secondary,
                             ),
                         ),
-                        const SizedBox(height: 1), // MODIFIED: Reduced spacing
-                        // Text should flow, max 2 lines to maintain compact height
+                        const SizedBox(height: 1), 
                         Text( 
-                            _currentAddress, // State variable
+                            _currentAddress, 
                             style: TextStyle(
-                                fontSize: 11, // MODIFIED: Reduced font size for better fit
+                                fontSize: 11, 
                                 fontWeight: FontWeight.w500,
                                 color: cs.onSurface,
                             ),
-                            maxLines: 2, // Constrain lines to fit the smaller height
+                            maxLines: 2, 
                             overflow: TextOverflow.ellipsis,
                         ),
                     ],
@@ -555,12 +649,18 @@ class _DashboardState extends State<Dashboard> {
               ),
             ),
 
-            // MODIFIED: Pass the hardcoded terminal data
+            // Pass all required props to CommentingSection
             CommentingSection(
               chatMessages: _liveChatMessages, 
               onExpansionChanged: _onCommunityInsightExpansionChanged,
               currentUserId: _currentUserId,
-              hardcodedTerminals: _hardcodedTerminals, // <--- NEW PROP
+              hardcodedTerminals: _hardcodedTerminals, 
+              isShowingTerminals: _isShowingTerminals, 
+              onShowTerminalsPressed: _handleTerminalsPressed, 
+              
+              selectedTerminalId: _selectedTerminalId, 
+              onTerminalCardSelected: _handleTerminalCardSelected, 
+              onBackToTerminals: _handleBackToTerminals, 
             ),
             
             // Contains SearchBar 
@@ -613,9 +713,7 @@ class _DashboardState extends State<Dashboard> {
                duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 right: _isCommunityInsightExpanded ? 16 :10,
-                // Repositioned to the bottom right when expanded
                 bottom: _isCommunityInsightExpanded ? 10 : null, 
-                // Repositioned to the top right when collapsed
                 top: _isCommunityInsightExpanded ? null : 80, 
 
               child: AnimatedSwitcher(
@@ -626,16 +724,12 @@ class _DashboardState extends State<Dashboard> {
                     child: child);
                 },
 
-              // Use Row to place modal beside the FloatingButton stack
               key: ValueKey<bool>(_isCommunityInsightExpanded),
               child: Row( 
                 mainAxisSize: MainAxisSize.min,
-                // Align content to the bottom of the tallest element in the Row (which is the FAB stack)
                 crossAxisAlignment: CrossAxisAlignment.end, 
                 children: [
-                    // Modal appears on the LEFT of the buttons
                     if (_showAddressModal && !_isCommunityInsightExpanded) 
-                        // Wrap in a Column to allow vertical centering/alignment within the space defined by the Row
                         Column( 
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -650,10 +744,13 @@ class _DashboardState extends State<Dashboard> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
+                            // Pass all required props to FloatingButton
                             FloatingButton(
                               isCommunityInsightExpanded: _isCommunityInsightExpanded,
+                              isShowingTerminals: _isShowingTerminals, 
                               onMyLocationPressed: _handleMyLocationPressed, 
-                              onAddInsightPressed: _handleAddInsightPressed, // NEW: Pass the Add Insight handler
+                              onAddInsightPressed: _handleAddInsightPressed,
+                              onTerminalPressed: _handleTerminalsPressed, 
                             ),
                         ],
                     ),
@@ -669,11 +766,11 @@ class _DashboardState extends State<Dashboard> {
 }
 
 // =========================================================================
-// Terminal Details Modal Widget
+// Terminal Details Modal Widget (Kept here as it's used by map marker taps)
 // =========================================================================
 
 class TerminalDetailsModal extends StatelessWidget {
-  final Map<String, String> details;
+  final Map<String, dynamic> details;
   final ColorScheme cs;
 
   const TerminalDetailsModal({super.key, required this.details, required this.cs});
@@ -716,7 +813,6 @@ class TerminalDetailsModal extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
               Text(label, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurface.withAlpha(179))),
               const SizedBox(height: 2),
               Text(value, style: TextStyle(fontSize: 15, color: cs.onSurface)),
@@ -727,44 +823,3 @@ class TerminalDetailsModal extends StatelessWidget {
     );
   }
 }
-
-// =========================================================================
-// NOTE: This placeholder reflects the original structure from lib/core/widgets/app_floating_button.dart
-// It has been replaced by the actual content in the next section for standalone compilation.
-// However, the dashboard depends on the file existing.
-// =========================================================================
-
-// For compilation completeness, the placeholder class is kept here, 
-// but its logical content is placed in the actual app_floating_button.dart section.
-// The dashboard relies on a FloatingButton widget with the defined interface.
-// If this file were truly lib/dashboard/dashboard.dart, the definition below would be removed.
-// Assuming for now the definition below is correct for the sake of the dashboard.
-/*
-class FloatingButton extends StatelessWidget {
-  final bool isCommunityInsightExpanded;
-  final VoidCallback onMyLocationPressed;
-
-  const FloatingButton({
-    super.key,
-    required this.isCommunityInsightExpanded,
-    required this.onMyLocationPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Placeholder implementation for functionality not available in provided files
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton(
-          heroTag: 'my_location',
-          onPressed: onMyLocationPressed,
-          backgroundColor: const Color(0xFF6CA89A), 
-          foregroundColor: Colors.white, 
-          child: const Icon(Icons.my_location),
-        ),
-      ],
-    );
-  }
-}
-*/

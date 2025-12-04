@@ -3,13 +3,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:zapac/dashboard/models/chat_message.dart';
 import 'package:zapac/dashboard/models/user_interaction.dart'; 
 import 'package:zapac/core/widgets/insight_card.dart';
+import 'package:zapac/dashboard/dashboard.dart' show TerminalDetailsModal; // Import the modal for use here
+
 class CommentingSection extends StatefulWidget {
   final ValueSetter<bool>? onExpansionChanged;
   final List<ChatMessage> chatMessages; 
   final String? currentUserId; 
-  // NEW: Accept hardcoded terminals
   final List<Map<String, dynamic>> hardcodedTerminals; 
   
+  // Terminal View State
+  final bool isShowingTerminals;
+  final VoidCallback onShowTerminalsPressed; 
+
+  // PROPS FOR DETAIL VIEW
+  final String? selectedTerminalId; // ID of the terminal to show details for
+  final ValueSetter<String> onTerminalCardSelected; // Handler when a card is tapped
+  final VoidCallback onBackToTerminals; // Handler for the back button
+
   final FirebaseFirestore firestore = FirebaseFirestore.instance; 
 
   CommentingSection({
@@ -17,7 +27,14 @@ class CommentingSection extends StatefulWidget {
     this.onExpansionChanged,
     required this.chatMessages,
     this.currentUserId, 
-    required this.hardcodedTerminals, // <--- NEW REQUIRED PROP
+    required this.hardcodedTerminals,
+    required this.isShowingTerminals, 
+    required this.onShowTerminalsPressed, 
+    
+    // REQUIRED PROPS
+    required this.selectedTerminalId, 
+    required this.onTerminalCardSelected, 
+    required this.onBackToTerminals, 
   });
 
   @override
@@ -29,8 +46,6 @@ class _CommentingSectionState extends State<CommentingSection> {
   
   bool _isSheetFullyExpanded = false;
   String _selectedFilter = 'All';
-  // NEW: State to track which view is active in the sheet
-  String _currentView = 'Insights'; // 'Insights' or 'Terminals'
 
   Map<String, UserInteraction> _userInteractions = {};
 
@@ -52,7 +67,6 @@ class _CommentingSectionState extends State<CommentingSection> {
   void _fetchUserInteractions() async {
     if (widget.currentUserId == null || widget.chatMessages.isEmpty || !mounted) return;
 
-    // FIX: Using null-aware access and simplifying the list creation
     final messagesWithIds = widget.chatMessages.where((msg) => msg.id != null).map((msg) => msg.id!).toSet();
     if (messagesWithIds.isEmpty) return;
 
@@ -60,7 +74,6 @@ class _CommentingSectionState extends State<CommentingSection> {
 
     for (final messageId in messagesWithIds) {
       try {
-        // FIX: Access widget.currentUserId is safe here due to the null check above
         final doc = await widget.firestore
             .collection('public_data')
             .doc('zapac_community')
@@ -112,6 +125,13 @@ class _CommentingSectionState extends State<CommentingSection> {
     super.didUpdateWidget(oldWidget);
     if (widget.chatMessages.length != oldWidget.chatMessages.length || widget.currentUserId != oldWidget.currentUserId) {
       _fetchUserInteractions();
+    }
+    
+    // If we transition to detail view, ensure the sheet is expanded.
+    if (widget.selectedTerminalId != null && oldWidget.selectedTerminalId == null) {
+        if (_sheetController.size < 0.85) {
+             _sheetController.animateTo(0.85, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+        }
     }
   }
 
@@ -253,7 +273,6 @@ class _CommentingSectionState extends State<CommentingSection> {
           builder: (BuildContext context) {
             final colorScheme = Theme.of(context).colorScheme;
             return AlertDialog(
-              // FIX: Replaced .background with .surface
               backgroundColor: colorScheme.surface, 
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               contentPadding: const EdgeInsets.only(top: 20, left: 24, right: 24, bottom: 8), 
@@ -272,7 +291,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      // FIX: Replaced .onBackground with .onSurface
                       color: colorScheme.onSurface,
                     ),
                   ),
@@ -282,7 +300,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      // FIX: Replaced .onBackground.withOpacity(0.7) with .onSurface.withAlpha(179)
                       color: colorScheme.onSurface.withAlpha(179),
                     ),
                   ),
@@ -292,7 +309,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                 TextButton(
                   child: const Text('OK', style: TextStyle(color: Colors.blue)),
                   onPressed: () {
-                    // FIX: Guard Navigator call
                     if (mounted) Navigator.of(context).pop();
                   },
                 ),
@@ -357,7 +373,6 @@ class _CommentingSectionState extends State<CommentingSection> {
 
     final loadingContext = context; 
     
-    // FIX: Replaced .withOpacity(0.7) with .withAlpha(179)
     showGeneralDialog(
         context: loadingContext,
         barrierDismissible: false,
@@ -374,7 +389,6 @@ class _CommentingSectionState extends State<CommentingSection> {
     );
 
     try {
-      // FIX: Using null-aware access after previous null checks
       final messageRef = widget.firestore
           .collection('public_data')
           .doc('zapac_community')
@@ -384,7 +398,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       await messageRef.delete();
       
       if (loadingContext.mounted) {
-          // FIX: Use loadingContext for navigation after async operation
           Navigator.of(loadingContext).pop(); 
       }
 
@@ -392,7 +405,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       // Logger.error("Error deleting message ${message.id}: $e");
       
       if (loadingContext.mounted) {
-          // FIX: Use loadingContext for navigation after async operation
           Navigator.of(loadingContext).pop(); 
       }
       
@@ -434,106 +446,168 @@ class _CommentingSectionState extends State<CommentingSection> {
     );
   }
   
-  // MODIFIED: _buildTabButton now accepts an iconPath string
-  Widget _buildTabButton(String label, String view, String iconPath, ColorScheme cs) {
-    final bool isSelected = _currentView == view;
-    const Color buttonBackgroundColor = Color(0xFFE6A84B); 
-    
-    final BorderSide border = isSelected 
-      ? const BorderSide(color: Colors.white, width: 1.0)
-      : const BorderSide(color: buttonBackgroundColor, width: 2.0);
-
-    return SizedBox(
-      width: 120, 
-      height: 40, 
-      child: TextButton(
-        onPressed: () {
-          if (!mounted) return;
-          setState(() {
-            _currentView = view;
-          });
-        },
-        style: TextButton.styleFrom(
-          padding: EdgeInsets.zero,
-          backgroundColor: buttonBackgroundColor, 
-          shape: RoundedRectangleBorder(
-             borderRadius: BorderRadius.circular(8),
-             side: border,
-          ),
-          minimumSize: Size.zero, 
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        // NEW: Use Row to place the image asset and text side-by-side
-        child: Row( 
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // **NOTE: Replace 'assets/icons/...' with your actual image paths**
-            Image.asset(
-              iconPath,
-              width: 18, 
-              height: 18,
-              // Use color to tint the image white if it's a monochrome icon
-              color: Colors.white, 
+  // Widget to display a single Terminal Card
+  Widget _buildTerminalCard(Map<String, dynamic> terminal, ColorScheme cs) {
+    final details = terminal['details'] as Map<String, String>;
+    return GestureDetector(
+      onTap: () {
+        // Call the parent handler to switch to detail view
+        widget.onTerminalCardSelected(terminal['id'] as String); 
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: cs.surfaceVariant, 
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: Colors.grey.shade300, 
+              width: 1.0,
             ),
-            const SizedBox(width: 8), 
-            Text(
-              label,
-              style: const TextStyle( 
-                fontWeight: FontWeight.bold,
-                color: Colors.white, 
-                fontSize: 14,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(15),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                details['title'] ?? 'Terminal',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: cs.primary,
+                ),
+              ),
+              const Divider(height: 12),
+              _buildTerminalDetailRow(Icons.access_time, 'Status', details['status'] ?? 'N/A', cs),
+              _buildTerminalDetailRow(Icons.route, 'Routes', details['routes'] ?? 'N/A', cs),
+              _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] ?? 'N/A', cs),
+              const SizedBox(height: 8),
+              Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                      'Tap for more details...',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                          color: cs.secondary,
+                      ),
+                  ),
+              )
+            ],
+          ),
         ),
       ),
     );
   }
   
-  // NEW: Widget to display a single Terminal Card
-  Widget _buildTerminalCard(Map<String, dynamic> terminal, ColorScheme cs) {
-    final details = terminal['details'] as Map<String, String>;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: cs.surfaceVariant, // Use a slight off-white/grey for card background
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: Colors.grey.shade300, 
-            width: 1.0,
+  // MODIFIED: Widget to display the full details of the selected terminal with Route/Fare table
+  Widget _buildTerminalDetailView(Map<String, dynamic> terminal, ColorScheme cs, ScrollController scrollController) {
+    final details = terminal['details'] as Map<String, dynamic>;
+    final List<Map<String, dynamic>> routesFares = (details['routes_fares'] as List<dynamic>?)
+      ?.map((e) => e as Map<String, dynamic>)
+      .toList() ?? [];
+
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.all(16.0),
+      children: [
+        // Title
+        Text(
+          details['title'] ?? 'Terminal Details',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+            color: cs.primary,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(15),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              details['title'] ?? 'Terminal',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: cs.primary,
+        const SizedBox(height: 16),
+        
+        // General Details (Status, Routes, Facilities)
+        _buildTerminalDetailRow(Icons.access_time_filled, 'Status', details['status'] ?? 'N/A', cs),
+        const SizedBox(height: 10),
+        _buildTerminalDetailRow(Icons.directions_bus, 'Primary Routes', details['routes'] ?? 'N/A', cs),
+        const SizedBox(height: 10),
+        _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] ?? 'N/A', cs),
+        
+        // NEW SECTION: Routes & Fares
+        const SizedBox(height: 30),
+        Text(
+          'Routes & Fares',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            color: cs.onSurface,
+          ),
+        ),
+        const SizedBox(height: 10),
+        
+        // Table Header
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text('Route', style: TextStyle(fontWeight: FontWeight.bold, color: cs.secondary)),
               ),
-            ),
-            const Divider(height: 12),
-            _buildTerminalDetailRow(Icons.access_time, 'Status', details['status'] ?? 'N/A', cs),
-            _buildTerminalDetailRow(Icons.route, 'Routes', details['routes'] ?? 'N/A', cs),
-            _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] ?? 'N/A', cs),
-          ],
+              Expanded(
+                flex: 1,
+                child: Text('Fare', style: TextStyle(fontWeight: FontWeight.bold, color: cs.secondary)),
+              ),
+            ],
+          ),
         ),
-      ),
+        Divider(height: 1, thickness: 1, color: Colors.grey[400]),
+
+        // Route/Fare List
+        ...routesFares.map((rf) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    rf['route'] as String? ?? 'N/A', 
+                    style: TextStyle(color: cs.onSurface, fontSize: 14),
+                    softWrap: true,
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Text(
+                    rf['fare'] as String? ?? 'N/A', 
+                    style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+        
+        // Footer (Location Coordinates)
+        const SizedBox(height: 30),
+        Text(
+          'Location Coordinates:',
+          style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface),
+        ),
+        Text(
+          'Lat: ${terminal['lat']}, Lng: ${terminal['lng']}',
+          style: TextStyle(color: cs.onSurface.withAlpha(179)),
+        ),
+      ],
     );
   }
 
-  // NEW: Helper for Terminal Detail Row
+
+  // Helper for Terminal Detail Row (used for Status, Routes, Facilities)
   Widget _buildTerminalDetailRow(IconData icon, String label, String value, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -577,7 +651,7 @@ class _CommentingSectionState extends State<CommentingSection> {
 
       switch (_selectedFilter) {
         case 'Warning':
-          // ... (filter logic for Warning)
+          // Explicit filter words for Warning
           return messageLower.contains('traffic') ||
                  messageLower.contains('accident') ||
                  messageLower.contains('danger') ||
@@ -605,7 +679,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('bangga');
                  
         case 'Shortcuts':
-          // ... (filter logic for Shortcuts)
+          // Explicit filter words for Shortcuts
           return messageLower.contains('shortcut') ||
                  messageLower.contains('faster') ||
                  messageLower.contains('route') ||
@@ -614,7 +688,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('dali');
                  
         case 'Fare Tips':
-          // ... (filter logic for Fare Tips)
+          // Explicit filter words for Fare Tips
           return messageLower.contains('fare') ||
                  messageLower.contains('price') ||
                  messageLower.contains('cost') ||
@@ -627,7 +701,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('bayad');
                  
         case 'Driver Reviews':
-          // ... (filter logic for Driver Reviews)
+          // Explicit filter words for Driver Reviews
           return messageLower.contains('driver') ||
                  messageLower.contains('reckless') ||
                  messageLower.contains('rude') ||
@@ -640,6 +714,26 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
     }).toList();
 
+    // Conditional Title and Find Selected Terminal
+    String headerTitle;
+    Map<String, dynamic>? selectedTerminal;
+
+    if (widget.isShowingTerminals) {
+      if (widget.selectedTerminalId != null) {
+        selectedTerminal = widget.hardcodedTerminals.firstWhere(
+            (t) => t['id'] == widget.selectedTerminalId,
+            orElse: () => <String, dynamic>{},
+        );
+        headerTitle = selectedTerminal.isNotEmpty 
+            ? selectedTerminal['name'] as String 
+            : 'Terminal Details';
+      } else {
+        headerTitle = 'Terminals';
+      }
+    } else {
+      headerTitle = 'Taga ZAPAC Says...';
+    }
+
 
     return DraggableScrollableSheet(
       controller: _sheetController,
@@ -649,7 +743,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       builder: (context, scrollController) {
         return Container(
           decoration: BoxDecoration(
-            // FIX: Replaced .background with .surface
             color: colorScheme.surface, 
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(30),
@@ -657,10 +750,9 @@ class _CommentingSectionState extends State<CommentingSection> {
             ),
             boxShadow: [
               BoxShadow(
-                // FIX: Replaced .withOpacity(0.26) with .withAlpha(66)
                 color: Colors.black.withAlpha(66),
                 blurRadius: 10,
-                offset: Offset(0, -5),
+                offset: const Offset(0, -5),
               ),
             ],
           ),
@@ -683,6 +775,49 @@ class _CommentingSectionState extends State<CommentingSection> {
 
           child: Column(
             children: [
+              // Header Container to include back button
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF4BE6C), 
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Back button visible only if showing terminals AND viewing a specific terminal
+                    if (widget.isShowingTerminals && widget.selectedTerminalId != null)
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: widget.onBackToTerminals,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    
+                    if (widget.isShowingTerminals && widget.selectedTerminalId != null)
+                      const SizedBox(width: 8),
+
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          headerTitle, // Conditional title
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 18,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    
+                    // Spacer to balance the back button size if needed (48px = icon + padding)
+                    if (widget.isShowingTerminals && widget.selectedTerminalId != null)
+                      const SizedBox(width: 48), 
+                  ],
               // MODIFIED: Header Container with custom background color and centered buttons
                 GestureDetector(
                 onTap: () {
@@ -718,8 +853,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
               ),
 
-              // NEW: Conditional content rendering for Insights view (Filter Chips are only for Insights)
-              if (_currentView == 'Insights')
+              // Filter Chips (Only visible for Insights)
+              if (!widget.isShowingTerminals)
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -748,8 +883,21 @@ class _CommentingSectionState extends State<CommentingSection> {
                 ),
                 
               Expanded(
-                child: _currentView == 'Insights'
-                    ? ListView.builder(
+                // FINAL CONDITIONAL RENDERING LOGIC
+                child: widget.isShowingTerminals
+                    ? (widget.selectedTerminalId != null && selectedTerminal != null && selectedTerminal.isNotEmpty)
+                        // Detail View
+                        ? _buildTerminalDetailView(selectedTerminal, colorScheme, scrollController) 
+                        // List View
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: widget.hardcodedTerminals.length,
+                            itemBuilder: (context, index) {
+                              return _buildTerminalCard(widget.hardcodedTerminals[index], colorScheme);
+                            },
+                          )
+                    // Insights View
+                    : ListView.builder(
                         controller: scrollController,
                         itemCount: filteredMessages.length,
                         itemBuilder: (context, index) {
@@ -769,14 +917,6 @@ class _CommentingSectionState extends State<CommentingSection> {
                             onReport: () => _handleReport(message),
                             onDelete: () => _deleteMessage(message),
                           );
-                        },
-                      )
-                    // NEW: Display the Terminal List when the Terminals tab is selected
-                    : ListView.builder(
-                        controller: scrollController,
-                        itemCount: widget.hardcodedTerminals.length,
-                        itemBuilder: (context, index) {
-                          return _buildTerminalCard(widget.hardcodedTerminals[index], colorScheme);
                         },
                       ),
               ),

@@ -651,7 +651,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     // Check the state map for inline tooltip visibility
     final bool isTooltipVisible = _isDiscountTooltipVisible[transportName] == true;
     const String tooltipMessage = 
-        "20% fare discount applies to Senior Citizens, PWDs, and Students as mandated by Philippine Law.\n(RA 9994 | RA 9442 | RA 11314)";
+        "20% fare discount applies to Senior Citizens, PWDs, and Students as mandated by Philippine Law. (RA 9994 | RA 9442 | RA 11314)";
 
 
     return Card(
@@ -669,20 +669,23 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             // 1. Time Row (Dynamic)
             Row(
               // Vertically centering elements in this row
-              crossAxisAlignment: CrossAxisAlignment.center, 
+              crossAxisAlignment: CrossAxisAlignment.center, // Changed to center the items vertically
+              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Ensures the badge stays on the right
               children: [
-                Icon(Icons.schedule, color: cs.primary),
-                const SizedBox(width: 4), // Reduced spacing
-                Expanded(
-                  child: Text(
-                    timeRange, // Display dynamic time range
-                    textAlign: TextAlign.center, // Centered Arrow
-                    style: TextStyle(
-                      color: cs.onSurface,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                Row( // Group icon and time range together
+                  children: [
+                    Icon(Icons.schedule, color: cs.primary, size: 20), // Use consistent icon size
+                    const SizedBox(width: 2), // Small space after the icon
+                    Text(
+                      timeRange, // Display dynamic time range
+                      // Removed: textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: cs.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
                 Container(
                   // Reduced padding for a smaller badge
@@ -904,7 +907,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         child: ElevatedButton(
           onPressed: () => _launchAppOrStore(appName), // Call the launch function
           style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(6),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 2,
             minimumSize: const Size(0, 20),
@@ -912,7 +915,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
           ),
           child: Image.asset(
             imagePath,
-            height: 24,
+            height: 30,
             fit: BoxFit.contain,
             color: backgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white, 
             colorBlendMode: BlendMode.modulate, 
@@ -936,7 +939,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         _buildActionButton(
           cs, 
           'Maxim',
-          'assets/maxim.png', 
+          'assets/maximT.png', 
           backgroundColor: maximYellow,
         ), 
         _buildActionButton(
@@ -1092,7 +1095,8 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final Color textColor = cs.onSurface;
-
+    final String headerDuration = _transportDurations['Grab (4-seater)'] ?? widget.route.duration;
+    
     return Scaffold(
       backgroundColor: cs.background,
       appBar: AppBar(
@@ -1144,7 +1148,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               _buildStatColumn("Distance", widget.route.distance, textColor),
-                              _buildStatColumn("Duration", widget.route.duration, textColor),
+                              _buildStatColumn("Duration", headerDuration, textColor),
                             ],
                           ),
                           _buildFareList(cs, textColor), // Use the new list builder

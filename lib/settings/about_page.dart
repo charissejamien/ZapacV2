@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'privacy_policy.dart';
+import 'terms_of_service.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -84,12 +86,16 @@ class AboutPage extends StatelessWidget {
             _buildLegalTile(
               context,
               title: 'Privacy Policy',
-              onTap: () => _launchURL('https://zapac.ph/privacy'), // Placeholder link
+              onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+            ),
             ),
             _buildLegalTile(
               context,
               title: 'Terms of Service',
-              onTap: () => _launchURL('https://zapac.ph/terms'), // Placeholder link
+              onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const TermsOfServicePage()),
+              ),
             ),
             _buildLegalTile(
               context,

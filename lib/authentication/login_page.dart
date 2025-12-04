@@ -344,18 +344,6 @@ class _LoginPageState extends State<LoginPage> {
             disableSocial ? () {} : _onGoogleLogin,
           ),
         ),
-        // SizedBox(
-        //   width: screenWidth * 0.42,
-        //   child: _socialButton(
-        //     Icons.facebook,
-        //     "Facebook",
-        //     facebookBgLight,
-        //     isDarkMode ? darkFgColor : Colors.blue,
-        //     facebookFgLight,
-        //     _isFacebookLoading,
-        //     disableSocial ? () {} : _onFacebookLogin,
-        //   ),
-        // ),
       ],
     );
   }

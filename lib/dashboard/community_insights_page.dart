@@ -645,6 +645,58 @@ class _CommentingSectionState extends State<CommentingSection> {
     );
   }
 
+  /// Helper to render "Taga ZAPAC says..." with only "ZAPAC" bold and gradient
+  Widget _buildZapacHeaderTitle() {
+    const double fontSize = 18;
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        children: [
+          const TextSpan(
+            text: 'Taga ',
+            style: TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: fontSize,
+              color: Colors.black87,
+            ),
+          ),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: ShaderMask(
+              shaderCallback: (Rect bounds) {
+                return const LinearGradient(
+                  colors: [
+                    Color(0xFF6CA89A), // greenish
+                    Color(0xFF4A6FA5), // bluish
+                  ],
+                ).createShader(bounds);
+              },
+              blendMode: BlendMode.srcIn,
+              child: const Text(
+                'ZAPAC',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: fontSize,
+                  color: Colors.white, // base color for shader to apply on
+                ),
+              ),
+            ),
+          ),
+          const TextSpan(
+            text: ' says...',
+            style: TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: fontSize,
+              color: Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -821,15 +873,17 @@ class _CommentingSectionState extends State<CommentingSection> {
 
                           Expanded(
                             child: Center(
-                              child: Text(
-                                headerTitle, // "Terminals", "Taga ZAPAC Says...", or Terminal Name
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              child: widget.isShowingTerminals
+                                  ? Text(
+                                      headerTitle, // "Terminals" or Terminal Name
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    )
+                                  : _buildZapacHeaderTitle(),
                             ),
                           ),
                           

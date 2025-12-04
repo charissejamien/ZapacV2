@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:zapac/dashboard/models/chat_message.dart';
 import 'package:zapac/dashboard/route_details_overlay.dart'; 
 import 'community_insights_page.dart';
 import '../core/widgets/searchBar.dart';
@@ -10,8 +11,7 @@ import '../core/widgets/app_floating_button.dart';
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart'; 
 import 'dart:io' show Platform;
-// FIX: The import below is necessary, so the redundant one was removed.
-import 'community_insights_page.dart' show ChatMessage; 
+// (Removed duplicate and unnecessary imports related to ChatMessage and CommentingSection)
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math'; // Added for min/max calculation

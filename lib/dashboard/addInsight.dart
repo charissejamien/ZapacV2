@@ -128,14 +128,9 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
         return;
     }
 
-    // 1. Close the current bottom sheet modal
-    if (mounted) {
-      Navigator.pop(context);
-    } else {
-      return; 
-    }
+    // --- FIX START: Swapping pop order and using try/finally for cleanup ---
     
-    // Set posting state (although the modal is closed, this prevents double tap if modal dismissal is slow)
+    // 1. Set posting state
     if (mounted) setState(() => _isPosting = true);
 
     // Get refreshed user details
@@ -154,9 +149,9 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
       senderUid: senderUid,
     );
     
-    // Show a temporary loading screen on the root navigator
-    // This context is safe because it is scoped to the global app
-    final loadingDialog = showGeneralDialog(
+    // 2. Show a temporary loading screen on the root navigator (pushed on top of the current modal)
+    // The current `context` is still valid and mounted here.
+    showGeneralDialog(
         context: context,
         barrierDismissible: false,
         transitionDuration: const Duration(milliseconds: 150),
@@ -171,48 +166,58 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
             );
         },
     );
-
+    
+    bool success = false;
     try {
+      // 3. Post to Firebase (Wait for async operation)
       await widget.firestore 
         .collection('public_data')
         .doc('zapac_community')
         .collection('comments')
         .add(newInsight.toFirestore());
 
-      // 4. Dismiss loading dialog
-      // Use rootNavigator: true to pop the dialog that was pushed globally.
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-      
-      // 5. Provide success feedback
-      if (mounted) {
-        widget.onInsightAdded(newInsight);
-        SystemSound.play(SystemSoundType.click); // Success Haptic/Sound
-        _showSnackBar(
-          'Insight posted successfully!',
-          const Color(0xFF6CA89A),
-          Icons.check_circle_rounded,
-        );
-      }
+      success = true;
+
     } catch (e) {
       // Logger.error('Failed to post insight: $e');
-      
-      // 4b. Dismiss loading dialog on error
+      success = false;
+
+    } finally {
+      // 4. DISMISS LOADING DIALOG FIRST (pushed on root navigator)
+      // Since `context` belongs to the modal sheet, we use `rootNavigator: true`.
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-
-      // 5b. Provide error feedback
+      
+      // 5. DISMISS MODAL SHEET SECOND (the widget itself)
       if (mounted) {
-        setState(() => _isPosting = false);
-        _showSnackBar(
-          'Failed to post. Please try again.',
-          theme.colorScheme.error,
-          Icons.error_outline,
-        );
+         Navigator.pop(context); 
       }
+      
+      // 6. Provide feedback using the context that is still valid after the sheet pop (e.g., the root navigator's context).
+      // Since we already popped the sheet, we rely on the global context provided by ScaffoldMessenger.
+      if (mounted) {
+        if (success) {
+            widget.onInsightAdded(newInsight);
+            SystemSound.play(SystemSoundType.click); 
+            _showSnackBar(
+              'Insight posted successfully!',
+              const Color(0xFF6CA89A),
+              Icons.check_circle_rounded,
+            );
+        } else {
+            _showSnackBar(
+              'Failed to post. Please try again.',
+              theme.colorScheme.error,
+              Icons.error_outline,
+            );
+        }
+      }
+      
+      // Reset state for safety, though the widget is now disposed.
+      if (mounted) setState(() => _isPosting = false);
     }
+    // --- FIX END ---
   }
 
   void _showSnackBar(String message, Color color, IconData icon) {
@@ -243,6 +248,7 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
 
   @override
   Widget build(BuildContext context) {
+// ... (rest of the build function remains the same)
     final theme = Theme.of(context);
     final textColor = theme.textTheme.bodyLarge?.color ?? Colors.black;
     // final isDark = theme.brightness == Brightness.dark; // isDark is unused

@@ -113,9 +113,9 @@ Map<String, String> _calculateAllEstimatedFares(String distanceText, String dura
   // 1. Moto Taxi (Previous single fare)
   double motoTaxiFare;
   if (distanceKm <= 4.0) {
-    motoTaxiFare = 15.0; 
+    motoTaxiFare = 20.74;
   } else {
-    motoTaxiFare = 15.0 + ((distanceKm - 4.0) * 2.5);
+    motoTaxiFare = 20.74 + (distanceKm * 10.65);
   }
   fares['Moto Taxi'] = motoTaxiFare;
 
@@ -123,7 +123,7 @@ Map<String, String> _calculateAllEstimatedFares(String distanceText, String dura
   const double grabBase = 45.0;
   const double grabDistRate = 15.0;
   const double grabTimeRate = 2.0;
-  const double grabSurge = 1.5;
+  const double grabSurge = 1;
   double grabFare = (grabBase + (distanceKm * grabDistRate + durationMin * grabTimeRate)) * grabSurge;
   fares['Grab (4-seater)'] = grabFare;
   

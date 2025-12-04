@@ -191,7 +191,7 @@ class MapUtils {
       origin: origin,
       destination: destination,
       apiKey: apiKey,
-      mode: 'driving',
+      mode: 'bicycling',
     );
 
   // MODIFIED: Public function for PUJ/Bus (now returns detailed steps for real route codes)

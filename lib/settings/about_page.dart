@@ -10,7 +10,8 @@ class AboutPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('About Zapac'),
+        title: const Text('About Zapac', 
+        style:TextStyle(color: Colors.white)),
         backgroundColor: cs.primary,
         iconTheme: const IconThemeData(color: Colors.white),
       ),

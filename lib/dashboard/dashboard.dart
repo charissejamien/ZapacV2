@@ -11,13 +11,9 @@ import '../core/widgets/app_floating_button.dart'; // Ensure this is the correct
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart'; 
 import 'dart:io' show Platform;
-
-// FIX: The import below is necessary, so the redundant one was removed.
-import 'community_insights_page.dart' show ChatMessage; 
-// (Removed duplicate and unnecessary imports related to ChatMessage and CommentingSection)
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'dart:math'; // Added for min/max calculation
+import 'dart:math'; 
 
 // Dark Map Style JSON (Night/Aubergine inspired)
 const String _darkMapStyleJson = r'''

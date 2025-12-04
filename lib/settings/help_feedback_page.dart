@@ -125,18 +125,27 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage> {
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: ExpansionTile(
-            key: PageStorageKey(category.title),
-            title: Text(
-              category.title,
-              style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary, fontSize: 16),
+        child: Material(
+          color: cs.surface,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.transparent,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
             ),
-            leading: Icon(category.icon, color: cs.primary),
-            collapsedIconColor: cs.onSurface.withOpacity(0.6),
-            iconColor: cs.primary,
-            children: category.questions.map((item) => _buildQuestionDropdown(context, cs, item)).toList(),
+            child: ExpansionTile(
+              key: PageStorageKey(category.title),
+              title: Text(
+                category.title,
+                style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary, fontSize: 16),
+              ),
+              leading: Icon(category.icon, color: cs.primary),
+              collapsedIconColor: cs.onSurface.withOpacity(0.6),
+              iconColor: cs.primary,
+              children: category.questions
+                  .map((item) => _buildQuestionDropdown(context, cs, item))
+                  .toList(),
+            ),
           ),
         ),
       ),
@@ -202,8 +211,12 @@ class _HelpAndFeedbackPageState extends State<HelpAndFeedbackPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Help & Feedback'),
+        title: const Text('Help & Feedback', 
+        style: TextStyle(
+          color: Colors.white
+          ),),
         backgroundColor: cs.primary,
+        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),

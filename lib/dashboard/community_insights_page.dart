@@ -34,6 +34,10 @@ class _CommentingSectionState extends State<CommentingSection> {
 
   Map<String, UserInteraction> _userInteractions = {};
 
+  // NEW for snap logic
+  double _lastSize = 0.0;
+  bool _isDragging = false;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +86,14 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
   void _handleExpansionChange() {
+
+     _lastSize = _sheetController.size;
+
+    // Detect drag movement
+    if (_sheetController.size < 0.85 && _sheetController.size > 0.25) {
+      _isDragging = true;
+    }
+
     final bool isExpandedNow = _sheetController.size >= 0.85;
     if (isExpandedNow != _isSheetFullyExpanded) {
       if (mounted) {
@@ -92,6 +104,8 @@ class _CommentingSectionState extends State<CommentingSection> {
       widget.onExpansionChanged?.call(_isSheetFullyExpanded); 
     }
   }
+
+  
 
   @override
   void didUpdateWidget(covariant CommentingSection oldWidget) {
@@ -650,10 +664,27 @@ class _CommentingSectionState extends State<CommentingSection> {
               ),
             ],
           ),
+          child: NotificationListener<ScrollEndNotification>(
+            onNotification: (n) {
+              if (_isDragging) {
+                _isDragging = false;
+
+                // SNAP UP or SNAP DOWN
+                final snapTarget = _lastSize > 0.55 ? 0.85 : 0.25;
+
+                _sheetController.animateTo(
+                  snapTarget,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              }
+              return false;
+            },
+
           child: Column(
             children: [
               // MODIFIED: Header Container with custom background color and centered buttons
-                            GestureDetector(
+                GestureDetector(
                 onTap: () {
                   final target =
                       _sheetController.size > 0.5 ? 0.25 : 0.85;
@@ -751,6 +782,7 @@ class _CommentingSectionState extends State<CommentingSection> {
               ),
             ],
           ),
+          )
         );
       },
     );

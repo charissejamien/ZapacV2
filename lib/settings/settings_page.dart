@@ -7,6 +7,7 @@ import 'help_feedback_page.dart';
 import 'about_page.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'notifications.dart';
 
 
 class SettingsPage extends StatefulWidget {
@@ -170,8 +171,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: 'Notifications',
                   icon: Icons.notifications_rounded,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Notification settings coming soon!')),
+                    Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const NotificationPage()),
                     );
                   },
                 ),

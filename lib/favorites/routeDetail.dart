@@ -4,6 +4,7 @@ import 'favorite_route.dart';
 import 'favorite_routes_service.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 import 'dart:io' show Platform; 
+import 'package:zapac/core/widgets/fare_accuracy_review.dart';
 import '../core/utils/map_utils.dart'; // Import map utilities
 import 'favoriteRouteData.dart'; 
 import 'dart:async'; // 1. IMPORT dart:async FOR TIMER
@@ -1095,6 +1096,11 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final Color textColor = cs.onSurface;
+
+    final String estimatedFareLabel = widget.route.estimatedFares.values.isNotEmpty
+        ? widget.route.estimatedFares.values.first
+        :'N/A';
+
     final String headerDuration = _transportDurations['Grab (4-seater)'] ?? widget.route.duration;
     
     return Scaffold(
@@ -1162,6 +1168,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
           ],
         ),
       ),
+      bottomNavigationBar: FareAccuracyReviewBar(
+        routeName: widget.route.routeName,
+        estimatedFareLabel: estimatedFareLabel, 
+        onAnswer: (isAccurate) {
+        },
+    ),
     );
   }
-}
+  }

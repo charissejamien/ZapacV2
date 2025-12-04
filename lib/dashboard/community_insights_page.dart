@@ -49,6 +49,10 @@ class _CommentingSectionState extends State<CommentingSection> {
 
   Map<String, UserInteraction> _userInteractions = {};
 
+  // NEW for snap logic
+  double _lastSize = 0.0;
+  bool _isDragging = false;
+
   @override
   void initState() {
     super.initState();
@@ -95,6 +99,14 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
   void _handleExpansionChange() {
+
+     _lastSize = _sheetController.size;
+
+    // Detect drag movement
+    if (_sheetController.size < 0.85 && _sheetController.size > 0.25) {
+      _isDragging = true;
+    }
+
     final bool isExpandedNow = _sheetController.size >= 0.85;
     if (isExpandedNow != _isSheetFullyExpanded) {
       if (mounted) {
@@ -105,6 +117,8 @@ class _CommentingSectionState extends State<CommentingSection> {
       widget.onExpansionChanged?.call(_isSheetFullyExpanded); 
     }
   }
+
+  
 
   @override
   void didUpdateWidget(covariant CommentingSection oldWidget) {
@@ -742,6 +756,23 @@ class _CommentingSectionState extends State<CommentingSection> {
               ),
             ],
           ),
+          child: NotificationListener<ScrollEndNotification>(
+            onNotification: (n) {
+              if (_isDragging) {
+                _isDragging = false;
+
+                // SNAP UP or SNAP DOWN
+                final snapTarget = _lastSize > 0.55 ? 0.85 : 0.25;
+
+                _sheetController.animateTo(
+                  snapTarget,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              }
+              return false;
+            },
+
           child: Column(
             children: [
               // Header Container to include back button
@@ -787,6 +818,38 @@ class _CommentingSectionState extends State<CommentingSection> {
                     if (widget.isShowingTerminals && widget.selectedTerminalId != null)
                       const SizedBox(width: 48), 
                   ],
+              // MODIFIED: Header Container with custom background color and centered buttons
+                GestureDetector(
+                onTap: () {
+                  final target =
+                      _sheetController.size > 0.5 ? 0.25 : 0.85;
+
+                  _sheetController.animateTo(
+                    target,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF4BE6C),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildTabButton("Terminals", "Terminals",
+                          "assets/terminalsIcon.png", colorScheme),
+                      const SizedBox(width: 12),
+                      _buildTabButton("Insights", "Insights",
+                          "assets/insightsIcon.png", colorScheme),
+                    ],
+                  ),
                 ),
               ),
 
@@ -859,6 +922,7 @@ class _CommentingSectionState extends State<CommentingSection> {
               ),
             ],
           ),
+          )
         );
       },
     );

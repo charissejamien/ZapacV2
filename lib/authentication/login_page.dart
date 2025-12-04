@@ -50,7 +50,8 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
-        Navigator.pushReplacementNamed(context, '/app');
+        // NAVIGATE TO ONBOARDING INSTEAD OF '/app'
+        Navigator.pushReplacementNamed(context, '/onboarding/profile'); 
       }
     } catch (e) {
       String message = e.toString().replaceFirst('Exception: ', '');
@@ -91,7 +92,8 @@ class _LoginPageState extends State<LoginPage> {
       await _authService.signInWithEmail(email, password);
 
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/app');
+        // NAVIGATE TO ONBOARDING INSTEAD OF '/app'
+        Navigator.pushReplacementNamed(context, '/onboarding/profile'); 
       }
     } catch (e) {
       String message = e.toString().replaceFirst('Exception: ', '');

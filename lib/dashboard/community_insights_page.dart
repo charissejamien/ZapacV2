@@ -653,26 +653,37 @@ class _CommentingSectionState extends State<CommentingSection> {
           child: Column(
             children: [
               // MODIFIED: Header Container with custom background color and centered buttons
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                // NEW: Use F4BE6C background color
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF4BE6C), 
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
+                            GestureDetector(
+                onTap: () {
+                  final target =
+                      _sheetController.size > 0.5 ? 0.25 : 0.85;
+
+                  _sheetController.animateTo(
+                    target,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF4BE6C),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // MODIFIED: Pass the icon path for Terminals
-                    _buildTabButton('Terminals', 'Terminals', 'assets/terminalsIcon.png', colorScheme),
-                    const SizedBox(width: 16),
-                    // MODIFIED: Pass the icon path for Insights
-                    _buildTabButton('Insights', 'Insights', 'assets/insightsIcon.png', colorScheme),
-                  ],
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildTabButton("Terminals", "Terminals",
+                          "assets/terminalsIcon.png", colorScheme),
+                      const SizedBox(width: 12),
+                      _buildTabButton("Insights", "Insights",
+                          "assets/insightsIcon.png", colorScheme),
+                    ],
+                  ),
                 ),
               ),
 

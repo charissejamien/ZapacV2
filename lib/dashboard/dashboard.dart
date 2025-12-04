@@ -6,7 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/dashboard/route_details_overlay.dart'; 
 import 'community_insights_page.dart';
 import '../core/widgets/searchBar.dart';
-import '../core/widgets/app_floating_button.dart';
+import '../core/widgets/app_floating_button.dart'; // Ensure this is the correct import path
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart'; 
 import 'dart:io' show Platform;
@@ -238,6 +238,18 @@ class _DashboardState extends State<Dashboard> {
   void _addNewInsight(ChatMessage newInsight) {
     // Logger.info("Insight added, Firebase listener will refresh UI.");
   }
+  
+  // NEW FUNCTION: Handler for the Add Insight FAB
+  void _handleAddInsightPressed() {
+    if (!mounted) return;
+    
+    // Calls the modal function from addInsight.dart
+    showAddInsightModal(
+      context: context,
+      firestore: _firestore,
+      onInsightAdded: _addNewInsight, 
+    );
+  }
 
   // FIX 1: Using the now-available MapUtils.getAddressFromLatLng
   Future<void> _updateCurrentAddress({LatLng? location}) async {
@@ -378,8 +390,6 @@ class _DashboardState extends State<Dashboard> {
     }
 
     if (lat != null && lng != null) {
-      final newPosition = LatLng(lat, lng);
-      
       final LatLng? currentLocation = await MapUtils.getCurrentLocation(context);
       if (currentLocation == null) {
           if (mounted) {
@@ -600,7 +610,9 @@ class _DashboardState extends State<Dashboard> {
                duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 right: _isCommunityInsightExpanded ? 16 :10,
+                // Repositioned to the bottom right when expanded
                 bottom: _isCommunityInsightExpanded ? 10 : null, 
+                // Repositioned to the top right when collapsed
                 top: _isCommunityInsightExpanded ? null : 80, 
 
               child: AnimatedSwitcher(
@@ -638,6 +650,7 @@ class _DashboardState extends State<Dashboard> {
                             FloatingButton(
                               isCommunityInsightExpanded: _isCommunityInsightExpanded,
                               onMyLocationPressed: _handleMyLocationPressed, 
+                              onAddInsightPressed: _handleAddInsightPressed, // NEW: Pass the Add Insight handler
                             ),
                         ],
                     ),
@@ -713,19 +726,24 @@ class TerminalDetailsModal extends StatelessWidget {
 }
 
 // =========================================================================
-// PLACEHOLDER: FloatingButton Class (Missing from provided files)
+// NOTE: This placeholder reflects the original structure from lib/core/widgets/app_floating_button.dart
+// It has been replaced by the actual content in the next section for standalone compilation.
+// However, the dashboard depends on the file existing.
 // =========================================================================
 
-// This is added to fix the compilation error in the build method.
+// For compilation completeness, the placeholder class is kept here, 
+// but its logical content is placed in the actual app_floating_button.dart section.
+// The dashboard relies on a FloatingButton widget with the defined interface.
+// If this file were truly lib/dashboard/dashboard.dart, the definition below would be removed.
+// Assuming for now the definition below is correct for the sake of the dashboard.
+/*
 class FloatingButton extends StatelessWidget {
   final bool isCommunityInsightExpanded;
-  // Removed final VoidCallback onAddInsightPressed;
   final VoidCallback onMyLocationPressed;
 
   const FloatingButton({
     super.key,
     required this.isCommunityInsightExpanded,
-    // Removed required this.onAddInsightPressed,
     required this.onMyLocationPressed,
   });
 
@@ -735,16 +753,15 @@ class FloatingButton extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Removed FloatingActionButton for 'add_insight' and the following SizedBox
         FloatingActionButton(
           heroTag: 'my_location',
           onPressed: onMyLocationPressed,
-          // CHANGED: Set background color to 0xFF6CA89A
           backgroundColor: const Color(0xFF6CA89A), 
-          foregroundColor: Colors.white, // Set foreground color for contrast
+          foregroundColor: Colors.white, 
           child: const Icon(Icons.my_location),
         ),
       ],
     );
   }
 }
+*/

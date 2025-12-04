@@ -3,31 +3,21 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:zapac/core/widgets/bottomNavBar.dart';
-import 'package:zapac/settings/settings_page.dart';
-import 'package:zapac/settings/profile_page.dart';
+import 'package:zapac/dashboard/models/chat_message.dart';
 import 'package:zapac/dashboard/route_details_overlay.dart'; 
 import 'community_insights_page.dart';
 import '../core/widgets/searchBar.dart';
-import '../core/widgets/app_floating_button.dart';
+import '../core/widgets/app_floating_button.dart'; // Ensure this is the correct import path
 import 'addInsight.dart';
 import '../core/utils/map_utils.dart'; 
 import 'dart:io' show Platform;
 
 // FIX: The import below is necessary, so the redundant one was removed.
 import 'community_insights_page.dart' show ChatMessage; 
+// (Removed duplicate and unnecessary imports related to ChatMessage and CommentingSection)
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math'; // Added for min/max calculation
-
-// Category Model for the Chips
-class Category {
-  final String label;
-  final IconData icon;
-  final String placeType; // Google Place Type identifier
-
-  const Category({required this.label, required this.icon, required this.placeType});
-}
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -44,7 +34,6 @@ class _DashboardState extends State<Dashboard> {
   final LatLng _initialCameraPosition = const LatLng(10.314481680817886, 123.88813209917954);
 
   bool _isCommunityInsightExpanded = false;
-  int _selectedIndex = 0;
   bool _isMapReady = false; 
 
   List<ChatMessage> _liveChatMessages = [];
@@ -63,7 +52,7 @@ class _DashboardState extends State<Dashboard> {
   bool _showAddressModal = false;
   Timer? _addressTimer; 
 
-  // Hardcoded terminal data
+  // Hardcoded terminal data (USED BY CommentingSection)
   final List<Map<String, dynamic>> _hardcodedTerminals = const [
     {
       'id': 'cebu_south_terminal',
@@ -126,18 +115,9 @@ class _DashboardState extends State<Dashboard> {
       }
     },
 ];
-  // FIX: Made private field _terminalIcon 'final'
-  final BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+  // MODIFIED: Initial value for the icon is a default, will be updated in initState
+  BitmapDescriptor _terminalIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
 
-  // List of categories for the chips
-  static const List<Category> _categories = [
-    Category(label: 'Terminal', icon: Icons.tram, placeType: 'bus_station'), // Use bus_station for PUV terminals
-    Category(label: 'Mall', icon: Icons.shopping_bag, placeType: 'shopping_mall'),
-    Category(label: 'Grocery', icon: Icons.local_grocery_store, placeType: 'supermarket'),
-    Category(label: 'Gasoline', icon: Icons.local_gas_station, placeType: 'gas_station'),
-    Category(label: 'School', icon: Icons.school, placeType: 'school'),
-    Category(label: 'Hospital', icon: Icons.local_hospital, placeType: 'hospital'),
-  ];
   
   String _getMapApiKey() {
     if (Platform.isIOS) {
@@ -162,8 +142,9 @@ class _DashboardState extends State<Dashboard> {
       }
     });
 
-    // NOTE: If you add an asset 'assets/icons/bus_icon.png', uncomment and change the path here
-    // _loadTerminalIcon(); 
+    // NEW: Load the custom marker icon
+    _loadTerminalIcon(); 
+    
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -173,12 +154,12 @@ class _DashboardState extends State<Dashboard> {
     });
   }
   
-  // NOTE: This function is only needed if you use a custom asset for the terminal icon.
-  /*
+  // NEW: Function to load the custom image asset as a BitmapDescriptor
   Future<void> _loadTerminalIcon() async {
+      // **NOTE: Change 'assets/images/bus_terminal_pin.png' to your actual asset path.**
       final newIcon = await BitmapDescriptor.fromAssetImage(
           const ImageConfiguration(size: Size(48, 48)),
-          'assets/icons/bus_icon.png', // Replace with your actual path
+          'assets/insightsIcon.png', 
       );
       if (mounted) {
           setState(() {
@@ -186,7 +167,6 @@ class _DashboardState extends State<Dashboard> {
           });
       }
   }
-  */
 
   @override
   void dispose() {
@@ -227,7 +207,6 @@ class _DashboardState extends State<Dashboard> {
       });
 
     }, onError: (error) {
-      // FIX: Replaced print with logger comment
       // Logger.error("Error fetching community insights: $error");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -251,18 +230,6 @@ class _DashboardState extends State<Dashboard> {
     await _updateCurrentAddress(location: _initialCameraPosition); 
   }
 
-  void _onItemTapped(int index) {
-    if (!mounted) return;
-    setState(() {
-      _selectedIndex = index;
-    });
-
-    if (index == 3) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage())); 
-    } else if (index == 2) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())); 
-    }
-  }
 
   void _onCommunityInsightExpansionChanged(bool isExpanded) {
     if (!mounted) return;
@@ -274,8 +241,20 @@ class _DashboardState extends State<Dashboard> {
   void _addNewInsight(ChatMessage newInsight) {
     // Logger.info("Insight added, Firebase listener will refresh UI.");
   }
+  
+  // NEW FUNCTION: Handler for the Add Insight FAB
+  void _handleAddInsightPressed() {
+    if (!mounted) return;
+    
+    // Calls the modal function from addInsight.dart
+    showAddInsightModal(
+      context: context,
+      firestore: _firestore,
+      onInsightAdded: _addNewInsight, 
+    );
+  }
 
-  // FIX: Used null-aware assignment instead of if statement
+  // FIX 1: Using the now-available MapUtils.getAddressFromLatLng
   Future<void> _updateCurrentAddress({LatLng? location}) async {
     if (!mounted) return;
 
@@ -414,8 +393,6 @@ class _DashboardState extends State<Dashboard> {
     }
 
     if (lat != null && lng != null) {
-      final newPosition = LatLng(lat, lng);
-      
       final LatLng? currentLocation = await MapUtils.getCurrentLocation(context);
       if (currentLocation == null) {
           if (mounted) {
@@ -428,28 +405,22 @@ class _DashboardState extends State<Dashboard> {
       
       if (!mounted) return; // Guard against async gap
 
-      final routeDetails = await MapUtils.getRouteDetails(
-          origin: currentLocation,
-          destination: newPosition,
+      // FIX: Replace non-existent getRouteDetails with getRouteAndDetails
+      // This new function handles drawing the route and returns real-time driving details.
+      final routeDetails = await MapUtils.getRouteAndDetails(
+          item: item, 
           apiKey: _getMapApiKey(),
+          markers: _markers,
+          polylines: _polylines,
+          mapController: _mapController,
+          context: context,
       );
 
       if (!mounted) return; // Guard against async gap
 
       setState(() {
-        _markers.clear();
-        _polylines.clear(); 
-
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('destination_search'),
-            position: newPosition,
-            infoWindow: InfoWindow(title: name ?? 'Selected Location'),
-          ),
-        );
-        
         _currentSearchName = name;
-        if (routeDetails != null) {
+        if (routeDetails.isNotEmpty) {
             _currentSearchDetails = routeDetails;
             _showDetailsButton = true; 
         } else {
@@ -458,10 +429,7 @@ class _DashboardState extends State<Dashboard> {
             // Logger.error("Failed to fetch route details.");
         }
       });
-
-      await _mapController.animateCamera(
-        CameraUpdate.newLatLngZoom(newPosition, 16.0),
-      );
+      // Camera animation handled inside MapUtils.getRouteAndDetails
     }
   }
 
@@ -504,162 +472,6 @@ class _DashboardState extends State<Dashboard> {
       );
   }
 
-  // MODIFIED: Function to search POIs by category
-  Future<void> _searchPOIsByCategory(String placeType) async {
-    if (!mounted || !_isMapReady || _mapController == null) return; 
-    _clearSearchMarker(); 
-
-    // Handle hardcoded terminals separately
-    if (placeType == 'bus_station') {
-      _markers.clear();
-      
-      // Variables for bounds calculation (Point 2)
-      double minLat = 90.0, maxLat = -90.0;
-      double minLng = 180.0, maxLng = -180.0;
-
-      for (var terminal in _hardcodedTerminals) {
-        final lat = terminal['lat'] as double;
-        final lng = terminal['lng'] as double;
-        
-        // Calculate bounds
-        minLat = min(minLat, lat);
-        maxLat = max(maxLat, lat);
-        minLng = min(minLng, lng);
-        maxLng = max(maxLng, lng);
-
-        _markers.add(
-          Marker(
-            markerId: MarkerId(terminal['id'] as String),
-            position: LatLng(lat, lng),
-            infoWindow: InfoWindow(title: terminal['name'] as String),
-            icon: _terminalIcon, // Use custom icon (Pin will be Green - Point 3)
-            onTap: () => _handleTerminalTapped(terminal['id'] as String),
-          ),
-        );
-      }
-      
-      if (mounted) {
-        setState(() {
-          _showDetailsButton = false;
-        });
-        // REMOVED: Snackbar notification (Point 1)
-      }
-      
-      // Zoom to fit all terminal locations (Point 2)
-      if (_hardcodedTerminals.isNotEmpty) {
-          final bounds = LatLngBounds(
-              southwest: LatLng(minLat, minLng),
-              northeast: LatLng(maxLat, maxLng),
-          );
-          // 50.0 padding is added for better visual spacing around the markers
-          _mapController.animateCamera(
-              CameraUpdate.newLatLngBounds(bounds, 50.0), 
-          );
-      }
-      return; // Exit here to use hardcoded markers for terminals
-    }
-
-    // Existing Google Places API logic for other categories
-    try {
-      // Use getVisibleRegion() and calculate center from bounds
-      final LatLngBounds bounds = await _mapController.getVisibleRegion();
-      final LatLng mapCenter = LatLng(
-        (bounds.northeast.latitude + bounds.southwest.latitude) / 2,
-        (bounds.northeast.longitude + bounds.southwest.longitude) / 2,
-      );
-      
-      final String apiKey = _getMapApiKey();
-
-      final String url = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${mapCenter.latitude},${mapCenter.longitude}&radius=5000&type=$placeType&key=$apiKey';
-
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        if (data['status'] == 'OK' && data['results'] != null) {
-          final List<dynamic> results = data['results'];
-          _markers.clear();
-          
-          for (var result in results) {
-            final lat = result['geometry']['location']['lat'];
-            final lng = result['geometry']['location']['lng'];
-            final name = result['name'];
-            
-            _markers.add(
-              Marker(
-                markerId: MarkerId(result['place_id']),
-                position: LatLng(lat, lng),
-                infoWindow: InfoWindow(title: name),
-                icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-              ),
-            );
-          }
-
-          if (mounted) {
-            setState(() {
-              _showDetailsButton = false;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Found ${results.length} ${placeType.replaceAll("_", " ")}s nearby.')),
-            );
-          }
-        } else {
-           if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('No results found for this category nearby.')),
-              );
-          }
-        }
-      } else {
-         if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Failed to fetch POI data from Google Places.')),
-            );
-         }
-      }
-    } catch (e) {
-      // Logger.error("POI Search Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('An error occurred during POI search.')),
-        );
-      }
-    }
-  }
-
-  // Widget to build the horizontal list of category chips
-  Widget _buildCategoryChips(ColorScheme cs) {
-    return Container(
-      height: 48, // Fixed height for the horizontal list
-      margin: const EdgeInsets.only(top: 8.0),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: EdgeInsets.zero,
-        itemCount: _categories.length,
-        itemBuilder: (context, index) {
-          final category = _categories[index];
-          return Padding(
-            padding: EdgeInsets.only(right: index == _categories.length - 1 ? 0 : 8.0),
-            child: ActionChip(
-              avatar: Icon(category.icon, size: 18, color: cs.primary),
-              label: Text(category.label, style: TextStyle(color: cs.onSurface)),
-              backgroundColor: cs.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                // FIX: Replaced .withOpacity(0.5) with .withAlpha(128)
-                side: BorderSide(color: cs.primary.withAlpha(128)),
-              ),
-              onPressed: () {
-                _searchPOIsByCategory(category.placeType);
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   // MODIFIED: Widget for the temporary, address modal, constrained width/height, non-full-width
   Widget _buildAddressModal(ColorScheme cs) {
     return AnimatedOpacity(
@@ -671,8 +483,9 @@ class _DashboardState extends State<Dashboard> {
             maintainState: true,
             maintainSize: true,
             child: Container(
-                width: 300, // Increased width
-                constraints: const BoxConstraints(minHeight: 60), // Minimum height for alignment
+                width: 250, // MODIFIED: Changed width from 300 to 250
+                // MODIFIED: Changed minHeight from 60 to 56.0 (standard FAB height)
+                constraints: const BoxConstraints(minHeight: 56.0), 
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
                     color: cs.surface,
@@ -694,21 +507,21 @@ class _DashboardState extends State<Dashboard> {
                         Text(
                             "CURRENTLY AT",
                             style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 9, // MODIFIED: Reduced font size for better fit
                                 fontWeight: FontWeight.bold,
                                 color: cs.secondary,
                             ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 1), // MODIFIED: Reduced spacing
                         // Text should flow, max 2 lines to maintain compact height
                         Text( 
                             _currentAddress, // State variable
                             style: TextStyle(
-                                fontSize: 13,
+                                fontSize: 11, // MODIFIED: Reduced font size for better fit
                                 fontWeight: FontWeight.w500,
                                 color: cs.onSurface,
                             ),
-                            maxLines: 3, // Constrain lines to fit
+                            maxLines: 2, // Constrain lines to fit the smaller height
                             overflow: TextOverflow.ellipsis,
                         ),
                     ],
@@ -725,11 +538,6 @@ class _DashboardState extends State<Dashboard> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: _selectedIndex,
-        onItemTapped: _onItemTapped,
-      ),
-
       body: SafeArea(
         child: Stack(
           children: [
@@ -747,15 +555,17 @@ class _DashboardState extends State<Dashboard> {
               ),
             ),
 
+            // MODIFIED: Pass the hardcoded terminal data
             CommentingSection(
               chatMessages: _liveChatMessages, 
               onExpansionChanged: _onCommunityInsightExpansionChanged,
               currentUserId: _currentUserId,
+              hardcodedTerminals: _hardcodedTerminals, // <--- NEW PROP
             ),
             
-            // Contains SearchBar and Category Chips
+            // Contains SearchBar 
             Positioned(
-              top: 8,
+              top: 15,
               left: 0, 
               right: 0,
               child: Column(
@@ -769,11 +579,6 @@ class _DashboardState extends State<Dashboard> {
                       onPlaceSelected: _handlePlaceSelected,
                       onSearchCleared: _clearSearchMarker,
                     ),
-                  ),
-                  // Category Chips
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: _buildCategoryChips(cs), 
                   ),
                 ],
               ),
@@ -808,8 +613,10 @@ class _DashboardState extends State<Dashboard> {
                duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 right: _isCommunityInsightExpanded ? 16 :10,
-                bottom: _isCommunityInsightExpanded ? 10 : 520,
-                top: _isCommunityInsightExpanded ? null : 50,
+                // Repositioned to the bottom right when expanded
+                bottom: _isCommunityInsightExpanded ? 10 : null, 
+                // Repositioned to the top right when collapsed
+                top: _isCommunityInsightExpanded ? null : 80, 
 
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 800),
@@ -820,8 +627,8 @@ class _DashboardState extends State<Dashboard> {
                 },
 
               // Use Row to place modal beside the FloatingButton stack
+              key: ValueKey<bool>(_isCommunityInsightExpanded),
               child: Row( 
-                key: ValueKey<bool>(_isCommunityInsightExpanded),
                 mainAxisSize: MainAxisSize.min,
                 // Align content to the bottom of the tallest element in the Row (which is the FAB stack)
                 crossAxisAlignment: CrossAxisAlignment.end, 
@@ -845,24 +652,8 @@ class _DashboardState extends State<Dashboard> {
                         children: [
                             FloatingButton(
                               isCommunityInsightExpanded: _isCommunityInsightExpanded,
-                              onAddInsightPressed: () {
-                                final currentUserId = _auth.currentUser?.uid;
-                                if (!mounted) return;
-
-                                if (currentUserId == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Please sign in to post an insight.'), backgroundColor: Colors.red),
-                                  );
-                                  return;
-                                }
-
-                                showAddInsightModal(
-                                  context: context,
-                                  firestore: _firestore,
-                                  onInsightAdded: _addNewInsight,
-                                );
-                              },
                               onMyLocationPressed: _handleMyLocationPressed, 
+                              onAddInsightPressed: _handleAddInsightPressed, // NEW: Pass the Add Insight handler
                             ),
                         ],
                     ),
@@ -936,3 +727,44 @@ class TerminalDetailsModal extends StatelessWidget {
     );
   }
 }
+
+// =========================================================================
+// NOTE: This placeholder reflects the original structure from lib/core/widgets/app_floating_button.dart
+// It has been replaced by the actual content in the next section for standalone compilation.
+// However, the dashboard depends on the file existing.
+// =========================================================================
+
+// For compilation completeness, the placeholder class is kept here, 
+// but its logical content is placed in the actual app_floating_button.dart section.
+// The dashboard relies on a FloatingButton widget with the defined interface.
+// If this file were truly lib/dashboard/dashboard.dart, the definition below would be removed.
+// Assuming for now the definition below is correct for the sake of the dashboard.
+/*
+class FloatingButton extends StatelessWidget {
+  final bool isCommunityInsightExpanded;
+  final VoidCallback onMyLocationPressed;
+
+  const FloatingButton({
+    super.key,
+    required this.isCommunityInsightExpanded,
+    required this.onMyLocationPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Placeholder implementation for functionality not available in provided files
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton(
+          heroTag: 'my_location',
+          onPressed: onMyLocationPressed,
+          backgroundColor: const Color(0xFF6CA89A), 
+          foregroundColor: Colors.white, 
+          child: const Icon(Icons.my_location),
+        ),
+      ],
+    );
+  }
+}
+*/

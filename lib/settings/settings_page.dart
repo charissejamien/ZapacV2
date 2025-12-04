@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:zapac/core/widgets/bottomNavBar.dart';
-import 'package:zapac/dashboard/dashboard.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/authentication/login_page.dart';
 import 'package:zapac/app/main.dart';
 import 'profile_page.dart';
+import 'help_feedback_page.dart';
+import 'about_page.dart';
+import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
+
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -19,6 +22,7 @@ class _SettingsPageState extends State<SettingsPage> {
   String _displayName = 'New User';
   String _userEmail = 'newzapacuser@example.com';
   static const String _userStatus = 'Daily Commuter';
+  File? _profileImageFile;
 
   @override
   void initState() {
@@ -26,7 +30,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _loadUserData();
   }
 
-  void _loadUserData() {
+  void _loadUserData() async { 
     _currentUser = FirebaseAuth.instance.currentUser;
     _userEmail = _currentUser?.email ?? 'N/A';
     _displayName = _currentUser?.displayName ?? _userEmail.split('@').first;
@@ -36,6 +40,15 @@ class _SettingsPageState extends State<SettingsPage> {
     if (_displayName.isNotEmpty) {
       _initials = _displayName[0].toUpperCase();
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    final savedPath = prefs.getString('profile_pic_path');
+    if (savedPath != null && File(savedPath).existsSync()) {
+      _profileImageFile = File(savedPath);
+    } else {
+      _profileImageFile = null;
+    }
+
     if (mounted) setState(() {});
   }
 
@@ -168,21 +181,13 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildSettingsSection(
               'SUPPORT',
               [
-                // _buildSettingsTile(
-                //   title: 'Share our app',
-                //   icon: Icons.share_rounded,
-                //   onTap: () {
-                //     ScaffoldMessenger.of(context).showSnackBar(
-                //       const SnackBar(content: Text('Share app functionality coming soon!')),
-                //     );
-                //   },
-                // ),
                 _buildSettingsTile(
                   title: 'Help & Feedback',
                   icon: Icons.help_outline_rounded,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Help center coming soon!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const HelpAndFeedbackPage()),
                     );
                   },
                 ),
@@ -190,8 +195,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   title: 'About',
                   icon: Icons.info_outline_rounded,
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('About page coming soon!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AboutPage()),
                     );
                   },
                 ),
@@ -207,7 +213,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   isDanger: true,
                   trailing: const SizedBox.shrink(),
                   onTap: () async {
-                    // Show confirmation dialog
                     final shouldLogout = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -279,23 +284,28 @@ class _SettingsPageState extends State<SettingsPage> {
           child: CircleAvatar(
             radius: 50,
             backgroundColor: Colors.white,
-            child: _currentUser?.photoURL != null
+            child: _profileImageFile != null
                 ? CircleAvatar(
                     radius: 48,
-                    backgroundImage: NetworkImage(_currentUser!.photoURL!),
+                    backgroundImage: FileImage(_profileImageFile!),
                   )
-                : CircleAvatar(
-                    radius: 48,
-                    backgroundColor: const Color(0xFF4A6FA5),
-                    child: Text(
-                      _initials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                : (_currentUser?.photoURL != null
+                    ? CircleAvatar(
+                        radius: 48,
+                        backgroundImage: NetworkImage(_currentUser!.photoURL!),
+                      )
+                    : CircleAvatar(
+                        radius: 48,
+                        backgroundColor: const Color(0xFF4A6FA5),
+                        child: Text(
+                          _initials,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )),
           ),
         ),
         Positioned(
@@ -345,7 +355,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const ProfilePage()),
-                );
+                ).then((_) => _loadUserData());
               },
               child: _buildProfileAvatar(),
             ),
@@ -422,17 +432,6 @@ class _SettingsPageState extends State<SettingsPage> {
             child: _buildResponsiveSettingsList(),
           ),
         ],
-      ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: 2,
-        onItemTapped: (index) {
-          if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const Dashboard()),
-            );
-          }
-        },
       ),
     );
   }

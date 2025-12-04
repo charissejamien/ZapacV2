@@ -3,9 +3,6 @@ import 'addNewRoute.dart';
 import 'package:zapac/favorites/favorite_route.dart';
 import 'routeDetail.dart';
 // import 'favoriteRouteData.dart'; // REMOVED: No longer using local data
-import 'package:zapac/core/widgets/bottomNavBar.dart';
-import 'package:zapac/dashboard/dashboard.dart'; 
-import 'package:zapac/settings/settings_page.dart'; 
 // NEW IMPORTS
 import 'package:zapac/favorites/favorite_routes_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -158,22 +155,6 @@ class _FavoriteRoutesPageState extends State<FavoriteRoutesPage> {
               );
             },
           ),
-      bottomNavigationBar: BottomNavBar(
-        selectedIndex: 1,
-        onItemTapped: (int index) {
-          if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const Dashboard()),
-            );
-          } else if (index == 3) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const SettingsPage()),
-            );
-          }
-        },
-      ),
     );
   }
 }

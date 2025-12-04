@@ -5,7 +5,6 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math' as math;
-import 'dart:io' show Platform;
 
 class MapUtils {
   // -------------------------
@@ -35,7 +34,7 @@ class MapUtils {
     markers.removeWhere((marker) => marker.markerId.value == 'current_location_marker');
     markers.removeWhere((marker) => marker.markerId.value == 'start');
     markers.removeWhere((marker) => marker.markerId.value == 'end');
-    // Logger.info('Cleared all relevant markers and polylines.');
+    print('Cleared all relevant markers and polylines.');
   }
 
   // -------------------------
@@ -66,32 +65,11 @@ class MapUtils {
       }
     }
 
-    // Define LocationSettings for high accuracy based on platform
-    LocationSettings locationSettings;
-    if (Platform.isAndroid) {
-      locationSettings = AndroidSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 0,
-        forceLocationManager: true,
-      );
-    } else if (Platform.isIOS || Platform.isMacOS) {
-      locationSettings = AppleSettings(
-        accuracy: LocationAccuracy.high,
-        activityType: ActivityType.other,
-        allowBackgroundLocationUpdates: false,
-        distanceFilter: 0,
-      );
-    } else {
-      locationSettings = const LocationSettings(accuracy: LocationAccuracy.high);
-    }
-
-
     try {
-      // Use locationSettings instead of deprecated desiredAccuracy
-      Position position = await Geolocator.getCurrentPosition(locationSettings: locationSettings);
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       return LatLng(position.latitude, position.longitude);
     } catch (e) {
-      // Logger.error('Error getting location: $e');
+      print('Error getting location: $e');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not get current location.')),
@@ -100,57 +78,62 @@ class MapUtils {
       return null;
     }
   }
-  
-  // NEW: Method to perform reverse geocoding (LatLng to Address)
-  static Future<String?> getAddressFromLatLng({
-    required LatLng latLng,
-    required String apiKey,
-  }) async {
-    final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/geocode/json?latlng=${latLng.latitude},${latLng.longitude}&key=$apiKey'
-    );
 
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-
-        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
-          // Return the formatted address from the first result
-          return data['results'][0]['formatted_address'] as String;
-        }
-      }
-    } catch (e) {
-      // Logger.error("Error fetching address: $e");
-    }
-    return null;
-  }
-
-  // FIX: Removed the empty optional parameter block {} to fix the "Expected an identifier" error
   static Future<void> getCurrentLocationAndMarker(
     Set<Marker> markers,
     GoogleMapController mapController,
-    BuildContext context,
-  ) async {
-    if (!context.mounted) return;
+    BuildContext context, {
+    required bool Function() isMounted,
+  }) async {
+    if (!isMounted()) return;
 
     LatLng? currentLatLng = await getCurrentLocation(context);
     
-    if (currentLatLng != null && context.mounted) {
+    if (currentLatLng != null && isMounted()) {
       mapController.animateCamera(CameraUpdate.newLatLngZoom(currentLatLng, 18.0)); 
     }
   }
 
-  static Future<Map<String, dynamic>?> getRouteDetails({
+  static Future<String?> getAddressFromLatLng({
+    required LatLng latLng,
+    required String apiKey,
+  }) async {
+    final url = 'https://maps.googleapis.com/maps/api/geocode/json?latlng=${latLng.latitude},${latLng.longitude}&key=$apiKey';
+    
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'OK' && data['results'].isNotEmpty) {
+          return data['results'][0]['formatted_address'];
+        }
+      }
+    } catch (e) {
+      print("Error fetching address: $e");
+    }
+    return null;
+  }
+  
+  // CORE FUNCTION: Fetches route details using a specified mode. (Replaces original getRouteDetails)
+  static Future<Map<String, dynamic>?> _fetchRouteDetailsByMode({
     required LatLng origin,
     required LatLng destination,
     required String apiKey,
+    required String mode,
   }) async {
     final originStr = "${origin.latitude},${origin.longitude}";
     final destinationStr = "${destination.latitude},${destination.longitude}";
     
+    // Configures Transit Mode (specifically for bus/PUJ)
+    final transitParams = (mode == 'transit' ? '&transit_mode=bus' : '');
+    
+    // Configures Real-Time Traffic for Driving
+    final trafficParams = (mode == 'driving') 
+        ? '&departure_time=now&traffic_model=best_guess'
+        : '';
+
     final url = Uri.parse(
-        'https://maps.googleapis.com/maps/api/directions/json?origin=$originStr&destination=$destinationStr&key=$apiKey&mode=driving'
+        'https://maps.googleapis.com/maps/api/directions/json?origin=$originStr&destination=$destinationStr&key=$apiKey&mode=$mode$transitParams$trafficParams'
     );
 
     try {
@@ -161,19 +144,82 @@ class MapUtils {
         if (data['routes'] != null && data['routes'].isNotEmpty) {
           final leg = data['routes'][0]['legs'][0];
           
+          // Use duration_in_traffic if available for real-time traffic
+          final duration = (mode == 'driving') && leg['duration_in_traffic'] != null
+              ? leg['duration_in_traffic']['text'] as String
+              : leg['duration']['text'] as String;
+          
+          // MODIFIED: For transit mode, return detailed steps/route name info
+          if (mode == 'transit') {
+            return {
+              'distance': leg['distance']['text'] as String,
+              'duration': duration,
+              'steps': leg['steps'] as List<dynamic>, // Include steps for route code extraction
+            };
+          }
+
           return {
             'distance': leg['distance']['text'] as String,
-            'duration': leg['duration']['text'] as String,
+            'duration': duration,
           };
         }
       }
     } catch (e) {
-      // Logger.error("Error fetching route details: $e");
+      print("Error fetching route details for mode $mode: $e");
     }
     return null;
   }
   
-  // REVISED: The getPredictions function with a larger radius for strict Cebu restriction
+  // Public function for general Driving (Taxi/Grab)
+  static Future<Map<String, dynamic>?> getDrivingDuration({
+    required LatLng origin,
+    required LatLng destination,
+    required String apiKey,
+  }) => _fetchRouteDetailsByMode(
+      origin: origin,
+      destination: destination,
+      apiKey: apiKey,
+      mode: 'driving',
+    );
+    
+  // Public function for Moto Taxi (using 'driving' mode as the best proxy)
+  static Future<Map<String, dynamic>?> getMotoTaxiDuration({
+    required LatLng origin,
+    required LatLng destination,
+    required String apiKey,
+  }) => _fetchRouteDetailsByMode(
+      origin: origin,
+      destination: destination,
+      apiKey: apiKey,
+      mode: 'bicycling',
+    );
+
+  // MODIFIED: Public function for PUJ/Bus (now returns detailed steps for real route codes)
+  static Future<Map<String, dynamic>?> getTransitDetails({
+    required LatLng origin,
+    required LatLng destination,
+    required String apiKey,
+  }) => _fetchRouteDetailsByMode(
+      origin: origin,
+      destination: destination,
+      apiKey: apiKey,
+      mode: 'transit',
+    );
+  
+  // NOTE: Keeping the deprecated getRouteDetails for compatibility with dashboard if needed,
+  // but it's now redundant and should use _fetchRouteDetailsByMode internally.
+  static Future<Map<String, dynamic>?> getRouteDetails({ // Deprecated/Redundant
+    required LatLng origin,
+    required LatLng destination,
+    required String apiKey,
+  }) => _fetchRouteDetailsByMode(
+      origin: origin,
+      destination: destination,
+      apiKey: apiKey,
+      mode: 'driving', // Defaults to driving
+    );
+  
+  // REVISED: The getPredictions function 
   static Future<List<dynamic>> getPredictions(String input, String apiKey) async {
     if (input.isEmpty) return [];
 
@@ -193,25 +239,25 @@ class MapUtils {
           // New parameters to enforce strict search within the Cebu area
           '&location=$cebuCenter' 
           '&radius=$searchRadius'
-          '&strictbounds=true'; // This is the key to forcing results within the circular area
+          '&strictbounds=true'; 
 
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return data['predictions'];
       } else {
-        // Logger.warning('Failed to load predictions: ${response.statusCode}');
+        print('Failed to load predictions: ${response.statusCode}');
         return [];
       }
     } catch (e) {
-      // Logger.error('Error getting predictions: $e');
+      print('Error getting predictions: $e');
       return [];
     }
   }
 
 
-  // Existing showRoute function 
-  static Future<Map<String, dynamic>> showRoute({
+  // Renamed from showRoute to getRouteAndDetails (used in dashboard.dart, kept for completeness)
+  static Future<Map<String, dynamic>> getRouteAndDetails({
     required dynamic item,
     required String apiKey,
     required Set<Marker> markers,
@@ -231,10 +277,7 @@ class MapUtils {
 
         final url = 'https://maps.googleapis.com/maps/api/place/details/json?place_id=$placeId&key=$apiKey';
         final response = await http.get(Uri.parse(url));
-        
-        if (!context.mounted) return {};
-        
-        if (response.statusCode != 200) return {};
+        if (!context.mounted || response.statusCode != 200) return {};
         
         final data = json.decode(response.body);
         if (data['status'] == 'OK') {
@@ -258,10 +301,9 @@ class MapUtils {
     if (originLatLng == null || !context.mounted) return {};
 
 
-    // Directions API Call
-    String url = 'https://maps.googleapis.com/maps/api/directions/json?origin=${originLatLng.latitude},${originLatLng.longitude}&destination=${destinationLatLng.latitude},${destinationLatLng.longitude}&key=$apiKey';
+    // Directions API Call (Driving mode for polyline visualization and distance)
+    String url = 'https://maps.googleapis.com/maps/api/directions/json?origin=${originLatLng.latitude},${originLatLng.longitude}&destination=${destinationLatLng.latitude},${destinationLatLng.longitude}&key=$apiKey&mode=driving';
     var response = await http.get(Uri.parse(url));
-    
     if (!context.mounted) return {};
 
     if (response.statusCode == 200) {

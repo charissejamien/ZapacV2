@@ -1,121 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; 
-
-String timeAgoSinceDate(Timestamp? timestamp) {
-  if (timestamp == null) {
-    return 'N/A'; 
-  }
-  
-  final DateTime now = DateTime.now();
-  final DateTime date = timestamp.toDate();
-  final Duration diff = now.difference(date);
-
-  if (diff.inSeconds < 60) {
-    return 'Just now';
-  } else if (diff.inMinutes < 60) {
-    final minutes = diff.inMinutes;
-    return '$minutes min${minutes == 1 ? '' : 's'} ago';
-  } else if (diff.inHours < 24) {
-    final hours = diff.inHours;
-    return '$hours hour${hours == 1 ? '' : 's'} ago';
-  } else if (diff.inDays < 7) {
-    final days = diff.inDays;
-    return '$days day${days == 1 ? '' : 's'} ago';
-  } else if (diff.inDays < 30) {
-    final weeks = (diff.inDays / 7).floor();
-    return '$weeks week${weeks == 1 ? '' : 's'} ago';
-  } else if (diff.inDays < 365) {
-    final months = (diff.inDays / 30).floor();
-    return '$months month${months == 1 ? '' : 's'} ago';
-  } else {
-    final years = (diff.inDays / 365).floor();
-    return '$years year${years == 1 ? '' : 's'} ago';
-  }
-}
-
-@immutable 
-class UserInteraction {
-  final bool isLiked;
-  final bool isDisliked;
-
-  const UserInteraction({this.isLiked = false, this.isDisliked = false});
-
-  factory UserInteraction.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>?;
-    if (data == null) {
-      return const UserInteraction(); 
-    }
-    return UserInteraction(
-      isLiked: data['isLiked'] ?? false,
-      isDisliked: data['isDisliked'] ?? false,
-    );
-  }
-}
-
-class ChatMessage {
-  final String? id; 
-  final String sender;
-  final String message;
-  final String route;
-  final String imageUrl;
-  final String? senderUid; 
-  int likes;
-  int dislikes;
-  
-  UserInteraction userInteraction; 
-  
-  final bool isMostHelpful;
-  final Timestamp? createdAt; 
-
-  ChatMessage({
-    this.id, 
-    required this.sender,
-    required this.message,
-    required this.route,
-    required this.imageUrl,
-    this.senderUid, 
-    this.likes = 0,
-    this.dislikes = 0,
-    this.userInteraction = const UserInteraction(), 
-    this.isMostHelpful = false,
-    this.createdAt, 
-  });
-
-  factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return ChatMessage(
-      id: doc.id,
-      sender: data['sender'] ?? 'Anonymous',
-      message: data['message'] ?? 'No message',
-      route: data['route'] ?? 'Unknown Route',
-      imageUrl: data['imageUrl'] ?? '',
-      senderUid: data['senderUid'] as String?, 
-      likes: data['likes'] ?? 0,
-      dislikes: data['dislikes'] ?? 0,
-      isMostHelpful: data['isMostHelpful'] ?? false,
-      createdAt: data['createdAt'] as Timestamp?, 
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'sender': sender,
-      'message': message,
-      'route': route,
-      'imageUrl': imageUrl,
-      'senderUid': senderUid, 
-      'likes': 0, 
-      'dislikes': 0,
-      'isMostHelpful': false,
-      'createdAt': FieldValue.serverTimestamp(), 
-    };
-  }
-}
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:zapac/dashboard/models/chat_message.dart';
+import 'package:zapac/dashboard/models/user_interaction.dart'; 
+import 'package:zapac/core/widgets/insight_card.dart';
 class CommentingSection extends StatefulWidget {
   final ValueSetter<bool>? onExpansionChanged;
   final List<ChatMessage> chatMessages; 
   final String? currentUserId; 
+  // NEW: Accept hardcoded terminals
+  final List<Map<String, dynamic>> hardcodedTerminals; 
   
   final FirebaseFirestore firestore = FirebaseFirestore.instance; 
 
@@ -124,6 +17,7 @@ class CommentingSection extends StatefulWidget {
     this.onExpansionChanged,
     required this.chatMessages,
     this.currentUserId, 
+    required this.hardcodedTerminals, // <--- NEW REQUIRED PROP
   });
 
   @override
@@ -135,8 +29,14 @@ class _CommentingSectionState extends State<CommentingSection> {
   
   bool _isSheetFullyExpanded = false;
   String _selectedFilter = 'All';
+  // NEW: State to track which view is active in the sheet
+  String _currentView = 'Insights'; // 'Insights' or 'Terminals'
 
   Map<String, UserInteraction> _userInteractions = {};
+
+  // NEW for snap logic
+  double _lastSize = 0.0;
+  bool _isDragging = false;
 
   @override
   void initState() {
@@ -174,7 +74,6 @@ class _CommentingSectionState extends State<CommentingSection> {
           newInteractions[messageId] = UserInteraction.fromFirestore(doc);
         }
       } catch (e) {
-        // FIX: Replaced print() with comment
         // Logger.error("Error fetching interaction for $messageId: $e");
       }
     }
@@ -187,6 +86,14 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
   void _handleExpansionChange() {
+
+     _lastSize = _sheetController.size;
+
+    // Detect drag movement
+    if (_sheetController.size < 0.85 && _sheetController.size > 0.25) {
+      _isDragging = true;
+    }
+
     final bool isExpandedNow = _sheetController.size >= 0.85;
     if (isExpandedNow != _isSheetFullyExpanded) {
       if (mounted) {
@@ -197,6 +104,8 @@ class _CommentingSectionState extends State<CommentingSection> {
       widget.onExpansionChanged?.call(_isSheetFullyExpanded); 
     }
   }
+
+  
 
   @override
   void didUpdateWidget(covariant CommentingSection oldWidget) {
@@ -294,7 +203,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
       
     } catch (e) {
-      // FIX: Replaced print() with comment
       // Logger.error("Error committing vote: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -394,7 +302,6 @@ class _CommentingSectionState extends State<CommentingSection> {
         );
       }
     } catch (e) {
-      // FIX: Replaced print() with comment
       // Logger.error("Error reporting message $messageId: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -482,7 +389,6 @@ class _CommentingSectionState extends State<CommentingSection> {
       }
 
     } catch (e) {
-      // FIX: Replaced print() with comment
       // Logger.error("Error deleting message ${message.id}: $e");
       
       if (loadingContext.mounted) {
@@ -496,176 +402,6 @@ class _CommentingSectionState extends State<CommentingSection> {
         );
       }
     }
-  }
-
-
-  Widget _buildInsightCard(ChatMessage message) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    
-    const iconSize = 20.0;
-    final dividerColor = Theme.of(context).dividerColor;
-    
-    final interaction = _userInteractions[message.id] ?? message.userInteraction;
-    final timeDisplay = timeAgoSinceDate(message.createdAt);
-    
-    final bool isCurrentUserSender = 
-        widget.currentUserId != null && 
-        message.senderUid != null &&
-        widget.currentUserId == message.senderUid;
-
-    final bool hasImageUrl = message.imageUrl.isNotEmpty;
-    final String initials = message.sender.isNotEmpty ? message.sender[0].toUpperCase() : '?';
-
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: 25,
-                backgroundColor: hasImageUrl ? Colors.transparent : colorScheme.primary, 
-                backgroundImage: hasImageUrl
-                    ? NetworkImage(message.imageUrl) as ImageProvider<Object>?
-                    : null,
-                child: hasImageUrl
-                    ? null
-                    : Text(
-                        initials,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            message.sender,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        if (message.isMostHelpful)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              // FIX: Replaced .withOpacity(0.2) with .withAlpha(51)
-                              color: const Color(0xFF6CA89A).withAlpha(51),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              '💡 Most Helpful',
-                              style: TextStyle(
-                                color: Color(0xFF6CA89A),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        PopupMenuButton<String>(
-                          onSelected: (String result) {
-                            if (result == 'delete' && message.id != null) {
-                              _deleteMessage(message);
-                            } else if (result == 'report' && message.id != null) {
-                                _handleReport(message);
-                            }
-                          },
-                          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                            const PopupMenuItem<String>(
-                              value: 'report',
-                              child: Text('Report'),
-                            ),
-                            if (isCurrentUserSender)
-                              const PopupMenuItem<String>(
-                                value: 'delete',
-                                child: Text('Delete', style: TextStyle(color: Colors.red)),
-                              ),
-                          ],
-                          icon: Icon(
-                            Icons.more_horiz,
-                            color: dividerColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      message.message,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Route: ${message.route}  |  $timeDisplay',
-                      style: TextStyle(
-                        color: textTheme.bodySmall?.color,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.only(left: 61),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                InkWell(
-                  onTap: () => _handleVote(message, true),
-                  child: Row(
-                    children: [
-                      Icon(
-                        interaction.isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
-                        color: interaction.isLiked ? Colors.blue : dividerColor,
-                        size: iconSize,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        message.likes.toString(),
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 24),
-                InkWell(
-                  onTap: () => _handleVote(message, false),
-                  child: Row(
-                    children: [
-                      Icon(
-                        interaction.isDisliked ? Icons.thumb_down : Icons.thumb_down_alt_outlined,
-                        color: interaction.isDisliked ? Colors.red : dividerColor,
-                        size: iconSize,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        message.dislikes.toString(),
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurface),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildFilterChip(String label) {
@@ -697,38 +433,151 @@ class _CommentingSectionState extends State<CommentingSection> {
           : null,
     );
   }
+  
+  // MODIFIED: _buildTabButton now accepts an iconPath string
+  Widget _buildTabButton(String label, String view, String iconPath, ColorScheme cs) {
+    final bool isSelected = _currentView == view;
+    const Color buttonBackgroundColor = Color(0xFFE6A84B); 
+    
+    final BorderSide border = isSelected 
+      ? const BorderSide(color: Colors.white, width: 1.0)
+      : const BorderSide(color: buttonBackgroundColor, width: 2.0);
+
+    return SizedBox(
+      width: 120, 
+      height: 40, 
+      child: TextButton(
+        onPressed: () {
+          if (!mounted) return;
+          setState(() {
+            _currentView = view;
+          });
+        },
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          backgroundColor: buttonBackgroundColor, 
+          shape: RoundedRectangleBorder(
+             borderRadius: BorderRadius.circular(8),
+             side: border,
+          ),
+          minimumSize: Size.zero, 
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        // NEW: Use Row to place the image asset and text side-by-side
+        child: Row( 
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // **NOTE: Replace 'assets/icons/...' with your actual image paths**
+            Image.asset(
+              iconPath,
+              width: 18, 
+              height: 18,
+              // Use color to tint the image white if it's a monochrome icon
+              color: Colors.white, 
+            ),
+            const SizedBox(width: 8), 
+            Text(
+              label,
+              style: const TextStyle( 
+                fontWeight: FontWeight.bold,
+                color: Colors.white, 
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // NEW: Widget to display a single Terminal Card
+  Widget _buildTerminalCard(Map<String, dynamic> terminal, ColorScheme cs) {
+    final details = terminal['details'] as Map<String, String>;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: cs.surfaceVariant, // Use a slight off-white/grey for card background
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Colors.grey.shade300, 
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              details['title'] ?? 'Terminal',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: cs.primary,
+              ),
+            ),
+            const Divider(height: 12),
+            _buildTerminalDetailRow(Icons.access_time, 'Status', details['status'] ?? 'N/A', cs),
+            _buildTerminalDetailRow(Icons.route, 'Routes', details['routes'] ?? 'N/A', cs),
+            _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] ?? 'N/A', cs),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Helper for Terminal Detail Row
+  Widget _buildTerminalDetailRow(IconData icon, String label, String value, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: cs.secondary),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              color: cs.onSurface,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                color: cs.onSurface.withAlpha(179),
+              ),
+              softWrap: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    final List<ChatMessage> currentMessages = widget.chatMessages.map((msg) {
-        if (msg.id != null && _userInteractions.containsKey(msg.id)) {
-          return ChatMessage(
-            id: msg.id,
-            sender: msg.sender,
-            message: msg.message,
-            route: msg.route,
-            imageUrl: msg.imageUrl,
-            senderUid: msg.senderUid, 
-            likes: msg.likes,
-            dislikes: msg.dislikes,
-            isMostHelpful: msg.isMostHelpful,
-            createdAt: msg.createdAt,
-            userInteraction: _userInteractions[msg.id]!,
-          );
-        }
-        return msg;
-    }).toList(); 
 
-    final filteredMessages = currentMessages.where((message) {
+    final filteredMessages = widget.chatMessages.where((message) {
       if (_selectedFilter == 'All') return true;
 
       final messageLower = message.message.toLowerCase();
 
       switch (_selectedFilter) {
         case 'Warning':
+          // ... (filter logic for Warning)
           return messageLower.contains('traffic') ||
                  messageLower.contains('accident') ||
                  messageLower.contains('danger') ||
@@ -756,6 +605,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('bangga');
                  
         case 'Shortcuts':
+          // ... (filter logic for Shortcuts)
           return messageLower.contains('shortcut') ||
                  messageLower.contains('faster') ||
                  messageLower.contains('route') ||
@@ -764,6 +614,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('dali');
                  
         case 'Fare Tips':
+          // ... (filter logic for Fare Tips)
           return messageLower.contains('fare') ||
                  messageLower.contains('price') ||
                  messageLower.contains('cost') ||
@@ -776,6 +627,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                  messageLower.contains('bayad');
                  
         case 'Driver Reviews':
+          // ... (filter logic for Driver Reviews)
           return messageLower.contains('driver') ||
                  messageLower.contains('reckless') ||
                  messageLower.contains('rude') ||
@@ -812,74 +664,125 @@ class _CommentingSectionState extends State<CommentingSection> {
               ),
             ],
           ),
+          child: NotificationListener<ScrollEndNotification>(
+            onNotification: (n) {
+              if (_isDragging) {
+                _isDragging = false;
+
+                // SNAP UP or SNAP DOWN
+                final snapTarget = _lastSize > 0.55 ? 0.85 : 0.25;
+
+                _sheetController.animateTo(
+                  snapTarget,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              }
+              return false;
+            },
+
           child: Column(
             children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  // FIX: This section's colors are hardcoded but will be kept as they are likely intentional for this header's design
-                  color: isDark ? const Color(0xFFDBA252) : const Color(0xFFF4BE6C),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
-                  ),
-                ),
-                child: Center(
-                  child: RichText(
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: isDark ? Colors.black : Colors.black,
-                        fontFamily: 'Roboto',
-                      ),
-                      children: [
-                        const TextSpan(text: 'Taga '),
-                        TextSpan(
-                          text: 'ZAPAC',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        const TextSpan(text: ' says...'),
-                      ],
+              // MODIFIED: Header Container with custom background color and centered buttons
+                GestureDetector(
+                onTap: () {
+                  final target =
+                      _sheetController.size > 0.5 ? 0.25 : 0.85;
+
+                  _sheetController.animateTo(
+                    target,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF4BE6C),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
                     ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildFilterChip('All'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Warning'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Shortcuts'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Fare Tips'),
-                      const SizedBox(width: 8),
-                      _buildFilterChip('Driver Reviews'),
+                      _buildTabButton("Terminals", "Terminals",
+                          "assets/terminalsIcon.png", colorScheme),
+                      const SizedBox(width: 12),
+                      _buildTabButton("Insights", "Insights",
+                          "assets/insightsIcon.png", colorScheme),
                     ],
                   ),
                 ),
               ),
-              Divider(height: 1, color: Theme.of(context).dividerColor),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: filteredMessages.length,
-                  itemBuilder: (context, index) {
-                    return _buildInsightCard(filteredMessages[index]);
-                  },
+
+              // NEW: Conditional content rendering for Insights view (Filter Chips are only for Insights)
+              if (_currentView == 'Insights')
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Row(
+                          children: [
+                            _buildFilterChip('All'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Warning'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Shortcuts'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Fare Tips'),
+                            const SizedBox(width: 8),
+                            _buildFilterChip('Driver Reviews'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Divider(height: 1, color: Colors.grey[300]!),
+                  ],
                 ),
+                
+              Expanded(
+                child: _currentView == 'Insights'
+                    ? ListView.builder(
+                        controller: scrollController,
+                        itemCount: filteredMessages.length,
+                        itemBuilder: (context, index) {
+                          final message = filteredMessages[index];
+                          final interaction = (message.id != null && _userInteractions[message.id] != null)
+                              ? _userInteractions[message.id]!
+                              : const UserInteraction();
+                          final isCurrentUserSender =
+                              widget.currentUserId != null && widget.currentUserId == message.senderUid;
+
+                          return InsightCard(
+                            message: message,
+                            interaction: interaction,
+                            isCurrentUserSender: isCurrentUserSender,
+                            onLike: () => _handleVote(message, true),
+                            onDislike: () => _handleVote(message, false),
+                            onReport: () => _handleReport(message),
+                            onDelete: () => _deleteMessage(message),
+                          );
+                        },
+                      )
+                    // NEW: Display the Terminal List when the Terminals tab is selected
+                    : ListView.builder(
+                        controller: scrollController,
+                        itemCount: widget.hardcodedTerminals.length,
+                        itemBuilder: (context, index) {
+                          return _buildTerminalCard(widget.hardcodedTerminals[index], colorScheme);
+                        },
+                      ),
               ),
             ],
           ),
+          )
         );
       },
     );

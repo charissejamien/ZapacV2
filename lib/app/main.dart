@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:zapac/dashboard/dashboard.dart';
 import '../authentication/login_page.dart';
 import '../authentication/onboarding_profile.dart';
+import 'main_shell.dart';
 
 class ThemeNotifier extends ChangeNotifier {
   ThemeMode _themeMode;
@@ -93,10 +93,10 @@ class ZapacApp extends StatelessWidget {
 
           themeMode: themeNotifier.themeMode,
 
-          initialRoute: '/',
+          initialRoute: '/login',
           routes: {
-            '/': (context) => const OnboardingProfilePage(),
-            // '/dashboard': (context) => const Dashboard(),
+            '/login': (context) => const LoginPage(),
+            '/app': (context) => const MainShell(),
           },
         );
       },

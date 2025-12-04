@@ -646,19 +646,20 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
   /// Helper to render "Taga ZAPAC says..." with only "ZAPAC" bold and gradient
-  Widget _buildZapacHeaderTitle() {
+  /// Helper to render "Taga ZAPAC says..." with adaptive text color
+  Widget _buildZapacHeaderTitle(Color textColor) { // <--- ADDED PARAMETER
     const double fontSize = 18;
 
     return RichText(
       textAlign: TextAlign.center,
       text: TextSpan(
         children: [
-          const TextSpan(
+          TextSpan(
             text: 'Taga ',
             style: TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: fontSize,
-              color: Colors.black87,
+              color: textColor, // <--- USE PARAMETER
             ),
           ),
           WidgetSpan(
@@ -668,8 +669,8 @@ class _CommentingSectionState extends State<CommentingSection> {
               shaderCallback: (Rect bounds) {
                 return const LinearGradient(
                   colors: [
-                    Color(0xFF6CA89A), // greenish
-                    Color(0xFF4A6FA5), // bluish
+                    Color(0xFF6CA89A), 
+                    Color(0xFF4A6FA5), 
                   ],
                 ).createShader(bounds);
               },
@@ -679,17 +680,17 @@ class _CommentingSectionState extends State<CommentingSection> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: fontSize,
-                  color: Colors.white, // base color for shader to apply on
+                  color: Colors.white, 
                 ),
               ),
             ),
           ),
-          const TextSpan(
+          TextSpan(
             text: ' says...',
             style: TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: fontSize,
-              color: Colors.black87,
+              color: textColor, // <--- USE PARAMETER
             ),
           ),
         ],
@@ -701,6 +702,12 @@ class _CommentingSectionState extends State<CommentingSection> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    final headerColor = isDarkMode ? const Color(0xFF8F6F3A) : const Color(0xFFF4BE6C);
+
+    final headerTextColor = isDarkMode ? Colors.white : Colors.black87;
 
     final filteredMessages = widget.chatMessages.where((message) {
       if (_selectedFilter == 'All') return true;
@@ -850,9 +857,9 @@ class _CommentingSectionState extends State<CommentingSection> {
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF4BE6C),
-                    borderRadius: BorderRadius.only(
+                  decoration: BoxDecoration(
+                    color: headerColor,
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(30),
                       topRight: Radius.circular(30),
                     ),
@@ -876,14 +883,14 @@ class _CommentingSectionState extends State<CommentingSection> {
                               child: widget.isShowingTerminals
                                   ? Text(
                                       headerTitle, // "Terminals" or Terminal Name
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: headerTextColor,
                                         fontSize: 18,
                                       ),
                                       textAlign: TextAlign.center,
                                     )
-                                  : _buildZapacHeaderTitle(),
+                                  : _buildZapacHeaderTitle(headerTextColor),
                             ),
                           ),
                           

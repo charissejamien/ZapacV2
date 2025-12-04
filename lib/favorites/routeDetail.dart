@@ -4,6 +4,7 @@ import 'favorite_route.dart';
 import 'favorite_routes_service.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 import 'dart:io' show Platform; 
+import 'package:zapac/core/widgets/fare_accuracy_review.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final FavoriteRoute route;
@@ -528,6 +529,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     final cs = theme.colorScheme;
     final Color textColor = cs.onSurface;
 
+    final String estimatedFareLabel = widget.route.estimatedFares.values.isNotEmpty
+        ? widget.route.estimatedFares.values.first
+        :'N/A';
+
     return Scaffold(
       backgroundColor: cs.background,
       appBar: AppBar(
@@ -594,6 +599,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
           ],
         ),
       ),
+      bottomNavigationBar: FareAccuracyReviewBar(
+        routeName: widget.route.routeName,
+        estimatedFareLabel: estimatedFareLabel, 
+        onAnswer: (isAccurate) {
+        },
+    ),
     );
   }
-}
+  }

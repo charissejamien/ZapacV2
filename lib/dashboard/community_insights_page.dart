@@ -108,6 +108,7 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
   void _handleExpansionChange() {
+    if (!_sheetController.isAttached) return;
     final currentSize = _sheetController.size;
 
     // Track how the sheet is moving (up or down) when not in a programmatic snap.
@@ -142,13 +143,16 @@ class _CommentingSectionState extends State<CommentingSection> {
     
     // If we transition to detail view, ensure the sheet is expanded.
     if (widget.selectedTerminalId != null && oldWidget.selectedTerminalId == null) {
-      if (_sheetController.size < _expandedSize) {
-        _sheetController.animateTo(
-          _expandedSize,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_sheetController.isAttached) return;
+        if (_sheetController.size < _expandedSize) {
+          _sheetController.animateTo(
+            _expandedSize,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
     }
   }
 
@@ -893,6 +897,7 @@ class _CommentingSectionState extends State<CommentingSection> {
       minChildSize: _closedSize,
       maxChildSize: _expandedSize,
       builder: (context, scrollController) {
+        final sheetSize = _sheetController.isAttached ? _sheetController.size : _closedSize;
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface, 
@@ -910,6 +915,7 @@ class _CommentingSectionState extends State<CommentingSection> {
           ),
           child: NotificationListener<ScrollNotification>(
             onNotification: (notification) {
+              if (!_sheetController.isAttached) return false;
               // Track the start size of this drag/scroll gesture.
               if (notification is ScrollStartNotification) {
                 _gestureStartSize = _sheetController.size;
@@ -999,6 +1005,7 @@ class _CommentingSectionState extends State<CommentingSection> {
               // CORRECTED HEADER LOGIC (Single Title or Back Button + Title)
               GestureDetector(
                 onTap: () {
+                  if (!_sheetController.isAttached) return;
                   // Cycle: closed -> preview -> expanded -> closed
                   final currentSize = _sheetController.size;
                   const double epsilon = 0.03;
@@ -1113,7 +1120,7 @@ class _CommentingSectionState extends State<CommentingSection> {
 
 
               // Filter Chips (Only visible for Insights and when sheet is at least in preview state)
-              if (!widget.isShowingTerminals && _sheetController.size >= _previewSize - 0.02)
+              if (!widget.isShowingTerminals && sheetSize >= _previewSize - 0.02)
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

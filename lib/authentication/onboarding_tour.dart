@@ -143,7 +143,7 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
 
           Image.asset(
             imagePath, 
-            height: 280, 
+            height: 240, 
             fit: BoxFit.contain,
           ),
           const SizedBox(height: 30.0),

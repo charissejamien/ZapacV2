@@ -7,6 +7,7 @@ class InsightCard extends StatelessWidget {
   final ChatMessage message;
   final UserInteraction interaction;
   final bool isCurrentUserSender;
+  final String? categoryLabel;
   final VoidCallback? onLike;
   final VoidCallback? onDislike;
   final VoidCallback? onReport;
@@ -17,6 +18,7 @@ class InsightCard extends StatelessWidget {
     required this.message,
     required this.interaction,
     required this.isCurrentUserSender,
+    this.categoryLabel,
     this.onLike,
     this.onDislike,
     this.onReport,
@@ -137,6 +139,27 @@ class InsightCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
+                    if (categoryLabel != null) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6CA89A).withAlpha(40),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          categoryLabel!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6CA89A),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

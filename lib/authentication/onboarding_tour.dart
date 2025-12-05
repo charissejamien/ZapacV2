@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:zapac/dashboard/dashboard.dart';
 import 'package:zapac/core/widgets/onboardHeader.dart';
 import 'package:zapac/core/widgets/onboardFooter.dart';
+import 'package:shared_preferences/shared_preferences.dart'; 
+
+// === NEW IMPORT for Location Logic ===
+import 'package:zapac/core/utils/map_utils.dart'; // Assuming map_utils.dart is in a sibling directory or adjust as needed.
 
 class OnboardingTourPage extends StatefulWidget {
 
@@ -15,7 +18,9 @@ class OnboardingTourPage extends StatefulWidget {
 class _OnboardingTourPageState extends State<OnboardingTourPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  final int _numPages = 3;
+  
+  // === MODIFIED: Increased page count from 3 to 4 ===
+  final int _numPages = 4; //
 
   @override
   void initState() {
@@ -37,14 +42,13 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     super.dispose();
   }
 
-  void _onNextPressed() {
-    if (_currentPage < _numPages - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      // CHANGED: Navigate to the MainShell via '/app' route
+  // Completes onboarding and navigates to the main app
+  Future<void> _completeOnboardingAndNavigate() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboardingComplete', true);
+
+    if (mounted) {
+      // Navigate to the MainShell via '/app' route
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/app',
         (Route<dynamic> route) => false,
@@ -52,13 +56,34 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     }
   }
 
-  // Helper function for navigating directly to Dashboard
+  // === NEW FUNCTION: Triggers the OS location prompt and then navigates ===
+  Future<void> _onEnableLocationPressed() async {
+    // This function from map_utils handles the permission check and displays the OS prompt
+    await MapUtils.getCurrentLocation(context); 
+
+    // Regardless of whether permission was granted or denied, the user has completed this step.
+    if (mounted) {
+      await _completeOnboardingAndNavigate(); 
+    }
+  }
+
+  void _onNextPressed() {
+    // Only navigate to the next page if not on the new last page (index 3)
+    if (_currentPage < _numPages - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    } 
+  }
+
+  // === MODIFIED FUNCTION: Skips to the final location page (index 3) ===
   void _onSkipPressed() {
-     // CHANGED: Navigate to the MainShell via '/app' route
-     Navigator.of(context).pushNamedAndRemoveUntil(
-      '/app',
-      (Route<dynamic> route) => false,
-    );
+     _pageController.animateToPage(
+       _numPages - 1, // Jump to the last page (index 3)
+       duration: const Duration(milliseconds: 400),
+       curve: Curves.easeInOut,
+     );
   }
 
   Widget _buildPageIndicator(int index, ColorScheme cs) {
@@ -91,6 +116,7 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.bold,
+          height: 1.1,
           color: Colors.white, 
         ),
       ),
@@ -146,10 +172,96 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     );
   }
 
+
+  // === NEW PAGE FOR LOCATION PROMPT ===
+  Widget _buildLocationPage(ColorScheme cs) { //
+    // 0.8 opacity ≈ alpha 204
+    final descriptionAlpha = 204;
+    final greenColor = const Color(0xFF6CA89A);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 30.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          // Placeholder Image or Icon for Location
+          Image.asset(
+            'assets/Vector.png',
+            height: 80, // Maintain original size constraint
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(height: 30.0),
+          
+         // Title 1
+        _buildGradientText(
+          'Ready to \nZap around Cebu?', 
+          36, 
+          isTitle: true, 
+        ),
+          const SizedBox(height: 30.0),
+
+          // Title 2 (Subtitle)
+          Text(
+            'Enable your location to find the nearest stops around you.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: cs.onSurface.withAlpha(descriptionAlpha),
+            ),
+          ),
+
+          const SizedBox(height: 15.0),
+          
+          // Description
+          Text(
+            'We prioritize your privacy and only use location for navigation',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontStyle: FontStyle.italic,
+              color: cs.onSurface.withAlpha(descriptionAlpha),
+            ),
+          ),
+          
+          const SizedBox(height: 40.0),
+
+          // Enable Locations Button
+          ElevatedButton(
+            onPressed: _onEnableLocationPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: greenColor, 
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              "Enable Locations",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  
+
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final isLastPage = _currentPage == _numPages - 1;
+    
+    // Check if it's the new second-to-last page
+    final isPenultimatePage = _currentPage == _numPages - 2; 
+    // Check if it's the new last page
+    final isLastPage = _currentPage == _numPages - 1; 
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -189,7 +301,7 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
                     imagePath: 'assets/onboardingTwo.png',
                   ),
                   
-                  // Page 3
+                  // Page 3 (Old last page, now second-to-last)
                   _buildTourPage(
                     title: 'Know Your "Plete"',
                     subtitle: 'Before You Hop On.',
@@ -197,17 +309,22 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
                     cs: cs,
                     imagePath: 'assets/onboardingThree.png',
                   ),
+
+                  // === Page 4 (New last page) ===
+                  _buildLocationPage(cs), //
                 ],
               ),
             ),
             
+            // The bottom row is only needed for the first three pages.
+            if (!isLastPage)
             Padding(
               padding: const EdgeInsets.only(bottom: 40, left: 30, right: 30, top: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton(
-                    onPressed: _onSkipPressed,
+                    onPressed: _onSkipPressed, // Jumps to the location page
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(60, 40),
@@ -223,17 +340,19 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    // The indicator includes the new 4th page
                     children: List.generate(_numPages, (index) => _buildPageIndicator(index, cs)),
                   ),
 
                   TextButton(
-                    onPressed: _onNextPressed,
+                    // On the second-to-last page, this navigates to the final location page.
+                    onPressed: _onNextPressed, 
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                       minimumSize: const Size(60, 40),
                     ),
                     child: Text(
-                      isLastPage ? 'Get Started' : 'Next',
+                      isPenultimatePage ? 'Get Started' : 'Next',
                       style: TextStyle(
                         color: cs.primary,
                         fontSize: 18,
@@ -242,6 +361,15 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
                     ),
                   ),
                 ],
+              ),
+            ),
+            // Still show the indicator on the last page for context
+            if (isLastPage)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 40, top: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_numPages, (index) => _buildPageIndicator(index, cs)),
               ),
             ),
           ],

@@ -57,8 +57,10 @@ flutter:
     - assets/onboardingOne.png
     - assets/onboardingTwo.png
     - assets/onboardingThree.png
+    - assets/onboardingFour.png
     - assets/insightsIcon.png
     - assets/terminalMarker.png
     - assets/maximOne.png
     - assets/maximT.png
     - assets/van.png
+    - assets/Vector.png

@@ -36,6 +36,9 @@ dependencies:
   #Google Fonts
   google_fonts: ^6.3.2
 
+  #Tutorial
+  tutorial_coach_mark: ^1.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

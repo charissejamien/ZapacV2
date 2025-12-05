@@ -3,6 +3,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import 'package:zapac/dashboard/models/chat_message.dart';
 import 'package:zapac/dashboard/route_details_overlay.dart'; 
 import 'community_insights_page.dart';
@@ -14,6 +16,7 @@ import 'dart:io' show Platform;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:math'; 
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 // Dark Map Style JSON (Night/Aubergine inspired)
 const String _darkMapStyleJson = r'''
@@ -29,6 +32,145 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
+
+  final GlobalKey _searchKey = GlobalKey();
+  final GlobalKey _terminalListKey = GlobalKey();
+  final GlobalKey _fabKey = GlobalKey();
+
+  late TutorialCoachMark tutorialCoachMark;
+  List<TargetFocus> targets = [];
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 1) Show dashboard tutorial when first opening
+    _checkAndShowTutorial();
+
+    // 2) Initialize current user and listen to auth changes
+    _currentUserId = _auth.currentUser?.uid;
+    _authStateSubscription = _auth.authStateChanges().listen((User? user) {
+      if (mounted) {
+        setState(() {
+          _currentUserId = user?.uid;
+        });
+      }
+    });
+
+    // 3) Load custom terminal icon for markers
+    _loadTerminalIcon();
+
+    // 4) Start listening to community insights after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _fetchAndListenToMessages();
+        setState(() {});
+      }
+    });
+  }
+
+Future<void> _checkAndShowTutorial() async {
+  final prefs = await SharedPreferences.getInstance();
+  bool seen = prefs.getBool('dashboard_tutorial_seen') ?? false;
+
+  if (!seen) {
+    Future.delayed(const Duration(seconds: 1), (){
+      _showTutorial();
+    });
+  }
+}
+
+void _showTutorial() {
+  _initTargets();
+  tutorialCoachMark = TutorialCoachMark(
+    targets: targets,
+    colorShadow: const Color(0xFF6CA89A),
+    textSkip: "SKIP",
+    paddingFocus: 10,
+    opacityShadow: 0.8,
+    onFinish: () => _markTutorialAsSeen(),
+    onSkip: () {
+      _markTutorialAsSeen();
+      return true;
+    },
+    )..show(context: context);
+}
+
+Future<void> _markTutorialAsSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('dashboard_tutorial_seen', true);
+  }
+
+ void _initTargets() {
+    targets.clear();
+    
+    // TARGET 1: SEARCH BAR
+    targets.add(
+      TargetFocus(
+        identify: "search_bar",
+        keyTarget: _searchKey,
+        alignSkip: Alignment.topRight,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Find Terminals",
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 20),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(top: 10.0),
+                    child: Text(
+                      "Search for specific locations, routes, or terminals here.",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+
+    // TARGET 2: TERMINAL LIST / CONTENT
+    targets.add(
+      TargetFocus(
+        identify: "terminal_list",
+        keyTarget: _terminalListKey,
+        shape: ShapeLightFocus.RRect,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) {
+              return const Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Live Updates",
+                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 20),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(top: 10.0),
+                    child: Text(
+                      "See real-time crowd updates and comments from other commuters.",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  } 
+
   late GoogleMapController _mapController; 
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
@@ -159,29 +301,6 @@ class _DashboardState extends State<Dashboard> {
   String? _currentUserId;
   StreamSubscription? _authStateSubscription;
 
-  @override
-  void initState() {
-    super.initState();
-    _currentUserId = _auth.currentUser?.uid;
-    
-    _authStateSubscription = _auth.authStateChanges().listen((User? user) {
-      if (mounted) {
-        setState(() {
-          _currentUserId = user?.uid;
-        });
-      }
-    });
-
-    _loadTerminalIcon(); 
-    
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _fetchAndListenToMessages(); 
-        setState(() {});
-      }
-    });
-  }
 
   // NEW: Handle theme changes after map is created
   @override
@@ -711,6 +830,7 @@ class _DashboardState extends State<Dashboard> {
 
             // Pass all required props to CommentingSection
             CommentingSection(
+              key: _terminalListKey, // tutorial target for terminal list / sheet
               chatMessages: _liveChatMessages, 
               onExpansionChanged: _onCommunityInsightExpansionChanged,
               currentUserId: _currentUserId,
@@ -735,9 +855,12 @@ class _DashboardState extends State<Dashboard> {
                   // SearchBar
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: SearchBar(
-                      onPlaceSelected: _handlePlaceSelected,
-                      onSearchCleared: _clearSearchMarker,
+                    child: Container(
+                      key: _searchKey, // tutorial target for search
+                      child: SearchBar(
+                        onPlaceSelected: _handlePlaceSelected,
+                        onSearchCleared: _clearSearchMarker,
+                      ),
                     ),
                   ),
                 ],

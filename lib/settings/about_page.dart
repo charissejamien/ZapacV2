@@ -87,14 +87,14 @@ class AboutPage extends StatelessWidget {
               context,
               title: 'Privacy Policy',
               onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                MaterialPageRoute(builder: (_) =>  PrivacyPolicyPage()),
             ),
             ),
             _buildLegalTile(
               context,
               title: 'Terms of Service',
               onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const TermsOfServicePage()),
+                MaterialPageRoute(builder: (_) =>  TermsOfServicePage()),
               ),
             ),
             _buildLegalTile(

@@ -1,19 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class PrivacyPolicyPage extends StatelessWidget {
-  final String onlineUrl;
-
-  const PrivacyPolicyPage({super.key, this.onlineUrl = 'https://zapac.ph/privacy'});
-
-  Future<void> _openOnline(BuildContext context) async {
-    final uri = Uri.parse(onlineUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open privacy URL')));
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +21,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               width: 150,)
             ),
             const SizedBox(height: 20),
-            Text('ZAPAC Privacy Policy', style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: cs.onSurface)),
+            Text('ZAPAC PRIVACY POLICY', style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: cs.onSurface)),
             Text(
               'Last Updated: December 4, 2025',
               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w300, color: cs.onSurface.withOpacity(0.8)),

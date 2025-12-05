@@ -448,6 +448,79 @@ class _CommentingSectionState extends State<CommentingSection> {
           : null,
     );
   }
+
+  /// Infer a simple category label for a given ChatMessage based on its text.
+  String? _inferCategoryLabel(ChatMessage message) {
+    final messageLower = message.message.toLowerCase();
+
+    // Warning
+    if (messageLower.contains('traffic') ||
+        messageLower.contains('accident') ||
+        messageLower.contains('danger') ||
+        messageLower.contains('slow') ||
+        messageLower.contains('kuyaw') ||
+        messageLower.contains('trapik') ||
+        messageLower.contains('aksidente') ||
+        messageLower.contains('hinay') ||
+        messageLower.contains('slide') ||
+        messageLower.contains('slippery') ||
+        messageLower.contains('baha') ||
+        messageLower.contains('flood') ||
+        messageLower.contains('landslide') ||
+        messageLower.contains('atang') ||
+        messageLower.contains('kidnap') ||
+        messageLower.contains('holdup') ||
+        messageLower.contains('tulis') ||
+        messageLower.contains('manulis') ||
+        messageLower.contains('ngitngit') ||
+        messageLower.contains('dark') ||
+        messageLower.contains('snatch') ||
+        messageLower.contains('hole') ||
+        messageLower.contains('buslot') ||
+        messageLower.contains('lubak') ||
+        messageLower.contains('bangga') ||
+        messageLower.contains('warning')) {
+      return 'Warning';
+    }
+
+    // Shortcuts
+    if (messageLower.contains('shortcut') ||
+        messageLower.contains('faster') ||
+        messageLower.contains('route') ||
+        messageLower.contains('quick') ||
+        messageLower.contains('lusot') ||
+        messageLower.contains('dali') ||
+        messageLower.contains('shortcut')) {
+      return 'Shortcut';
+    }
+
+    // Fare Tips
+    if (messageLower.contains('fare') ||
+        messageLower.contains('price') ||
+        messageLower.contains('cost') ||
+        messageLower.contains('plete') ||
+        messageLower.contains('plite') ||
+        messageLower.contains('pliti') ||
+        messageLower.contains('pleti') ||
+        messageLower.contains('sukli') ||
+        messageLower.contains('tagpila') ||
+        messageLower.contains('bayad') ||
+        messageLower.contains('Fare Tips')) {
+      return 'Fare Tip';
+    }
+
+    // Driver Reviews
+    if (messageLower.contains('driver') ||
+        messageLower.contains('reckless') ||
+        messageLower.contains('rude') ||
+        messageLower.contains('kind') ||
+        messageLower.contains('buotan') ||
+        messageLower.contains('barato')) {
+      return 'Driver Review';
+    }
+
+    return null;
+  }
   
   // Widget to display a single Terminal Card
   Widget _buildTerminalCard(Map<String, dynamic> terminal, ColorScheme cs) {
@@ -947,28 +1020,45 @@ class _CommentingSectionState extends State<CommentingSection> {
                             },
                           )
                     // Insights View
-                    : ListView.builder(
-                        controller: scrollController,
-                        itemCount: filteredMessages.length,
-                        itemBuilder: (context, index) {
-                          final message = filteredMessages[index];
-                          final interaction = (message.id != null && _userInteractions[message.id] != null)
-                              ? _userInteractions[message.id]!
-                              : const UserInteraction();
-                          final isCurrentUserSender =
-                              widget.currentUserId != null && widget.currentUserId == message.senderUid;
+                    : (filteredMessages.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Text(
+                                'No insights yet for this filter.\nBe the first to share what\'s happening on the road!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: colorScheme.onSurface.withAlpha(179),
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: filteredMessages.length,
+                            itemBuilder: (context, index) {
+                              final message = filteredMessages[index];
+                              final interaction = (message.id != null && _userInteractions[message.id] != null)
+                                  ? _userInteractions[message.id]!
+                                  : const UserInteraction();
+                              final isCurrentUserSender =
+                                  widget.currentUserId != null && widget.currentUserId == message.senderUid;
 
-                          return InsightCard(
-                            message: message,
-                            interaction: interaction,
-                            isCurrentUserSender: isCurrentUserSender,
-                            onLike: () => _handleVote(message, true),
-                            onDislike: () => _handleVote(message, false),
-                            onReport: () => _handleReport(message),
-                            onDelete: () => _deleteMessage(message),
-                          );
-                        },
-                      ),
+                              final categoryLabel = _inferCategoryLabel(message);
+
+                              return InsightCard(
+                                message: message,
+                                interaction: interaction,
+                                isCurrentUserSender: isCurrentUserSender,
+                                categoryLabel: categoryLabel,
+                                onLike: () => _handleVote(message, true),
+                                onDislike: () => _handleVote(message, false),
+                                onReport: () => _handleReport(message),
+                                onDelete: () => _deleteMessage(message),
+                              );
+                            },
+                          )),
               ),
             ],
           ),

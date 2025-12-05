@@ -245,6 +245,45 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
       ),
     );
   }
+  
+  Widget _quickTagChip(String label, String prefix) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ActionChip(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        backgroundColor: theme.colorScheme.surfaceVariant.withAlpha(alpha128),
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: theme.colorScheme.primary.withAlpha(90),
+          ),
+        ),
+        onPressed: () {
+          if (_isPosting) return;
+
+          final current = insightController.text;
+          // Only prepend if it doesn't already start with this prefix
+          if (!current.startsWith(prefix)) {
+            setState(() {
+              insightController.text = '$prefix$current';
+              insightController.selection = TextSelection.fromPosition(
+                TextPosition(offset: insightController.text.length),
+              );
+            });
+            HapticFeedback.lightImpact();
+          }
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -283,110 +322,237 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
           child: SlideTransition(
             position: _slideAnimation,
             child: Container(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).viewInsets.bottom + 16),
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                MediaQuery.of(context).viewInsets.bottom + 16,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: hasImageUrl ? Colors.transparent : theme.colorScheme.primary, 
-                        backgroundImage: hasImageUrl
-                            ? NetworkImage(profileUrl) as ImageProvider<Object>?
-                            : null,
-                        child: hasImageUrl
-                            ? null
-                            : Text(
-                                initials,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(25),
+                    blurRadius: 18,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: hintColor,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            senderName,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                    ),
+                    const SizedBox(height: 12),
+                    // Header row with title + close
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Add Community Insight',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
                               color: textColor,
                             ),
                           ),
-                          Text(
-                            'Posting publicly across ZAPAC',
-                            style: TextStyle(
-                              // FIX: Replaced .withOpacity(0.6) with .withAlpha(153)
-                              color: textColor?.withAlpha(153),
-                              fontSize: 12,
-                            ),
+                        ),
+                        IconButton(
+                          onPressed: _isPosting ? null : () => Navigator.of(context).pop(),
+                          icon: Icon(Icons.close, color: hintColor),
+                          tooltip: 'Close',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor:
+                              hasImageUrl ? Colors.transparent : theme.colorScheme.primary,
+                          backgroundImage: hasImageUrl
+                              ? NetworkImage(profileUrl) as ImageProvider<Object>?
+                              : null,
+                          child: hasImageUrl
+                              ? null
+                              : Text(
+                                  initials,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                senderName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Posting publicly across ZAPAC',
+                                style: TextStyle(
+                                  color: textColor.withAlpha(153),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Help other commuters by sharing what you experienced today.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: hintColor,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Quick category chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _quickTagChip('Warning', '⚠️ Warning: '),
+                          _quickTagChip('Shortcut', '🧭 Shortcut: '),
+                          _quickTagChip('Fare Tip', '💰 Fare tip: '),
+                          _quickTagChip('Driver', '🚍 Driver: '),
                         ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: insightController,
-                    focusNode: insightFocusNode, 
-                    decoration: InputDecoration(
-                      hintText: 'Share an insight to the community....',
-                      hintStyle: TextStyle(color: hintColor),
-                      border: InputBorder.none,
                     ),
-                    style: TextStyle(color: textColor),
-                    maxLines: 4,
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text(
-                        '$_charCount/$_maxChars',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _getCharCountColor(theme),
+                    const SizedBox(height: 12),
+                    // Insight text field
+                    TextField(
+                      controller: insightController,
+                      focusNode: insightFocusNode,
+                      decoration: InputDecoration(
+                        hintText: 'Share an insight to the community...',
+                        hintStyle: TextStyle(color: hintColor),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceVariant.withAlpha(30),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: theme.dividerColor.withAlpha(80),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: theme.dividerColor.withAlpha(80),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.all(12),
+                      ),
+                      style: TextStyle(color: textColor),
+                      maxLines: 4,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$_charCount/$_maxChars',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _getCharCountColor(theme),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Route field
+                    TextField(
+                      controller: routeController,
+                      focusNode: routeFocusNode,
+                      decoration: InputDecoration(
+                        hintText: 'What route are you on?',
+                        hintStyle: TextStyle(color: hintColor),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceVariant.withAlpha(30),
+                        prefixIcon: Icon(
+                          Icons.route,
+                          color: hintColor,
+                          size: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: theme.dividerColor.withAlpha(80),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: theme.dividerColor.withAlpha(80),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: routeController,
-                    decoration: InputDecoration(
-                      hintText: 'What route are you on?',
-                      hintStyle: TextStyle(color: hintColor),
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                      style: TextStyle(color: textColor),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isPosting ? null : _postInsight,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: _isPosting
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.onPrimary,
+                                ),
+                              )
+                            : const Text("Post Insight"),
                       ),
                     ),
-                    style: TextStyle(color: textColor),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      // FIX: Call the refactored, safe posting function
-                      onPressed: _isPosting ? null : _postInsight,
-                      child: _isPosting
-                          ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: theme.colorScheme.onPrimary,
-                              ),
-                            )
-                          : const Text("Post Insight"),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -50,7 +50,6 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final user = await _authService.signInWithGoogle();
       if (user != null && mounted) {
-        // NAVIGATE TO ONBOARDING INSTEAD OF '/app'
         Navigator.pushReplacementNamed(context, '/onboarding/profile'); 
       }
     } catch (e) {
@@ -92,7 +91,6 @@ class _LoginPageState extends State<LoginPage> {
       await _authService.signInWithEmail(email, password);
 
       if (mounted) {
-        // NAVIGATE TO ONBOARDING INSTEAD OF '/app'
         Navigator.pushReplacementNamed(context, '/onboarding/profile'); 
       }
     } catch (e) {
@@ -148,15 +146,17 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
 
-      appBar: 
-      AuthHeader(
+      appBar: AuthHeader(
         isSignUp: false,
         onSwitchTap: _navigateToSignUp,
       ),
 
       body: ListView(
+        // Added physics to prevent scroll bounce on iOS which can cut off the top
+        physics: const ClampingScrollPhysics(),
         children: [
-          const SizedBox(height: 25),
+          // INCREASED: Top spacing for breathing room
+          const SizedBox(height: 40), 
           Center(
             child: Text(
               "Welcome Back!",
@@ -167,24 +167,36 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           ),
-          const SizedBox(height: 15),
+          // INCREASED: Spacing between title and form
+          const SizedBox(height: 30), 
 
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(" Email", style: TextStyle(fontSize: 15)),
-                const SizedBox(height: 2),
+                // ADJUSTED: Added small left padding to align label with input text
+                const Padding(
+                  padding: EdgeInsets.only(left: 4.0, bottom: 6.0),
+                  child: Text("Email", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                ),
                 _buildTextField(emailController, ""),
-                const SizedBox(height: 20),
-                const Text(" Password", style: TextStyle(fontSize: 15)),
-                const SizedBox(height: 2),
+                
+                // INCREASED: Spacing between input fields
+                const SizedBox(height: 24), 
+                
+                // ADJUSTED: Added small left padding
+                const Padding(
+                  padding: EdgeInsets.only(left: 4.0, bottom: 6.0),
+                  child: Text("Password", style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                ),
                 _buildTextField(passwordController, "", isPassword: true),
+                
                 const SizedBox(height: 10),
 
+                // Error Message Container
                 SizedBox(
-                  height: 20,
+                  height: 24, // Slightly taller to prevent text clipping
                   child: Center(
                     child: _errorMessage != null
                         ? Text(
@@ -199,6 +211,8 @@ class _LoginPageState extends State<LoginPage> {
                         : Container(),
                   ),
                 ),
+
+                const SizedBox(height: 8),
 
                 SizedBox(
                   width: double.infinity,
@@ -215,7 +229,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: _isLoading
                         ? const SizedBox(
                             width: 20,
-                            height: 10,
+                            height: 20, // Matched width/height
                             child: CircularProgressIndicator(
                               color: Colors.black,
                               strokeWidth: 3,
@@ -225,41 +239,49 @@ class _LoginPageState extends State<LoginPage> {
                             "Login",
                             style: TextStyle(
                               color: Colors.black,
-                              fontSize: 15,
-                              fontWeight: FontWeight.normal,
+                              fontSize: 16, // Slightly larger
+                              fontWeight: FontWeight.w600, // Slightly bolder
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                // 💡 Alternative: Wrap the Row in Padding to constrain its size.
+                
+                const SizedBox(height: 24),
+                
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // 💡 FIX: Wrap the longer Text in a Flexible widget.
-                    // This allows it to take up only the remaining space,
-                    // preventing the Row from overflowing.
                     Flexible(
                       child: Text(
                         "Forgotten your password? ",
-                        // To allow truncation if space is extremely tight
                         overflow: TextOverflow.ellipsis, 
-                        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                        style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 14),
                       ),
                     ),
                     GestureDetector(
                       onTap: _navigateToResetPassword,
                       child: const Text(
                         "Reset password",
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.w400),
+                        style: TextStyle(
+                          color: Colors.red, 
+                          fontWeight: FontWeight.w500, // Slightly bolder
+                          fontSize: 14
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 25),
+                
+                // INCREASED: Spacing before divider
+                const SizedBox(height: 32),
                 _dividerWithText("or sign in with"),
-                const SizedBox(height: 20),
+                
+                // INCREASED: Spacing after divider
+                const SizedBox(height: 24),
                 _buildSocialButtons(socialButtonBgColor, socialButtonFgColor, _isGoogleLoading),
+                
+                // Added bottom padding to ensure scrolling doesn't cut off on small screens
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -296,6 +318,7 @@ class _LoginPageState extends State<LoginPage> {
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off : Icons.visibility,
                   color: Colors.grey,
+                  size: 22, // Fixed icon size
                 ),
                 onPressed: () =>
                     setState(() => _obscurePassword = !_obscurePassword),
@@ -305,17 +328,17 @@ class _LoginPageState extends State<LoginPage> {
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        // INCREASED: Vertical padding for a less cramped look
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       ),
     );
   }
 
   Widget _dividerWithText(String text) {
     return Row(children: [
-      const Expanded(child: Divider(thickness: 1, endIndent: 10)),
-      Text(text, style: const TextStyle(fontSize: 13)),
-      const Expanded(child: Divider(thickness: 1, indent: 10)),
+      const Expanded(child: Divider(thickness: 1, endIndent: 12)), // Slight indent adjust
+      Text(text, style: const TextStyle(fontSize: 13, color: Colors.grey)), // Added grey color
+      const Expanded(child: Divider(thickness: 1, indent: 12)),
     ]);
   }
 
@@ -325,17 +348,14 @@ class _LoginPageState extends State<LoginPage> {
     final googleBgLight = isDarkMode ? darkBgColor : const Color.fromARGB(255, 24, 24, 24);
     final googleFgLight = isDarkMode ? darkFgColor : Colors.white;
 
-    final facebookBgLight = isDarkMode ? darkBgColor : Theme.of(context).scaffoldBackgroundColor;
-    final facebookFgLight = isDarkMode ? darkFgColor : Colors.black;
-    
     final bool disableSocial = _isLoading || _isGoogleLoading || _isFacebookLoading;
-
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         SizedBox(
           width: 250,
+          height: 50, // Added explicit height for better touch target
           child: _socialButton(
             Icons.g_mobiledata,
             "Google",
@@ -363,11 +383,12 @@ class _LoginPageState extends State<LoginPage> {
                 strokeWidth: 2,
               ),
             )
-          : Icon(icon, color: iconColor, size: 20),
-      label: Text(text, style: TextStyle(fontSize: 14, color: textColor)),
+          : Icon(icon, color: iconColor, size: 24), // Increased Icon size slightly
+      label: Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: textColor)),
       style: ElevatedButton.styleFrom(
         backgroundColor: bgColor,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        // Removed vertical padding because SizedBox controls height now
+        padding: EdgeInsets.zero, 
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         elevation: 0,

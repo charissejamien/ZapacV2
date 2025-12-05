@@ -42,6 +42,18 @@ class CommentingSection extends StatefulWidget {
 }
 
 class _CommentingSectionState extends State<CommentingSection> {
+  // Defines how "tall" the sheet is in each state (as a fraction of screen height)
+  // closed  = just a thin grab area at the bottom
+  // preview = header + a bit of content (like Google Maps peek)
+  // expanded = full insights/terminal view
+  static const double _closedSize = 0.10;
+  static const double _previewSize = 0.26;
+  static const double _expandedSize = 0.85;
+
+  double _previousSize = _closedSize;
+  double _lastDelta = 0.0;
+  double _gestureStartSize = _closedSize;
+  bool _isAnimatingSnap = false;
   final DraggableScrollableController _sheetController = DraggableScrollableController();
   
   bool _isSheetFullyExpanded = false;
@@ -49,9 +61,6 @@ class _CommentingSectionState extends State<CommentingSection> {
 
   Map<String, UserInteraction> _userInteractions = {};
 
-  // NEW for snap logic
-  double _lastSize = 0.0;
-  bool _isDragging = false;
 
   @override
   void initState() {
@@ -99,25 +108,27 @@ class _CommentingSectionState extends State<CommentingSection> {
   }
 
   void _handleExpansionChange() {
+    if (!_sheetController.isAttached) return;
+    final currentSize = _sheetController.size;
 
-     _lastSize = _sheetController.size;
-
-    // Detect drag movement
-    if (_sheetController.size < 0.85 && _sheetController.size > 0.25) {
-      _isDragging = true;
+    // Track how the sheet is moving (up or down) when not in a programmatic snap.
+    if (!_isAnimatingSnap) {
+      _lastDelta = currentSize - _previousSize;
     }
+    _previousSize = currentSize;
 
-    // MODIFIED: Change the threshold from max (0.85) to a mid-point (0.45)
-    final double fabSwitchThreshold = 0.55;
-    final bool isExpandedNow = _sheetController.size >= fabSwitchThreshold;
-    
+    // Only update whether the sheet is considered "expanded" or not,
+    // and notify the parent if that state changes.
+    const double fabSwitchThreshold = 0.55;
+    final bool isExpandedNow = currentSize >= fabSwitchThreshold;
+
     if (isExpandedNow != _isSheetFullyExpanded) {
       if (mounted) {
         setState(() {
           _isSheetFullyExpanded = isExpandedNow;
         });
       }
-      widget.onExpansionChanged?.call(_isSheetFullyExpanded); 
+      widget.onExpansionChanged?.call(_isSheetFullyExpanded);
     }
   }
 
@@ -132,9 +143,16 @@ class _CommentingSectionState extends State<CommentingSection> {
     
     // If we transition to detail view, ensure the sheet is expanded.
     if (widget.selectedTerminalId != null && oldWidget.selectedTerminalId == null) {
-        if (_sheetController.size < 0.85) {
-             _sheetController.animateTo(0.85, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_sheetController.isAttached) return;
+        if (_sheetController.size < _expandedSize) {
+          _sheetController.animateTo(
+            _expandedSize,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
         }
+      });
     }
   }
 
@@ -448,6 +466,79 @@ class _CommentingSectionState extends State<CommentingSection> {
           : null,
     );
   }
+
+  /// Infer a simple category label for a given ChatMessage based on its text.
+  String? _inferCategoryLabel(ChatMessage message) {
+    final messageLower = message.message.toLowerCase();
+
+    // Warning
+    if (messageLower.contains('traffic') ||
+        messageLower.contains('accident') ||
+        messageLower.contains('danger') ||
+        messageLower.contains('slow') ||
+        messageLower.contains('kuyaw') ||
+        messageLower.contains('trapik') ||
+        messageLower.contains('aksidente') ||
+        messageLower.contains('hinay') ||
+        messageLower.contains('slide') ||
+        messageLower.contains('slippery') ||
+        messageLower.contains('baha') ||
+        messageLower.contains('flood') ||
+        messageLower.contains('landslide') ||
+        messageLower.contains('atang') ||
+        messageLower.contains('kidnap') ||
+        messageLower.contains('holdup') ||
+        messageLower.contains('tulis') ||
+        messageLower.contains('manulis') ||
+        messageLower.contains('ngitngit') ||
+        messageLower.contains('dark') ||
+        messageLower.contains('snatch') ||
+        messageLower.contains('hole') ||
+        messageLower.contains('buslot') ||
+        messageLower.contains('lubak') ||
+        messageLower.contains('bangga') ||
+        messageLower.contains('warning')) {
+      return 'Warning';
+    }
+
+    // Shortcuts
+    if (messageLower.contains('shortcut') ||
+        messageLower.contains('faster') ||
+        messageLower.contains('route') ||
+        messageLower.contains('quick') ||
+        messageLower.contains('lusot') ||
+        messageLower.contains('dali') ||
+        messageLower.contains('shortcut')) {
+      return 'Shortcut';
+    }
+
+    // Fare Tips
+    if (messageLower.contains('fare') ||
+        messageLower.contains('price') ||
+        messageLower.contains('cost') ||
+        messageLower.contains('plete') ||
+        messageLower.contains('plite') ||
+        messageLower.contains('pliti') ||
+        messageLower.contains('pleti') ||
+        messageLower.contains('sukli') ||
+        messageLower.contains('tagpila') ||
+        messageLower.contains('bayad') ||
+        messageLower.contains('Fare Tips')) {
+      return 'Fare Tip';
+    }
+
+    // Driver Reviews
+    if (messageLower.contains('driver') ||
+        messageLower.contains('reckless') ||
+        messageLower.contains('rude') ||
+        messageLower.contains('kind') ||
+        messageLower.contains('buotan') ||
+        messageLower.contains('barato')) {
+      return 'Driver Review';
+    }
+
+    return null;
+  }
   
   // Widget to display a single Terminal Card
   Widget _buildTerminalCard(Map<String, dynamic> terminal, ColorScheme cs) {
@@ -645,10 +736,69 @@ class _CommentingSectionState extends State<CommentingSection> {
     );
   }
 
+  /// Helper to render "Taga ZAPAC says..." with only "ZAPAC" bold and gradient
+  /// Helper to render "Taga ZAPAC says..." with adaptive text color
+  Widget _buildZapacHeaderTitle(Color textColor) { // <--- ADDED PARAMETER
+    const double fontSize = 18;
+
+    return RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: 'Taga ',
+            style: TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: fontSize,
+              color: textColor, // <--- USE PARAMETER
+            ),
+          ),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: ShaderMask(
+              shaderCallback: (Rect bounds) {
+                return const LinearGradient(
+                  colors: [
+                    Color(0xFF6CA89A), 
+                    Color(0xFF4A6FA5), 
+                  ],
+                ).createShader(bounds);
+              },
+              blendMode: BlendMode.srcIn,
+              child: const Text(
+                'ZAPAC',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: fontSize,
+                  color: Colors.white, 
+                ),
+              ),
+            ),
+          ),
+          TextSpan(
+            text: ' says...',
+            style: TextStyle(
+              fontWeight: FontWeight.normal,
+              fontSize: fontSize,
+              color: textColor, // <--- USE PARAMETER
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    final headerColor = isDarkMode ? const Color(0xFF8F6F3A) : const Color(0xFFF4BE6C);
+
+    final headerTextColor = isDarkMode ? Colors.white : Colors.black87;
 
     final filteredMessages = widget.chatMessages.where((message) {
       if (_selectedFilter == 'All') return true;
@@ -743,10 +893,11 @@ class _CommentingSectionState extends State<CommentingSection> {
 
     return DraggableScrollableSheet(
       controller: _sheetController,
-      initialChildSize: 0.35,
-      minChildSize: 0.25,
-      maxChildSize: 0.85,
+      initialChildSize: _closedSize,
+      minChildSize: _closedSize,
+      maxChildSize: _expandedSize,
       builder: (context, scrollController) {
+        final sheetSize = _sheetController.isAttached ? _sheetController.size : _closedSize;
         return Container(
           decoration: BoxDecoration(
             color: colorScheme.surface, 
@@ -762,50 +913,172 @@ class _CommentingSectionState extends State<CommentingSection> {
               ),
             ],
           ),
-          child: NotificationListener<ScrollEndNotification>(
-            onNotification: (n) {
-              if (_isDragging) {
-                _isDragging = false;
-
-                // SNAP UP or SNAP DOWN
-                final snapTarget = _lastSize > 0.55 ? 0.85 : 0.25;
-
-                _sheetController.animateTo(
-                  snapTarget,
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                );
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (!_sheetController.isAttached) return false;
+              // Track the start size of this drag/scroll gesture.
+              if (notification is ScrollStartNotification) {
+                _gestureStartSize = _sheetController.size;
+                return false;
               }
+
+              // Only handle snapping when the gesture ends.
+              if (notification is! ScrollEndNotification) {
+                return false;
+              }
+
+              if (_isAnimatingSnap) return false;
+
+              final size = _sheetController.size;
+              const double epsilon = 0.02;
+
+              // If we're already very close to closed or fully expanded, don't interfere.
+              if (size <= _closedSize + epsilon || size >= _expandedSize - epsilon) {
+                return false;
+              }
+
+              // Determine gesture direction based on total movement across the drag.
+              final double gestureDelta = size - _gestureStartSize;
+
+              // 1) Determine which "level" we're closest to right now.
+              // 0 = closed, 1 = preview, 2 = expanded
+              int currentLevel;
+              final midClosedPreview = (_closedSize + _previewSize) / 2;
+              final midPreviewExpanded = (_previewSize + _expandedSize) / 2;
+
+              if (size < midClosedPreview) {
+                currentLevel = 0;
+              } else if (size < midPreviewExpanded) {
+                currentLevel = 1;
+              } else {
+                currentLevel = 2;
+              }
+
+              // 2) Decide target level based on gesture direction.
+              int targetLevel;
+              const double directionThreshold = 0.015; // avoid noise/bounce
+
+              if (gestureDelta < -directionThreshold) {
+                // Dragging downward → always go one step "down"
+                // Expanded -> Preview, Preview -> Closed
+                targetLevel = (currentLevel - 1).clamp(0, 2);
+              } else if (gestureDelta > directionThreshold) {
+                // Dragging upward → always go one step "up"
+                // Closed -> Preview, Preview -> Expanded
+                targetLevel = (currentLevel + 1).clamp(0, 2);
+              } else {
+                // No clear direction → snap to the nearest of the three anchors
+                targetLevel = currentLevel;
+              }
+
+              // 3) Map level back to specific size.
+              double target;
+              switch (targetLevel) {
+                case 0:
+                  target = _closedSize;
+                  break;
+                case 1:
+                  target = _previewSize;
+                  break;
+                case 2:
+                default:
+                  target = _expandedSize;
+                  break;
+              }
+
+              _isAnimatingSnap = true;
+              _sheetController
+                  .animateTo(
+                    target,
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                  )
+                  .whenComplete(() {
+                _isAnimatingSnap = false;
+              });
+
               return false;
             },
-
-          child: Column(
-            children: [
+            child: Column(
+              children: [
               
               // CORRECTED HEADER LOGIC (Single Title or Back Button + Title)
               GestureDetector(
                 onTap: () {
-                  // Existing snap logic on tap (if the user taps the header bar)
-                  final target =
-                      _sheetController.size > 0.5 ? 0.25 : 0.85;
+                  if (!_sheetController.isAttached) return;
+                  // Cycle: closed -> preview -> expanded -> closed
+                  final currentSize = _sheetController.size;
+                  const double epsilon = 0.03;
 
-                  _sheetController.animateTo(
-                    target,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeOut,
-                  );
+                  double target;
+                  if ((currentSize - _closedSize).abs() < epsilon) {
+                    target = _previewSize;
+                  } else if ((currentSize - _previewSize).abs() < epsilon) {
+                    target = _expandedSize;
+                  } else {
+                    target = _closedSize;
+                  }
+
+                  _isAnimatingSnap = true;
+                  _sheetController
+                      .animateTo(
+                        target,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                      )
+                      .whenComplete(() {
+                    _isAnimatingSnap = false;
+                  });
                 },
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF4BE6C),
-                    borderRadius: BorderRadius.only(
+                  decoration: BoxDecoration(
+                    gradient: isDarkMode
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF8F6F3A),
+                              Color(0xFF6E532A),
+                            ],
+                          )
+                        : const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFF9D48A),
+                              Color(0xFFF4BE6C),
+                            ],
+                          ),
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(30),
                       topRight: Radius.circular(30),
                     ),
+                    border: Border.all(
+                      color: isDarkMode
+                          ? Colors.white.withOpacity(0.15)
+                          : Colors.black.withOpacity(0.06),
+                      width: 1,
+                    ),
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Drag handle hint so users know the sheet is draggable/tappable
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: (isDarkMode ? Colors.white : Colors.black87)
+                                .withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
                         children: [
                           // Back button visible only if viewing a specific terminal
                           if (widget.selectedTerminalId != null)
@@ -821,29 +1094,33 @@ class _CommentingSectionState extends State<CommentingSection> {
 
                           Expanded(
                             child: Center(
-                              child: Text(
-                                headerTitle, // "Terminals", "Taga ZAPAC Says...", or Terminal Name
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              child: widget.isShowingTerminals
+                                  ? Text(
+                                      headerTitle, // "Terminals" or Terminal Name
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.normal,
+                                        color: headerTextColor,
+                                        fontSize: 16,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    )
+                                  : _buildZapacHeaderTitle(headerTextColor),
                             ),
                           ),
                           
                           // Spacer to balance the back button size if needed
                           if (widget.selectedTerminalId != null)
-                            const SizedBox(width: 48), 
+                            const SizedBox(width: 48),
                         ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
 
 
-              // Filter Chips (Only visible for Insights)
-              if (!widget.isShowingTerminals)
+              // Filter Chips (Only visible for Insights and when sheet is at least in preview state)
+              if (!widget.isShowingTerminals && sheetSize >= _previewSize - 0.02)
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -886,28 +1163,45 @@ class _CommentingSectionState extends State<CommentingSection> {
                             },
                           )
                     // Insights View
-                    : ListView.builder(
-                        controller: scrollController,
-                        itemCount: filteredMessages.length,
-                        itemBuilder: (context, index) {
-                          final message = filteredMessages[index];
-                          final interaction = (message.id != null && _userInteractions[message.id] != null)
-                              ? _userInteractions[message.id]!
-                              : const UserInteraction();
-                          final isCurrentUserSender =
-                              widget.currentUserId != null && widget.currentUserId == message.senderUid;
+                    : (filteredMessages.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Text(
+                                'No insights yet for this filter.\nBe the first to share what\'s happening on the road!',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: colorScheme.onSurface.withAlpha(179),
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            itemCount: filteredMessages.length,
+                            itemBuilder: (context, index) {
+                              final message = filteredMessages[index];
+                              final interaction = (message.id != null && _userInteractions[message.id] != null)
+                                  ? _userInteractions[message.id]!
+                                  : const UserInteraction();
+                              final isCurrentUserSender =
+                                  widget.currentUserId != null && widget.currentUserId == message.senderUid;
 
-                          return InsightCard(
-                            message: message,
-                            interaction: interaction,
-                            isCurrentUserSender: isCurrentUserSender,
-                            onLike: () => _handleVote(message, true),
-                            onDislike: () => _handleVote(message, false),
-                            onReport: () => _handleReport(message),
-                            onDelete: () => _deleteMessage(message),
-                          );
-                        },
-                      ),
+                              final categoryLabel = _inferCategoryLabel(message);
+
+                              return InsightCard(
+                                message: message,
+                                interaction: interaction,
+                                isCurrentUserSender: isCurrentUserSender,
+                                categoryLabel: categoryLabel,
+                                onLike: () => _handleVote(message, true),
+                                onDislike: () => _handleVote(message, false),
+                                onReport: () => _handleReport(message),
+                                onDelete: () => _deleteMessage(message),
+                              );
+                            },
+                          )),
               ),
             ],
           ),

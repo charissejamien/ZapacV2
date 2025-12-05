@@ -23,7 +23,8 @@ class AppColors extends ThemeExtension<AppColors> {
 
   @override
   AppColors copyWith({Color? success, Color? warning}) =>
-      AppColors(success: success ?? this.success, warning: warning ?? this.warning);
+      AppColors(
+          success: success ?? this.success, warning: warning ?? this.warning);
 
   @override
   AppColors lerp(ThemeExtension<AppColors>? other, double t) {
@@ -32,7 +33,7 @@ class AppColors extends ThemeExtension<AppColors> {
       success: Color.lerp(success, other.success, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
     );
-    }
+  }
 }
 
 const List<String> _fallbackFonts = <String>[
@@ -46,10 +47,8 @@ const List<String> _fallbackFonts = <String>[
 ];
 
 class ZapacTheme {
-
   static TextTheme _textTheme(Brightness b) {
     final base = ThemeData(brightness: b, useMaterial3: true).textTheme;
-
     final body = GoogleFonts.interTextTheme(base);
 
     return body.copyWith(
@@ -63,7 +62,6 @@ class ZapacTheme {
         fontWeight: FontWeight.w700,
         letterSpacing: -0.2,
       ),
-
       titleLarge: GoogleFonts.manrope(
         fontSize: 20,
         fontWeight: FontWeight.w700,
@@ -76,27 +74,29 @@ class ZapacTheme {
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
-
       bodyLarge: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w400),
       bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400),
       bodySmall: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
-
-
       labelLarge: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700),
       labelMedium: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w600),
       labelSmall: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w600),
-
-
-      displaySmall: GoogleFonts.istokWeb(fontSize: 12, fontWeight: FontWeight.w400),
+      displaySmall:
+          GoogleFonts.istokWeb(fontSize: 12, fontWeight: FontWeight.w400),
     );
   }
 
   static List<ThemeExtension<dynamic>> _extensions(Brightness b) => [
-    AppColors(
-      success: b == Brightness.light ? const Color(0xFF2E7D32) : const Color(0xFF81C784),
-      warning: b == Brightness.light ? const Color(0xFFF9A825) : const Color(0xFFFFD54F),
-    ),
-  ];
+        AppColors(
+          success: b == Brightness.light
+              ? const Color(0xFF2E7D32)
+              // CHANGED: Darker/Richer Green (Material Green 500)
+              : const Color(0xFF4CAF50), 
+          warning: b == Brightness.light
+              ? const Color(0xFFF9A825)
+              // CHANGED: Darker/Richer Amber (Material Amber 600)
+              : const Color(0xFFFFB300), 
+        ),
+      ];
 
   // ---- LIGHT ----
   static ThemeData light = ThemeData(
@@ -137,15 +137,16 @@ class ZapacTheme {
     primaryColor: const Color(0xFF273238),
     fontFamily: GoogleFonts.manrope().fontFamily,
     fontFamilyFallback: _fallbackFonts,
-    colorScheme: const ColorScheme.dark(
-      primary: Color(0xFF273238),
+    colorScheme: ColorScheme.dark(
+      primary: const Color(0xFF273238),
       onPrimary: Colors.white,
-      background: Color(0xFF121212),
-      surface: Color(0xFF1E1E1E),
+      background: const Color(0xFF121212),
+      surface: const Color(0xFF1E1E1E),
       onSurface: Colors.white,
-      secondary: Color(0xFF9DBEBB),
-      error: Color(0xFFCF6679),
-      outlineVariant: Color(0xFF444444),
+      // CHANGED: Using your actual brand green instead of the pale pastel version
+      secondary: AppTheme.colors.green, 
+      error: const Color(0xFFCF6679),
+      outlineVariant: const Color(0xFF444444),
     ),
     scaffoldBackgroundColor: const Color(0xFF121212),
     cardColor: const Color(0xFF1E1E1E),

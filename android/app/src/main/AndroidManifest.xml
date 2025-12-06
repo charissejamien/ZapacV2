@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.zapac">
+    package="com.zapacv2">
 
     <!-- 🌐 Required for Facebook & Google Sign-In -->
     <uses-permission android:name="android.permission.INTERNET" />

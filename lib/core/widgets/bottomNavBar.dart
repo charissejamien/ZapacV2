@@ -52,14 +52,14 @@ class _BottomNavBarState extends State<BottomNavBar> with SingleTickerProviderSt
         ? const Color(0xFF1A2332)
         : const Color(0xFF4A6FA5);
     final Color iconColor = isDarkMode 
-        ? Colors.blue[200]!.withOpacity(0.6)
-        : Colors.white.withOpacity(0.7);
+    ? Colors.blue[200]!.withValues(alpha: 0.6) 
+        : Colors.white.withValues(alpha: 0.7);
     final Color selectedIconColor = isDarkMode 
         ? Colors.lightBlueAccent
         : Colors.white;
     final Color indicatorColor = isDarkMode
-        ? Colors.lightBlueAccent.withOpacity(0.2)
-        : Colors.white.withOpacity(0.2);
+        ? Colors.lightBlueAccent.withValues(alpha: 0.2)
+        : Colors.white.withValues(alpha: 0.7);
 
     return Container(
       decoration: BoxDecoration(
@@ -68,7 +68,7 @@ class _BottomNavBarState extends State<BottomNavBar> with SingleTickerProviderSt
           BoxShadow(
             blurRadius: 12,
             offset: const Offset(0, -2),
-            color: isDarkMode ? Colors.black45 : Colors.black.withOpacity(0.1),
+            color: isDarkMode ? Colors.black45 : Colors.black.withValues(alpha: 0.1),
           ),
         ],
       ),

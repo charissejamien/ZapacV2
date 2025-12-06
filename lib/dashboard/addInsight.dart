@@ -155,7 +155,7 @@ class _AddInsightContentState extends State<_AddInsightContent> with SingleTicke
         context: context,
         barrierDismissible: false,
         transitionDuration: const Duration(milliseconds: 150),
-        barrierColor: Colors.black.withOpacity(0.7),
+        barrierColor: Colors.black.withValues(alpha: 0.7),
         routeSettings: const RouteSettings(name: 'PostingIndicator'),
         pageBuilder: (ctx, a1, a2) {
             return Center(

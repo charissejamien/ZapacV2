@@ -40,23 +40,16 @@ void main() async {
   final isDarkMode = prefs.getBool('isDarkMode') ?? false;
   themeNotifier.setInitialTheme(isDarkMode ? ThemeMode.dark : ThemeMode.light);
 
-  // AUTHENTICATION PERSISTENCE AND NAVIGATION LOGIC
   final currentUser = FirebaseAuth.instance.currentUser;
-  // NOTE FOR TESTING: The onboardingComplete check is removed to force
-  // signed-in users to always go through the onboarding/location flow.
-  // final onboardingComplete = prefs.getBool('onboardingComplete') ?? false;
 
-  // FIX: Initialize the variable immediately to guarantee it's a non-null String.
   String determinedInitialRoute = '/login';
 
   if (currentUser != null) {
-    // === MODIFIED FOR TESTING ===
-    // User is signed in. Always go to the start of onboarding/profile page.
-    determinedInitialRoute = '/onboarding/profile'; //
-  } 
-  // If currentUser is null, it remains '/login'.
 
-  // PASS determinedInitialRoute to ZapacApp
+    determinedInitialRoute = '/onboarding/profile';
+  }
+
+
   runApp(ZapacApp(initialRoute: determinedInitialRoute));
 }
 

@@ -291,7 +291,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: _red.withOpacity(0.1),
+                        color: _red.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(

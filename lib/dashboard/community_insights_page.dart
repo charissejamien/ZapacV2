@@ -46,8 +46,8 @@ class _CommentingSectionState extends State<CommentingSection> {
   // closed  = just a thin grab area at the bottom
   // preview = header + a bit of content (like Google Maps peek)
   // expanded = full insights/terminal view
-  static const double _closedSize = 0.10;
-  static const double _previewSize = 0.26;
+  static const double _closedSize = 0.18;
+  static const double _previewSize = 0.30;
   static const double _expandedSize = 0.85;
 
   double _previousSize = _closedSize;
@@ -1057,8 +1057,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                     ),
                     border: Border.all(
                       color: isDarkMode
-                          ? Colors.white.withOpacity(0.15)
-                          : Colors.black.withOpacity(0.06),
+                          ? Colors.white.withValues(alpha: 0.15)
+                          : Colors.black.withValues(alpha: 0.06),
                       width: 1,
                     ),
                   ),
@@ -1072,7 +1072,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                           height: 4,
                           decoration: BoxDecoration(
                             color: (isDarkMode ? Colors.white : Colors.black87)
-                                .withOpacity(0.35),
+                                .withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),

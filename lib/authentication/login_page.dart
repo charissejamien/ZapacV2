@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:zapac/authentication/authentication.dart';
-import 'package:zapac/dashboard/dashboard.dart';
 import 'reset_password_page.dart';
 import 'signup_page.dart';
 import 'package:zapac/core/widgets/authheader.dart';
-import 'package:zapac/app/main_shell.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

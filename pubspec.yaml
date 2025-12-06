@@ -66,3 +66,4 @@ flutter:
     - assets/maximT.png
     - assets/van.png
     - assets/Vector.png
+    - .env

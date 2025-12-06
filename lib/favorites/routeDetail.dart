@@ -8,6 +8,7 @@ import 'package:zapac/core/widgets/fare_accuracy_review.dart';
 import '../core/utils/map_utils.dart'; // Import map utilities
 import 'favoriteRouteData.dart'; 
 import 'dart:async'; // 1. IMPORT dart:async FOR TIMER
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class RouteDetailPage extends StatefulWidget {
   final FavoriteRoute route;
@@ -120,9 +121,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
 
   String _getMapApiKey() {
     if (Platform.isIOS) {
-      return "AIzaSyCWHublkXuYaWfT68qUwGY3o5L9NB82JA8";
+      return dotenv.env['GOOGLE_MAPS_API_KEY_IOS']!;
     }
-    return "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
+    return dotenv.env['GOOGLE_MAPS_API_KEY_ANDROID']!;
   }
   
   // Helper function to shorten duration string format (e.g., "1 hour 12 mins" -> "1 h 12 min")

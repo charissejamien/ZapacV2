@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class RoutesService {
-  final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc";
+  final String apiKey = dotenv.env['GOOGLE_MAPS_API_KEY_ANDROID']!;
 
   /// Returns the decoded Directions API JSON (or null on error).
   Future<Map<String, dynamic>?> getRouteDetails({

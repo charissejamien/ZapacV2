@@ -13,6 +13,7 @@ import '../core/utils/map_utils.dart';
 import 'dart:io' show Platform;
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:math'; 
 
 // Dark Map Style JSON (Night/Aubergine inspired)
@@ -151,9 +152,9 @@ class _DashboardState extends State<Dashboard> {
   
   String _getMapApiKey() {
     if (Platform.isIOS) {
-      return "AIzaSyCWHublkXuYaWfT68qUwGY3o5L9NB82JA8";
+      return dotenv.env['GOOGLE_MAPS_API_KEY_IOS']!;
     }
-    return "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
+    return dotenv.env['GOOGLE_MAPS_API_KEY_ANDROID']!;
   }
 
   String? _currentUserId;

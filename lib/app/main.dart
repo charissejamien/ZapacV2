@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../authentication/login_page.dart';
 import '../authentication/onboarding_profile.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'main_shell.dart';
 
 class ThemeNotifier extends ChangeNotifier {
@@ -32,6 +33,7 @@ late ThemeNotifier themeNotifier = ThemeNotifier(ThemeMode.light);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   await Firebase.initializeApp();
 
   final prefs = await SharedPreferences.getInstance();

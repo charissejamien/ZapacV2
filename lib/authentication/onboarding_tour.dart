@@ -187,8 +187,8 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
         children: <Widget>[
           // Placeholder Image or Icon for Location
           Image.asset(
-            'assets/Vector.png',
-            height: 80, // Maintain original size constraint
+            'assets/onboardingOne.png',
+            height: 280, // Maintain original size constraint
             fit: BoxFit.contain,
           ),
           const SizedBox(height: 30.0),
@@ -211,7 +211,7 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
             ),
           ),
 
-          const SizedBox(height: 15.0),
+          const SizedBox(height: 10.0),
           
           // Description
           Text(
@@ -224,7 +224,7 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
             ),
           ),
           
-          const SizedBox(height: 40.0),
+          const SizedBox(height: 20.0),
 
           // Enable Locations Button
           ElevatedButton(

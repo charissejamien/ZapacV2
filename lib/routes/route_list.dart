@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import '../routes/route_detail.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class RouteListPage extends StatefulWidget {
   final Map<String, dynamic>? destination;
@@ -21,8 +22,7 @@ class _RouteListPageState extends State<RouteListPage> {
   // SortBy _sortBy = SortBy.time;
   Map<String, double>? _originCoords;
 
-  // Replace with your actual API key
-  final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc";
+final String apiKey = dotenv.env['GOOGLE_MAPS_API_KEY_ANDROID']!;
 
   Map<String, dynamic>? _getResolvedOriginMap() {
   if (_originCoords != null) {

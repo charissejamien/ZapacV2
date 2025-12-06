@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:zapac/favorites/favorite_route.dart';
 // import 'favoriteRouteData.dart'; // REMOVED: Local data store
 import 'dart:async'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 // NEW IMPORTS for Firebase
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:zapac/favorites/favorite_routes_service.dart';
@@ -189,7 +190,7 @@ class AddNewRoutePage extends StatefulWidget {
 class _AddNewRoutePageState extends State<AddNewRoutePage> {
   static const String _darkMapStyle = '[{"elementType":"geometry","stylers":[{"color":"#1f1f1f"}]},{"elementType":"labels.icon","stylers":[{"visibility":"off"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#e0e0e0"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3a3a3a"}]},{"featureType":"poi","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#273a2c"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#2c2c2c"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#1f1f1f"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3d3d3d"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2a2a2a"}]},{"featureType":"transit.station.bus","stylers":[{"visibility":"off"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0e1b25"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#a0a0a0"}]}]';
 
-  final String apiKey = "AIzaSyAJP6e_5eBGz1j8b6DEKqLT-vest54Atkc"; 
+  final String apiKey = dotenv.env['GOOGLE_MAPS_API_KEY_ANDROID']!;
 
   // NEW: Initialize the service
   final FavoriteRoutesService _routesService = FavoriteRoutesService();

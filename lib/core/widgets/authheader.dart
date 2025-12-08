@@ -1,64 +1,60 @@
-// auth_header.dart
-
 import 'package:flutter/material.dart';
 
-// The page imports are no longer needed here, preventing the circular dependency.
-
 class AuthHeader extends StatelessWidget implements PreferredSizeWidget {
-  
   final bool isSignUp;
-  // This is the function passed by the parent page (SignUpPage or LoginPage)
-  final VoidCallback onSwitchTap; 
+  final VoidCallback onSwitchTap;
 
   const AuthHeader({
-    super.key, 
+    super.key,
     required this.isSignUp,
-    required this.onSwitchTap, // 👈 New required parameter
+    required this.onSwitchTap,
   });
 
-  // Define the common AppBar properties
-  final appBarColor = const Color(0xFF4A6FA5);
-  final logoImage = 'assets/Logo.png'; 
+  final Color appBarColor = const Color(0xFF4A6FA5);
+  final String logoImage = 'assets/Logo.png';
 
   @override
   Size get preferredSize => const Size.fromHeight(180);
 
-  // Helper to build the text tabs (Login/Sign Up)
-  // 💥 REMOVED 'destinationPage' ARGUMENT 💥
-  Widget _buildTab(BuildContext context, {required String text, required bool isActive}) { 
-    final activeColor = Colors.white;
-    final inactiveColor = Colors.white.withAlpha(217);
-
-    return GestureDetector(
-      onTap: () {
-        if (!isActive) {
-          // Now, we simply call the function passed from the parent widget
-          onSwitchTap(); 
-        }
-      },
-      child: Column(
-        children: [
-          Text(
-            text,
-            style: TextStyle(
-              color: isActive ? activeColor : inactiveColor,
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontSize: 16,
-            ),
-          ),
-          Container(
-            width: 48,
-            height: 1.2,
-            color: isActive ? activeColor : Colors.transparent,
-            margin: const EdgeInsets.only(top: 6),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final height = preferredSize.height;
+    final width = MediaQuery.of(context).size.width;
+
+    final logoHeight = height * 0.5; // 50% of appBar height
+    final tabFontSize = height * 0.09; // scale tab text
+    final underlineWidth = width * 0.15; // scale tab underline
+    final spacingBetweenTabs = width * 0.07;
+
+    Widget _buildTab(String text, bool isActive) {
+      final activeColor = Colors.white;
+      final inactiveColor = Colors.white.withAlpha(217);
+
+      return GestureDetector(
+        onTap: () {
+          if (!isActive) onSwitchTap();
+        },
+        child: Column(
+          children: [
+            Text(
+              text,
+              style: TextStyle(
+                color: isActive ? activeColor : inactiveColor,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                fontSize: tabFontSize,
+              ),
+            ),
+            Container(
+              width: underlineWidth,
+              height: 1.2,
+              color: isActive ? activeColor : Colors.transparent,
+              margin: const EdgeInsets.only(top: 6),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ClipRRect(
       borderRadius: const BorderRadius.only(
         bottomLeft: Radius.circular(60),
@@ -66,32 +62,27 @@ class AuthHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
       child: AppBar(
         backgroundColor: appBarColor,
-        toolbarHeight: 150,
         automaticallyImplyLeading: false,
+        toolbarHeight: height,
         title: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            const SizedBox(height: 10),
-            Image.asset(logoImage, height: 90),
-            const SizedBox(height: 25),
+            SizedBox(height: height * 0.06),
+            Image.asset(
+              logoImage,
+              height: logoHeight,
+              fit: BoxFit.contain,
+            ),
+            SizedBox(height: height * 0.05),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildTab(
-                  context,
-                  text: "Sign Up",
-                  isActive: isSignUp, // Active if this is the SignUpPage
-                  // 💥 destinationPage is removed here 💥
-                ),
-                const SizedBox(width: 28),
-                _buildTab(
-                  context,
-                  text: "Log In",
-                  isActive: !isSignUp, // Active if this is the LoginPage
-                  // 💥 destinationPage is removed here 💥
-                ),
+                _buildTab("Sign Up", isSignUp),
+                SizedBox(width: spacingBetweenTabs),
+                _buildTab("Log In", !isSignUp),
               ],
             ),
+            SizedBox(height: height * 0.02),
           ],
         ),
       ),

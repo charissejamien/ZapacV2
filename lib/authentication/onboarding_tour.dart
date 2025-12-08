@@ -123,133 +123,171 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
     );
   }
 
-  Widget _buildTourPage({
-    required String? title,
-    required String subtitle,
-    required String description,
-    required ColorScheme cs,
-    required String imagePath,
-  }) {
-    // 0.8 opacity ≈ alpha 204
-    final descriptionAlpha = 204;
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          const SizedBox(height: 50.0),
+ Widget _buildTourPage({
+  required String? title,
+  required String subtitle,
+  required String description,
+  required ColorScheme cs,
+  required String imagePath,
+}) {
+  final descriptionAlpha = 204;
 
-          Image.asset(
-            imagePath, 
-            height: 240, 
-            fit: BoxFit.contain,
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final maxHeight = constraints.maxHeight;
+
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: maxHeight,
           ),
-          const SizedBox(height: 30.0),
-          
-          // Title
-          if (title != null && title.isNotEmpty) ...[
-            _buildGradientText(title, 32, isTitle: true),
-          ],
-          
-          // Subtitle
-          _buildGradientText(subtitle, 32, isTitle: false),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 30.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(height: maxHeight * 0.05),
 
-          const SizedBox(height: 20.0),
-          
-          // Description
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: cs.onSurface.withAlpha(descriptionAlpha),
+                // Responsive Image
+                Image.asset(
+                  imagePath,
+                  height: maxHeight * 0.40,
+                  fit: BoxFit.contain,
+                ),
+
+                SizedBox(height: maxHeight * 0.06),
+
+                // Title
+                if (title != null && title.isNotEmpty)
+                  _buildGradientText(title, 32, isTitle: true),
+
+                // Subtitle
+                _buildGradientText(subtitle, 28, isTitle: false),
+
+                SizedBox(height: maxHeight * 0.03),
+
+                Text(
+                  description,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: cs.onSurface.withAlpha(descriptionAlpha),
+                  ),
+                ),
+
+                SizedBox(height: maxHeight * 0.05),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-
-  // === NEW PAGE FOR LOCATION PROMPT ===
-  Widget _buildLocationPage(ColorScheme cs) { //
-    // 0.8 opacity ≈ alpha 204
-    final descriptionAlpha = 204;
-    final greenColor = const Color(0xFF6CA89A);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // Placeholder Image or Icon for Location
-          Image.asset(
-            'assets/onboardingOne.png',
-            height: 280, // Maintain original size constraint
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(height: 30.0),
-          
-         // Title 1
-        _buildGradientText(
-          'Ready to \nZap around Cebu?', 
-          36, 
-          isTitle: true, 
         ),
-          const SizedBox(height: 30.0),
+      );
+    },
+  );
+}
 
-          // Title 2 (Subtitle)
-          Text(
-            'Enable your location to find the nearest stops around you.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: cs.onSurface.withAlpha(descriptionAlpha),
+
+
+Widget _buildLocationPage(ColorScheme cs) {
+  final descriptionAlpha = 204;
+  final greenColor = const Color(0xFF6CA89A);
+
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final maxHeight = constraints.maxHeight;
+
+      return SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: maxHeight,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 30.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(height: maxHeight * 0.05),
+
+                // Responsive Image
+                Image.asset(
+                  'assets/onboardingOne.png',
+                  height: maxHeight * 0.32,
+                  fit: BoxFit.contain,
+                ),
+
+                SizedBox(height: maxHeight * 0.05),
+
+                // Gradient Title
+                _buildGradientText(
+                  'Ready to \nZap around Cebu?',
+                  36,
+                  isTitle: true,
+                ),
+
+                SizedBox(height: maxHeight * 0.03),
+
+                // Subtitle
+                Text(
+                  'Enable your location to find the nearest stops around you.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: cs.onSurface.withAlpha(descriptionAlpha),
+                  ),
+                ),
+
+                SizedBox(height: maxHeight * 0.02),
+
+                // Description
+                Text(
+                  'We prioritize your privacy and only use location for navigation',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontStyle: FontStyle.italic,
+                    color: cs.onSurface.withAlpha(descriptionAlpha),
+                  ),
+                ),
+
+                SizedBox(height: maxHeight * 0.04),
+
+                // Full-width Enable Locations Button
+                SizedBox(
+                  width: double.infinity, // full width within padding
+                  child: ElevatedButton(
+                    onPressed: _onEnableLocationPressed,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: greenColor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      "Enable Locations",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: maxHeight * 0.05),
+              ],
             ),
           ),
+        ),
+      );
+    },
+  );
+}
 
-          const SizedBox(height: 10.0),
-          
-          // Description
-          Text(
-            'We prioritize your privacy and only use location for navigation',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15,
-              fontStyle: FontStyle.italic,
-              color: cs.onSurface.withAlpha(descriptionAlpha),
-            ),
-          ),
-          
-          const SizedBox(height: 20.0),
 
-          // Enable Locations Button
-          ElevatedButton(
-            onPressed: _onEnableLocationPressed,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: greenColor, 
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 0,
-            ),
-            child: const Text(
-              "Enable Locations",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   
 
@@ -286,7 +324,7 @@ class _OnboardingTourPageState extends State<OnboardingTourPage> {
                   // Page 1
                   _buildTourPage(
                     title: null, 
-                    subtitle: 'Commuting in Cebu, Simplified.',
+                    subtitle: 'COMMUTING IN CEBU, SIMPLIFIED.',
                     description: 'Navigating the city shouldn\'t be a guessing game. Ditch the confusion and ride like a local.',
                     cs: cs,
                     imagePath: 'assets/onboardingOne.png',

@@ -30,10 +30,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
   final Color _green = const Color(0xFF6CA89A);
   final Color _beige = const Color(0xFFF3EEE6);
-
-  static const Color _red = Colors.red;
-  static const double _borderWidth = 1.5;
-  static const Color _googleBgDark = Color.fromARGB(255, 24, 24, 24);
+  final Color _red = Colors.red;
 
   @override
   void initState() {
@@ -51,7 +48,6 @@ class _SignUpPageState extends State<SignUpPage> {
     super.dispose();
   }
 
-  // --- VALIDATION LOGIC ---
   void _validateEmail() {
     final txt = _emailCtrl.text.trim();
     setState(() {
@@ -75,7 +71,7 @@ class _SignUpPageState extends State<SignUpPage> {
         _passwordHintColor = _red;
       } else {
         _passwordHint = 'Password looks good!';
-        _passwordHintColor = Colors.green;
+        _passwordHintColor = _green;
       }
       _validateConfirm();
     });
@@ -90,63 +86,12 @@ class _SignUpPageState extends State<SignUpPage> {
         _confirmHintColor = Colors.grey;
       } else if (pw == confirm) {
         _confirmHint = 'Passwords match!';
-        _confirmHintColor = Colors.green;
+        _confirmHintColor = _green;
       } else {
         _confirmHint = 'Passwords do not match.';
         _confirmHintColor = _red;
       }
     });
-  }
-
-  // --- ACTIONS ---
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withAlpha(51),
-      builder: (BuildContext context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-          child: AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            backgroundColor: Colors.white,
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.check_circle, color: _green, size: 60),
-                const SizedBox(height: 20),
-                const Text(
-                  "Sign up successful! Please check your email inbox to verify your account.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.black87),
-                ),
-                const SizedBox(height: 25),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LoginPage()),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _green,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text(
-                      "Log In",
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   Future<void> _onSignUp() async {
@@ -175,9 +120,7 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() => _isLoading = true);
     try {
       final cred = await AuthService().signUpWithEmail(email, pw);
-      if (cred != null && mounted) {
-        _showSuccessDialog();
-      }
+      if (cred != null && mounted) _showSuccessDialog();
     } catch (e) {
       setState(() => _generalError = e.toString());
     } finally {
@@ -204,141 +147,149 @@ class _SignUpPageState extends State<SignUpPage> {
 
   void _navigateToLogin() {
     Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, a1, a2) => const LoginPage(),
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        ));
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, a1, a2) => const LoginPage(),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
-    final bool disableEmailPassSignup = _isLoading || _isGoogleLoading;
-    
+    final media = MediaQuery.of(context);
+    final height = media.size.height;
+    final width = media.size.width;
+
+    final disableEmailPassSignup = _isLoading || _isGoogleLoading;
     final socialButtonBgColor = isDarkMode ? theme.cardColor : theme.scaffoldBackgroundColor;
 
     return Scaffold(
-      // CRITICAL: This ensures the layout is static and doesn't scroll when keyboard opens
-      resizeToAvoidBottomInset: false, 
+      resizeToAvoidBottomInset: false,
       appBar: AuthHeader(
         isSignUp: true,
         onSwitchTap: _navigateToLogin,
       ),
-      
-      // Changed from ListView to Column for a non-scrollable layout
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
+          padding: EdgeInsets.symmetric(horizontal: width * 0.08),
           child: Column(
-            // Use MainAxisAlignment to distribute space evenly
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly, 
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              
-              // Header
               Center(
                 child: Text(
                   "Create an Account",
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: height * 0.035,
                     fontWeight: FontWeight.bold,
                     color: _green,
                   ),
                 ),
               ),
-              
-              // Form Section
+              // Form Fields
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _inputField(
-                    label: 'Email',
+                  _responsiveTextField(
                     controller: _emailCtrl,
-                    isPassword: false,
-                    hintTextBelow: _emailError,
-                    hintColorBelow: _emailError != null ? _red : Colors.transparent,
+                    label: 'Email',
+                    screenHeight: height,
+                    screenWidth: width,
+                    errorText: _emailError,
                   ),
-                  const SizedBox(height: 16),
-                  
-                  _inputField(
-                    label: 'Password',
+                  SizedBox(height: height * 0.02),
+                  _responsiveTextField(
                     controller: _passwordCtrl,
+                    label: 'Password',
+                    screenHeight: height,
+                    screenWidth: width,
                     isPassword: true,
-                    hintTextBelow: _passwordHint,
-                    hintColorBelow: _passwordHintColor,
+                    errorText: _passwordHint,
+                    hintColor: _passwordHintColor,
                   ),
-                  const SizedBox(height: 16),
-                  
-                  _inputField(
-                    label: 'Confirm Password',
+                  SizedBox(height: height * 0.02),
+                  _responsiveTextField(
                     controller: _confirmCtrl,
+                    label: 'Confirm Password',
+                    screenHeight: height,
+                    screenWidth: width,
                     isPassword: true,
-                    hintTextBelow: _confirmHint,
-                    hintColorBelow: _confirmHintColor,
+                    errorText: _confirmHint,
+                    hintColor: _confirmHintColor,
                   ),
                 ],
               ),
-
-              // Error & Button Section
+              // Error and Button Section
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                   if (_generalError != null)
+                  if (_generalError != null)
                     Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(8),
+                      margin: EdgeInsets.only(bottom: height * 0.01),
+                      padding: EdgeInsets.all(width * 0.02),
                       decoration: BoxDecoration(
-                        color: _red.withValues(alpha: 0.5),
+                        color: _red.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         _generalError!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: _red, fontWeight: FontWeight.w500, fontSize: 12),
+                        style: TextStyle(
+                          color: _red,
+                          fontWeight: FontWeight.w500,
+                          fontSize: height * 0.015,
+                        ),
                       ),
                     ),
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: disableEmailPassSignup ? null : _onSignUp,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _green,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: EdgeInsets.symmetric(vertical: height * 0.02),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         elevation: 0,
                       ),
                       child: _isLoading
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 3))
-                          : const Text(
+                          ? SizedBox(
+                              height: height * 0.025,
+                              width: height * 0.025,
+                              child: const CircularProgressIndicator(color: Colors.black, strokeWidth: 3),
+                            )
+                          : Text(
                               "Sign Up",
-                              style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: height * 0.01726,
+                                fontWeight: FontWeight.w400,
+                              ),
                             ),
                     ),
                   ),
                 ],
               ),
-
-              // Footer Section
+              // Footer Social Section
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _dividerWithText("or sign in with"),
-                  const SizedBox(height: 20),
+                  _dividerWithText("or sign in with", width, height),
+                  SizedBox(height: height * 0.02),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SizedBox(
-                        width: 250,
-                        height: 50,
+                        width: width * 0.6,
+                        height: height * 0.065,
                         child: _socialBtn(
                           icon: Icons.g_mobiledata,
                           label: "Google",
-                          bg: socialButtonBgColor == theme.scaffoldBackgroundColor 
-                              ? const Color.fromARGB(255, 24, 24, 24) 
+                          bg: socialButtonBgColor == theme.scaffoldBackgroundColor
+                              ? const Color.fromARGB(255, 24, 24, 24)
                               : socialButtonBgColor,
                           iconColor: Colors.white,
                           textColor: Colors.white,
@@ -350,15 +301,13 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ],
               ),
-              
-              // Small spacer at bottom to keep it off the wave
-              const SizedBox(height: 10),
+              SizedBox(height: height * 0.01),
             ],
           ),
         ),
       ),
       bottomNavigationBar: Container(
-        height: 75,
+        height: height * 0.09,
         decoration: const BoxDecoration(
           color: Color(0xFF4A6FA5),
           borderRadius: BorderRadius.only(
@@ -370,96 +319,57 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  Widget _inputField({
-    required String label,
+  // Responsive Text Field with floating label
+  Widget _responsiveTextField({
     required TextEditingController controller,
+    required String label,
+    required double screenHeight,
+    required double screenWidth,
     bool isPassword = false,
-    String? hintTextBelow,
-    Color hintColorBelow = Colors.transparent,
+    String? errorText,
+    Color hintColor = Colors.transparent,
   }) {
-    Color borderColor;
-
-    if (controller == _emailCtrl) {
-      if (_emailError == null && controller.text.isNotEmpty) {
-        borderColor = _green;
-      } else {
-        borderColor = _emailError != null ? _red : Colors.transparent;
-      }
-    } else if (isPassword) {
-      if (hintColorBelow == _red) {
-        borderColor = _red;
-      } else if (hintColorBelow == Colors.green) {
-        borderColor = _green;
-      } else {
-        borderColor = Colors.transparent;
-      }
-    } else {
-      borderColor = Colors.transparent;
-    }
-
-    Color focusedBorderColor = borderColor == Colors.transparent 
-        ? (hintColorBelow == _red ? _red : _green) 
-        : borderColor;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4.0, bottom: 6.0),
-          child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword ? (controller == _passwordCtrl ? _obscurePassword : _obscureConfirm) : false,
+      style: TextStyle(fontSize: screenHeight * 0.02, color: Colors.black),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: _beige,
+        labelText: label,
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
+        labelStyle: TextStyle(fontSize: screenHeight * 0.018, color: Colors.grey[700]),
+        hintStyle: TextStyle(fontSize: screenHeight * 0.018, color: Colors.black54),
+        contentPadding: EdgeInsets.symmetric(horizontal: screenWidth * 0.05, vertical: screenHeight * 0.022),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: hintColor == _red ? _red : Colors.transparent, width: 2),
         ),
-        TextField(
-          controller: controller,
-          obscureText: isPassword
-              ? (controller == _passwordCtrl ? _obscurePassword : _obscureConfirm)
-              : false,
-          style: const TextStyle(color: Colors.black),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: _beige,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: borderColor, width: _borderWidth),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(18),
-              borderSide: BorderSide(color: focusedBorderColor, width: _borderWidth),
-            ),
-            suffixIcon: isPassword
-                ? IconButton(
-                    icon: Icon(
-                      (controller == _passwordCtrl ? _obscurePassword : _obscureConfirm)
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: Colors.grey[700],
-                      size: 22,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        if (controller == _passwordCtrl) {
-                          _obscurePassword = !_obscurePassword;
-                        } else {
-                          _obscureConfirm = !_obscureConfirm;
-                        }
-                      });
-                    },
-                  )
-                : null,
-          ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: hintColor == _red ? _red : _green, width: 2),
         ),
-        Padding(
-          padding: const EdgeInsets.only(left: 6.0, top: 4.0),
-          child: Text(
-            hintTextBelow ?? '',
-            style: TextStyle(
-              fontSize: 12, 
-              color: hintColorBelow == Colors.transparent ? Colors.grey : hintColorBelow,
-              fontWeight: FontWeight.w500
-            ),
-          ),
-        ),
-      ],
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  (controller == _passwordCtrl ? _obscurePassword : _obscureConfirm)
+                      ? Icons.visibility_off
+                      : Icons.visibility,
+                  color: Colors.grey[700],
+                  size: screenHeight * 0.025,
+                ),
+                onPressed: () {
+                  setState(() {
+                    if (controller == _passwordCtrl) {
+                      _obscurePassword = !_obscurePassword;
+                    } else {
+                      _obscureConfirm = !_obscureConfirm;
+                    }
+                  });
+                },
+              )
+            : null,
+      ),
     );
   }
 
@@ -475,7 +385,11 @@ class _SignUpPageState extends State<SignUpPage> {
     return ElevatedButton.icon(
       onPressed: isLoading ? null : onPressed,
       icon: isLoading
-          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+          ? SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            )
           : Icon(icon, color: iconColor, size: 24),
       label: Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: textColor)),
       style: ElevatedButton.styleFrom(
@@ -487,11 +401,62 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
-  Widget _dividerWithText(String text) {
+  Widget _dividerWithText(String text, double width, double height) {
     return Row(children: [
-      const Expanded(child: Divider(thickness: 1, endIndent: 12)),
-      Text(text, style: const TextStyle(fontSize: 13, color: Colors.grey)),
-      const Expanded(child: Divider(thickness: 1, indent: 12)),
+      Expanded(child: Divider(thickness: 1, endIndent: width * 0.03)),
+      Text(text, style: TextStyle(fontSize: height * 0.016, color: Colors.grey)),
+      Expanded(child: Divider(thickness: 1, indent: width * 0.03)),
     ]);
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withAlpha(51),
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+          child: AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: Colors.white,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, color: _green, size: MediaQuery.of(context).size.height * 0.08),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+                Text(
+                  "Sign up successful! Please check your email inbox to verify your account.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: MediaQuery.of(context).size.height * 0.018, color: Colors.black87),
+                ),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.025),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _green,
+                      padding: EdgeInsets.symmetric(vertical: MediaQuery.of(context).size.height * 0.018),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text(
+                      "Log In",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: MediaQuery.of(context).size.height * 0.02,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

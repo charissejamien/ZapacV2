@@ -32,7 +32,7 @@ android {
         applicationId = "com.zapacv2"
         minSdk = 23
         targetSdk = 35
-        versionCode = 2
+        versionCode = 4
         versionName = "1.0.1"
     }
 
@@ -58,7 +58,6 @@ flutter {
 
 dependencies {
     implementation("com.google.android.gms:play-services-auth:21.1.0")
-    implementation("com.facebook.android:facebook-android-sdk:17.0.1")
     implementation("com.google.firebase:firebase-auth")
     implementation("androidx.multidex:multidex:2.0.1")
 }

@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.zapacv2">
 
-    <!-- 🌐 Required for Facebook & Google Sign-In -->
+    <!-- 🌐 Required for Google Sign-In -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -42,46 +42,6 @@
                 <data android:scheme="com.googleusercontent.apps.YOUR_REVERSED_CLIENT_ID" />
             </intent-filter>
 
-            <!-- ✅ Facebook redirect -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <!-- ⚠️ This must match fb + your App ID -->
-                <data android:scheme="@string/fb_login_protocol_scheme" />
-            </intent-filter>
-        </activity>
-
-        <!-- ✅ Facebook SDK meta -->
-        <meta-data
-            android:name="com.facebook.sdk.ApplicationId"
-            android:value="@string/facebook_app_id" />
-        
-        <!-- 🔥 FIX: MISSING FACEBOOK CLIENT TOKEN -->
-        <meta-data
-            android:name="com.facebook.sdk.ClientToken"
-            android:value="@string/facebook_client_token"/>
-            
-        <!-- 🔥 FIX: ENSURE FacebookActivity IS CORRECTLY REGISTERED -->
-        <activity
-            android:name="com.facebook.FacebookActivity"
-            android:configChanges="keyboard|keyboardHidden|screenLayout|screenSize|orientation"
-            android:label="@string/app_name" />
-
-        <provider
-            android:name="com.facebook.FacebookContentProvider"
-            android:authorities="com.facebook.app.FacebookContentProvider1469785710946441"
-            android:exported="true" />
-
-        <activity
-            android:name="com.facebook.CustomTabMainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="@string/fb_login_protocol_scheme" />
-            </intent-filter>
         </activity>
 
         <!-- ✅ Google Play Services -->

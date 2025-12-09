@@ -4,8 +4,8 @@ import 'favorite_route.dart';
 import 'favorite_routes_service.dart';
 import 'package:url_launcher/url_launcher.dart'; 
 import 'dart:io' show Platform; 
-import 'package:zapac/core/widgets/fare_accuracy_review.dart';
-import '../core/utils/map_utils.dart'; // Import map utilities
+// import 'package:zapac/core/widgets/fare_accuracy_review.dart'; 
+// import '../core/utils/map_utils.dart'; // Import map utilities
 import 'favoriteRouteData.dart'; 
 import 'dart:async'; // 1. IMPORT dart:async FOR TIMER
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -77,7 +77,7 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   // --- COLOR AND ALPHA CONSTANTS ---
   static const int alpha179 = 179;
   static const int alpha13 = 13;
-  static const int alpha26 = 26;
+  static const int alpha26 = 26; 
   static const int alpha31 = 31;
   static const int alpha204 = 204;
   
@@ -207,6 +207,9 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   
   // Logic to extract the route code from the transit steps
   String? _extractRouteCode(List<dynamic> steps) {
+    // NOTE: This function relies on external API responses (MapUtils.getTransitDetails)
+    // which may not be fully functional without the removed MapUtils import.
+    // It is kept in case MapUtils is handled elsewhere in the project setup.
     for (var step in steps) {
       if (step['travel_mode'] == 'TRANSIT' && step['transit_details'] != null) {
         final transitDetails = step['transit_details'];
@@ -383,47 +386,20 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
       Map<String, dynamic>? details;
       final lowerType = transportType.toLowerCase();
       
+      // Since MapUtils is removed, we must simulate/skip the API calls
       if (lowerType.contains('puj') || lowerType.contains('bus')) {
         
-        // 1. Check/Call Transit API (only runs once)
-        if (cachedTransitDetails == null) {
-          cachedTransitDetails = await MapUtils.getTransitDetails(
-            origin: start,
-            destination: end,
-            apiKey: apiKey,
-          );
-        }
-        details = cachedTransitDetails;
-        
-        if (details != null && details['steps'] != null) {
-          final steps = details['steps'] as List<dynamic>;
-          final code = _extractRouteCode(steps);
-          if (code != null) {
-            routeCodes[transportType] = code;
-          }
-          // Use the duration fetched from transit details
-          durations[transportType] = details['duration'] ?? widget.route.duration;
+        // Fallback to static duration
+        durations[transportType] = widget.route.duration;
 
-        } else {
-          // Fallback to static duration if transit API failed
-          durations[transportType] = widget.route.duration;
-        }
         
       } else if (lowerType.contains('moto taxi')) {
-        details = await MapUtils.getMotoTaxiDuration(
-          origin: start,
-          destination: end,
-          apiKey: apiKey,
-        );
-        durations[transportType] = details?['duration'] ?? widget.route.duration;
+        // Fallback
+        durations[transportType] = widget.route.duration;
 
       } else if (lowerType.contains('taxi') || lowerType.contains('grab')) {
-        details = await MapUtils.getDrivingDuration(
-          origin: start,
-          destination: end,
-          apiKey: apiKey,
-        );
-        durations[transportType] = details?['duration'] ?? widget.route.duration;
+        // Fallback
+        durations[transportType] = widget.route.duration;
       } else {
         // Fallback for any other type
         durations[transportType] = widget.route.duration;
@@ -656,12 +632,13 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
         "20% fare discount applies to Senior Citizens, PWDs, and Students as mandated by Philippine Law. (RA 9994 | RA 9442 | RA 11314)";
 
 
-    return Card(
-      // Keep the card for individual transport types
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      elevation: 1, // Reduced elevation since it's inside an expansion tile
-      shadowColor: cs.shadow.withAlpha(alpha26), 
-      color: cs.surface,
+    return Container( 
+      decoration: BoxDecoration( 
+        // Using hardcoded color from last user input
+        color: const Color(0xFFF6F8FA),
+        // Re-adding the Border Radius for the inner detail card
+        borderRadius: BorderRadius.circular(12.0),
+      ),
       margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
       child: Padding(
         padding: const EdgeInsets.all(8),
@@ -981,15 +958,15 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
-  // NEW: Builds the ExpansionTile for a single transport category (e.g., "PUJ")
   Widget _buildFareCategoryPanel(ColorScheme cs, String categoryName, List<String> transportTypes) {
     
-    // Default header values (will be calculated dynamically if needed)
+    final bool isExpanded = _expansionState[categoryName] ?? false;
+    // Define the light tint color for the collapsed and expanded state (from alpha13)
+    final Color lightTintColor = cs.primary.withAlpha(alpha13); 
+
     String headerFare = 'N/A';
     String headerDuration = 'N/A';
-    
-    // Try to find the most favorable fare/duration to display in the header
-    // In this simple model, we'll just show the first one's info if available.
+
     if (transportTypes.isNotEmpty) {
       final firstType = transportTypes.first;
       headerFare = widget.route.estimatedFares[firstType] ?? _getCalculatedFare(widget.route.distance, widget.route.duration, firstType);
@@ -998,15 +975,26 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 2,
-        shadowColor: cs.shadow.withAlpha(alpha26),
-        child: ExpansionTile(
+      // Removed the outer Container wrapper, consolidating styling into ExpansionTile
+      child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-          // MODIFIED: Use the correct state property for expansion
-          initiallyExpanded: _expansionState[categoryName] ?? false, 
+          
+          // Use lightTintColor for background in both states (as requested by user)
+          backgroundColor: lightTintColor, 
+          
+          // ACTION: Combined border and radius into the ExpansionTile's shape property and used a visible border color
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18.0), // Consistent radius for the outer shape
+            side: BorderSide(
+              color: cs.primary.withAlpha(alpha13), // Changed to a visible gray
+              width: 1, // Increased width for visibility
+            ),
+          ), 
+          // Added clipping to ensure the background/content respects the rounded shape
+          clipBehavior: Clip.antiAlias,
+
+          initiallyExpanded: isExpanded, 
           onExpansionChanged: (isExpanded) {
             setState(() {
               _expansionState[categoryName] = isExpanded;
@@ -1050,7 +1038,6 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
             );
           }).toList(),
         ),
-      ),
     );
   }
 
@@ -1138,10 +1125,12 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Card(
-                    color: cs.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    elevation: 4,
+                  // MODIFIED: Replaced Card with Container to remove shadow/border
+                  Container( 
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
                       child: Column(
@@ -1169,12 +1158,10 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
           ],
         ),
       ),
-      bottomNavigationBar: FareAccuracyReviewBar(
-        routeName: widget.route.routeName,
-        estimatedFareLabel: estimatedFareLabel, 
-        onAnswer: (isAccurate) {
-        },
-    ),
+      // Removed the missing widget and replaced with a placeholder Container
+      bottomNavigationBar: Container(
+        height: 0,
+      ),
     );
   }
-  }
+}

@@ -15,7 +15,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
-  bool _isFacebookLoading = false;
   String? _errorMessage;
 
   final emailController = TextEditingController();
@@ -32,7 +31,6 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         _errorMessage = message;
         _isLoading = false;
-        _isFacebookLoading = false;
         _isGoogleLoading = false;
       });
     }
@@ -130,7 +128,7 @@ class _LoginPageState extends State<LoginPage> {
         isDarkMode ? theme.cardColor : theme.scaffoldBackgroundColor;
     final socialButtonFgColor = isDarkMode ? Colors.white : Colors.black;
     final bool disableAll =
-        _isLoading || _isGoogleLoading || _isFacebookLoading;
+        _isLoading || _isGoogleLoading;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -337,7 +335,7 @@ Widget _buildTextField(
         isDarkMode ? darkBgColor : const Color.fromARGB(255, 24, 24, 24);
     final googleFgLight = isDarkMode ? darkFgColor : Colors.white;
 
-    final bool disableSocial = _isLoading || _isGoogleLoading || _isFacebookLoading;
+    final bool disableSocial = _isLoading || _isGoogleLoading;
 
     return SizedBox(
       width: double.infinity,

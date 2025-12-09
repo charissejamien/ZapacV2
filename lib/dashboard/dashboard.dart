@@ -18,9 +18,24 @@ import 'dart:math';
 
 // Dark Map Style JSON (Night/Aubergine inspired)
 const String _darkMapStyleJson = r'''
-[{"elementType":"geometry","stylers":[{"color":"#242f3e"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},{"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},{"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263e"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},{"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263e"}]}]
+[{"elementType":"geometry","stylers":[{"color":"#242f3e"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},{"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#263c3f"}]},{"featureType":"poi.park","elementType":"labels.text.fill","stylers":[{"color":"#6b9a76"}]},{"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},{"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},{"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#746855"}]},{"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2835"}]},{"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#f3d19c"}]},{"featureType":"transit","elementType":"geometry","stylers":[{"color":"#2f3948"}]},{"featureType":"transit.station","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263e"}]},{"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#515c6d"}]},{"featureType":"water","elementType":"labels.text.stroke","stylers":[{"color":"#17263e"}]
+    // NEW RULE 1: Hide all general Points of Interest (POIs) and their labels
+    ,{"featureType": "poi", "stylers": [{"visibility": "off"}]}
+    // NEW RULE 2: Hide bus stop icons (specific transit stations)
+    ,{"featureType": "transit.station.bus", "stylers": [{"visibility": "off"}]}
+    // NEW RULE 3 (Optional): Hide other transit icons (like rail stations)
+    ,{"featureType": "transit", "elementType": "labels.icon", "stylers": [{"visibility": "off"}]}
+]
 ''';
 
+const String _lightMapStyleJson = r'''
+[
+    // This rule hides all general POIs
+    {"featureType": "poi", "stylers": [{"visibility": "off"}]},
+    // This rule hides bus stop icons
+    {"featureType": "transit.station.bus", "stylers": [{"visibility": "off"}]}
+]
+''';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -71,10 +86,15 @@ class _DashboardState extends State<Dashboard> {
         'routes': 'Southern Cebu (Oslob, Moalboal, Carcar)',
         'facilities': 'Restrooms, Ticketing Counters, Food Stalls',
         'routes_fares': [
-            {'route': 'Cebu City to Oslob (via Bato)', 'fare': 'P 250 - P 300'},
-            {'route': 'Cebu City to Moalboal', 'fare': 'P 180 - P 220'},
-            {'route': 'Cebu City to Carcar City', 'fare': 'P 50 - P 70'},
-            {'route': 'Cebu City to Liloan (Santander)', 'fare': 'P 350 - P 400'},
+            {'route': 'Cebu South Bus to Carcar', 'fare': 'P 95'},
+            {'route': 'Cebu South Bus to Sibonga', 'fare': 'P 131'},
+            {'route': 'Cebu South Bus to Argao', 'fare': 'P 156'},
+            {'route': 'Cebu South Bus to Pinamungajan', 'fare': 'P 175'},
+            {'route': 'Cebu South Bus to Aloguinsan', 'fare': 'P 201'},
+            {'route': 'Cebu South Bus to Moalboal', 'fare': 'P 210'},
+            {'route': 'Cebu South Bus to Alcoy', 'fare': 'P 215'},
+            {'route': 'Cebu South Bus to Bato (via Oslob)', 'fare': 'P 330'},
+            {'route': 'Cebu South Bus to Bato (via Barili)', 'fare': 'P 347'},
         ],
       }
     },
@@ -89,9 +109,13 @@ class _DashboardState extends State<Dashboard> {
         'routes': 'Northern Cebu (Bogo, Daanbantayan, Danao)',
         'facilities': 'Waiting Area, Ticket Booths, Vending Machines',
         'routes_fares': [
-            {'route': 'Cebu City to Bogo City', 'fare': 'P 150 - P 200'},
-            {'route': 'Cebu City to Daanbantayan', 'fare': 'P 250 - P 350'},
-            {'route': 'Cebu City to Danao City', 'fare': 'P 50 - P 75'},
+            {'route': 'Cebu North Bus to Tabogon', 'fare': 'P 202'},
+            {'route': 'Cebu North Bus to Tuburan', 'fare': 'P 235'},
+            {'route': 'Cebu North Bus to Hagnaya', 'fare': 'P 259'},
+            {'route': 'Cebu North Bus to Lambusan', 'fare': 'P 280'},
+            {'route': 'Cebu North Bus to Daan Bantayan', 'fare': 'P 301'},
+            {'route': 'Cebu North Bus to Maya', 'fare': 'P 320'},
+
         ],
       }
     },
@@ -106,9 +130,60 @@ class _DashboardState extends State<Dashboard> {
         'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
         'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
         'routes_fares': [
-            {'route': 'SM City to IT Park (01K)', 'fare': 'P 15 - P 25'},
-            {'route': 'SM City to Ayala Center (03B)', 'fare': 'P 15 - P 25'},
-            {'route': 'SM City to Fuente Osmeña (04H)', 'fare': 'P 20 - P 30'},
+            {
+                'route': 'SM City to Bulacao', 
+                'fare': 'P 37', 
+                'vehicle_code': '10H', 
+                'stops': 'SM City Cebu – F. Cabahug – MJ Cuenco – Downtown (Cathedral) – Cebu South Bus Terminal – N. Bacalso Highway – Mambaling – Basak – Pardo – Bulacao'
+            },
+            {
+                'route': 'SM City to Bulacao', 
+                'fare': 'P 37', 
+                'vehicle_code': '10M', 
+                'stops': 'SM City Cebu – F. Cabahug – MJ Cuenco – T. Padilla – Sancianko – Downtown – Leon Kilat – N. Bacalso – Basak – Mambaling – Pardo – Bulacao'
+            },
+            {
+                'route': 'SM City to Labangon', 
+                'fare': 'P 26', 
+                'vehicle_code': '12G', 
+                'stops': 'SM City Cebu – F. Cabahug – MJ Cuenco – Downtown – Sancianko – Panganiban – Katipunan – A. Bonifacio – Labangon'
+            },
+            {
+                'route': 'SM City to Labangon', 
+                'fare': 'P 28', 
+                'vehicle_code': '12I', 
+                'stops': 'SM City Cebu – F. Cabahug – Downtown (Sikatuna/Legazpi area) – N. Bacalso – Tres de Abril – Katipunan – Labangon'
+            },
+            {
+                'route': 'SM City to Alumnos', 
+                'fare': 'P 15', 
+                'vehicle_code': '08F', 
+                'stops': 'Sm City Cebu - Sergio Osmena Jr Blvd - Magallanes St - Carlock St - Alumnos' // This appears in the expanded panel
+            },
+            {
+                'route': 'SM City to Guadalupe', 
+                'fare': 'P 22', 
+                'vehicle_code': '06H', 
+                'stops': 'SM City Cebu – Archbishop Reyes – Ayala Center Cebu – Escario – Capitol – V. Rama – Guadalupe Church – Guadalupe'
+            },
+            {
+                'route': 'SM City to Ayala', 
+                'fare': 'P 15', 
+                'vehicle_code': '03Q', 
+                'stops': 'SM City Cebu – F. Cabahug – Archbishop Reyes – Ayala Center Cebu'
+            },
+            {
+                'route': 'Lahug to Ayala', 
+                'fare': 'P 15', 
+                'vehicle_code': '04L', 
+                'stops': 'SM City Cebu – F. Cabahug – MJ Cuenco – Ramos – Fuente – Downtown (Colon)'
+            },
+            {
+                'route': 'Urgello to Parkmall', 
+                'fare': 'P 22', 
+                'vehicle_code': '01k', 
+                'stops': 'SM City Cebu – MJ Cuenco – Downtown (Colon) – Metro Colon – Leon Kilat – V. Rama Extension – Urgello'
+            },
         ],
       }
     },
@@ -123,9 +198,54 @@ class _DashboardState extends State<Dashboard> {
         'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
         'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
         'routes_fares': [
-            {'route': 'Ayala to SM City (03B)', 'fare': 'P 15 - P 25'},
-            {'route': 'Ayala to IT Park (01K)', 'fare': 'P 15 - P 25'},
-            {'route': 'Ayala to Mango Ave', 'fare': 'P 13 - P 20'},
+            {
+              'route': 'Ayala to SM City',
+              'fare': 'P 15',
+              'vehicle_code': '03Q',
+              'stops': 'Ayala Center Cebu – Archbishop Reyes – F. Cabahug – SM City Cebu'
+            },
+            {
+              'route': 'Ayala to Lahug',
+              'fare': 'P 15',
+              'vehicle_code': '04L',
+              'stops': 'Ayala Center Cebu – Salinas Drive – JY Square – Lahug'
+            },
+            {
+              'route': 'Ayala to Labangon',
+              'fare': 'P 26',
+              'vehicle_code': '12L',
+              'stops': 'Ayala Center Cebu – Archbishop Reyes – Escario – Fuente – V. Rama – Katipunan – Labangon'
+            },
+            {
+              'route': 'Ayala to Colon',
+              'fare': 'P 17',
+              'vehicle_code': '14D',
+              'stops': 'Ayala Center Cebu – Escario – Capitol – Jones Avenue – Colon'
+            },
+            {
+              'route': 'Ayala to Mandaue',
+              'fare': 'P 24',
+              'vehicle_code': '20',
+              'stops': 'Ayala Center Cebu – Archbishop Reyes – F. Cabahug – Mabolo – Panagdait – Mandaue City'
+            },
+            {
+              'route': 'Guadalupe to SM City',
+              'fare': 'P 27',
+              'vehicle_code': '06H',
+              'stops': 'Guadalupe – V. Rama – Capitol – Escario – Ayala Center Cebu – Archbishop Reyes – SM City Cebu'
+            },
+            {
+              'route': 'Talamban to Carbon',
+              'fare': 'P 33',
+              'vehicle_code': '13C',
+              'stops': 'Talamban – Banilad – Gaisano Country Mall – USC TC – Lahug – Escario – Fuente – Colon – Carbon'
+            },
+            {
+              'route': 'Talamban to Colon',
+              'fare': 'P 33',
+              'vehicle_code': '13C',
+              'stops': 'Talamban – Banilad – Gaisano Country Mall – USC TC – Lahug – Escario – Fuente – Colon'
+            },
         ],
       }
     },
@@ -140,9 +260,16 @@ class _DashboardState extends State<Dashboard> {
         'routes': 'Route 01K, 03B, 04H (Modern Jeepneys)',
         'facilities': 'Sheltered Waiting Area, CCTV, Access to Mall',
         'routes_fares': [
-            {'route': 'IT Park to SM City (01K)', 'fare': 'P 15 - P 25'},
-            {'route': 'IT Park to Colon St', 'fare': 'P 20 - P 30'},
-            {'route': 'IT Park to Mandaue', 'fare': 'P 18 - P 28'},
+            {'route': 'IT Park to Danao', 'fare': 'P 50'},
+            {'route': 'IT Park to Liloan', 'fare': 'P 40'},
+            {'route': 'IT Park to Consolacion', 'fare': 'P 35'},
+            {'route': 'IT Park to Mandaue', 'fare': 'P 35'},
+            {'route': 'IT Park to Carbon', 'fare': 'P 20'},
+            {'route': 'IT Park to Il Corso', 'fare': 'P 26'},
+            {'route': 'IT Park to Mactan Newtown', 'fare': 'P 35'},
+            {'route': 'IT Park to Talisay', 'fare': 'P 40'},
+            {'route': 'IT Park to Minglanilla', 'fare': 'P 44'},
+            {'route': 'IT Park to Naga', 'fare': 'P 55'},
         ],
       }
     },
@@ -201,8 +328,8 @@ class _DashboardState extends State<Dashboard> {
   Future<void> _loadTerminalIcon() async {
       // Increased the logical size to 80x80 dp for a bigger icon.
       final newIcon = await BitmapDescriptor.fromAssetImage(
-          const ImageConfiguration(size: Size(80, 80)),
-          'assets/insightsIcon.png', 
+          const ImageConfiguration(size: Size(96, 96)),
+          'assets/terminal-ninetysix.png', 
       );
       if (mounted) {
           setState(() {
@@ -260,17 +387,15 @@ class _DashboardState extends State<Dashboard> {
   }
   
   // MODIFIED: Logic to center map on current location AND apply map style
-  void _onMapCreated(GoogleMapController controller) async { 
-    _mapController = controller;
-    _isMapReady = true;
+ void _onMapCreated(GoogleMapController controller) async { 
+  _mapController = controller;
+  _isMapReady = true;
 
-    // Apply initial map style based on current theme brightness
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    if (isDarkMode) {
-      _mapController.setMapStyle(_darkMapStyleJson);
-    } else {
-      _mapController.setMapStyle("[]"); // Explicitly setting to default style
-    }
+  // Apply initial map style based on current theme brightness
+  final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  // Apply the correct style here as well
+  final mapStyle = isDarkMode ? _darkMapStyleJson : _lightMapStyleJson; 
+  _mapController.setMapStyle(mapStyle);
     
     // 1. Try to get current location
     final LatLng? currentLocation = await MapUtils.getCurrentLocation(context);
@@ -453,24 +578,33 @@ class _DashboardState extends State<Dashboard> {
 
 
   void _handleTerminalTapped(String terminalId) {
-      final terminal = _hardcodedTerminals.firstWhere(
-          (t) => t['id'] == terminalId,
-          orElse: () => <String, dynamic>{}, 
-      );
+    if (!mounted) return;
 
-      if (terminal.isNotEmpty && mounted) {
-          // Keep the existing dialog for marker taps on the map
-          showDialog(
-              context: context,
-              builder: (BuildContext context) {
-                  return TerminalDetailsModal(
-                      details: terminal['details'] as Map<String, dynamic>,
-                      cs: Theme.of(context).colorScheme,
-                  );
-              },
-          );
-      }
-  }
+    // Check if the terminal is valid (optional, as the marker ID guarantees it)
+    final terminal = _hardcodedTerminals.firstWhere(
+        (t) => t['id'] == terminalId,
+        orElse: () => <String, dynamic>{}, 
+    );
+
+    if (terminal.isNotEmpty) {
+        setState(() {
+            // 1. Switch the sheet to the Terminals view
+            _isShowingTerminals = true; 
+            // 2. Set the specific terminal ID for the detail view
+            _selectedTerminalId = terminalId; 
+            // 3. Ensure the sheet is expanded (or in a state where it will animate to expanded)
+            // The CommentingSection widget has logic to animate to _expandedSize 
+            // in didUpdateWidget when _selectedTerminalId changes from null to a value.
+            _isCommunityInsightExpanded = true; 
+        });
+        
+        // OPTIONAL: Animate map to the tapped terminal
+        final position = LatLng(terminal['lat'] as double, terminal['lng'] as double);
+        _mapController.animateCamera(
+            CameraUpdate.newLatLngZoom(position, 16.0),
+        );
+    }
+}
 
 
   Future<void> _handleMyLocationPressed() async {

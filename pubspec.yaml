@@ -74,4 +74,9 @@ flutter:
     - assets/maximT.png
     - assets/van.png
     - assets/Vector.png
+    - assets/terminal.png
+    - assets/terminalOne.png
+    - assets/terminal-sixtyfour.png
+    - assets/terminal-finale.png
+    - assets/terminal-ninetysix.png
     - .env

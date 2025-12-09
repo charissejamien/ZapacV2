@@ -60,6 +60,9 @@ class _CommentingSectionState extends State<CommentingSection> {
   String _selectedFilter = 'All';
 
   Map<String, UserInteraction> _userInteractions = {};
+  
+  // NEW STATE: Index of the currently expanded route in the detail view
+  int? _expandedRouteIndex; 
 
 
   @override
@@ -143,6 +146,10 @@ class _CommentingSectionState extends State<CommentingSection> {
     
     // If we transition to detail view, ensure the sheet is expanded.
     if (widget.selectedTerminalId != null && oldWidget.selectedTerminalId == null) {
+      // Clear expanded route index when navigating to a new terminal detail
+      setState(() {
+          _expandedRouteIndex = null;
+      });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_sheetController.isAttached) return;
         if (_sheetController.size < _expandedSize) {
@@ -153,6 +160,13 @@ class _CommentingSectionState extends State<CommentingSection> {
           );
         }
       });
+    }
+    // If we transition back from a detail view to the list view
+    if (widget.selectedTerminalId == null && oldWidget.selectedTerminalId != null) {
+        // Clear expanded route index
+        setState(() {
+            _expandedRouteIndex = null;
+        });
     }
   }
 
@@ -603,9 +617,69 @@ class _CommentingSectionState extends State<CommentingSection> {
     );
   }
   
-  // MODIFIED: Widget to display the full details of the selected terminal with Route/Fare table
+  // Helper for rendering detail lines in the expanded route panel
+  Widget _buildDetailLine(String label, String value, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: 14, color: cs.onSurface),
+          children: <TextSpan>[
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            TextSpan(
+              text: value,
+              style: TextStyle(color: cs.onSurface.withAlpha(200)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStaticRouteRow(Map<String, dynamic> rf, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              rf['route'] as String? ?? 'N/A', 
+              style: TextStyle(color: cs.onSurface, fontSize: 14),
+              softWrap: true,
+            ),
+          ),
+          Expanded(
+            flex: 1,
+            child: Text(
+              rf['fare'] as String? ?? 'N/A', 
+              style: TextStyle(
+                color: cs.onSurface, 
+                fontWeight: FontWeight.w500, 
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.end, 
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   Widget _buildTerminalDetailView(Map<String, dynamic> terminal, ColorScheme cs, ScrollController scrollController) {
     final details = terminal['details'] as Map<String, dynamic>;
+    final terminalId = terminal['id'] as String;
+    
+    final bool useInteractiveList = [
+        'ayala_puv_terminal', 
+        'cebu_itpark_transport_terminal', 
+        'sm_city_cebu_terminal',
+    ].contains(terminalId);
+
     final List<Map<String, dynamic>> routesFares = (details['routes_fares'] as List<dynamic>?)
       ?.map((e) => e as Map<String, dynamic>)
       .toList() ?? [];
@@ -616,7 +690,7 @@ class _CommentingSectionState extends State<CommentingSection> {
       children: [
         // Title
         Text(
-          details['title'] as String? ?? 'Terminal Details', // FIX: Add safe casting
+          details['title'] as String? ?? 'Terminal Details',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 24,
@@ -624,16 +698,13 @@ class _CommentingSectionState extends State<CommentingSection> {
           ),
         ),
         const SizedBox(height: 16),
-        
-        // General Details (Status, Routes, Facilities)
-        // FIX: Add safe casting
+  
         _buildTerminalDetailRow(Icons.access_time_filled, 'Status', details['status'] as String? ?? 'N/A', cs),
         const SizedBox(height: 10),
         _buildTerminalDetailRow(Icons.directions_bus, 'Primary Routes', details['routes'] as String? ?? 'N/A', cs),
         const SizedBox(height: 10),
         _buildTerminalDetailRow(Icons.local_convenience_store, 'Facilities', details['facilities'] as String? ?? 'N/A', cs),
-        
-        // NEW SECTION: Routes & Fares
+
         const SizedBox(height: 30),
         Text(
           'Routes & Fares',
@@ -644,61 +715,138 @@ class _CommentingSectionState extends State<CommentingSection> {
           ),
         ),
         const SizedBox(height: 10),
-        
-        // Table Header
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Text('Route', style: TextStyle(fontWeight: FontWeight.bold, color: cs.secondary)),
-              ),
-              Expanded(
-                flex: 1,
-                child: Text('Fare', style: TextStyle(fontWeight: FontWeight.bold, color: cs.secondary)),
-              ),
-            ],
-          ),
-        ),
-        Divider(height: 1, thickness: 1, color: Colors.grey[400]),
 
-        // Route/Fare List
-        ...routesFares.map((rf) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: Text(
-                    rf['route'] as String? ?? 'N/A', 
-                    style: TextStyle(color: cs.onSurface, fontSize: 14),
-                    softWrap: true,
-                  ),
+        if (!useInteractiveList)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Table Header
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Text('Route', style: TextStyle(fontWeight: FontWeight.bold, color: cs.secondary)),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Text(
+                          'Fare', 
+                          style: TextStyle(fontWeight: FontWeight.bold, color: cs.secondary),
+                          textAlign: TextAlign.end, 
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  flex: 1,
-                  child: Text(
-                    rf['fare'] as String? ?? 'N/A', 
-                    style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w500, fontSize: 14),
+              ),
+              Divider(height: 1, thickness: 1, color: Colors.grey[400]),
+
+              // Static Route/Fare List
+              ...routesFares.map((rf) => _buildStaticRouteRow(rf, cs)).toList(),
+            ],
+          )
+        else 
+          Column(
+            children: routesFares.asMap().entries.map((entry) {
+              final index = entry.key;
+              final rf = entry.value;
+              final isExpanded = _expandedRouteIndex == index;
+              
+              final routeName = rf['route'] as String? ?? 'N/A';
+              final fare = rf['fare'] as String? ?? 'N/A';
+              final vehicleCode = rf['vehicle_code'] as String? ?? 'N/A'; 
+              final routeStops = rf['stops'] as String? ?? 'No stops defined.'; 
+              final Color primaryContentColor = isExpanded ? Colors.white : cs.onSurface;
+              final Color borderColor = isExpanded ? cs.primary : Colors.grey.shade300;
+              final Color backgroundColor = isExpanded ? cs.secondary : cs.surface; 
+
+              return Column(
+                children: [
+                  // 1. The main interactive button area
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        // Toggle expansion state: close if already expanded, open otherwise
+                        _expandedRouteIndex = isExpanded ? null : index;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+                      decoration: BoxDecoration(
+                        // Use cs.secondary for expanded state to match the secondary color gradient
+                        color: backgroundColor, 
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: borderColor,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              routeName, 
+                              style: TextStyle(
+                                // Use the calculated primaryContentColor (white when expanded)
+                                color: primaryContentColor, 
+                                fontWeight: isExpanded ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 15,
+                              ),
+                              softWrap: true,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            fare, 
+                            style: TextStyle(
+                              color: primaryContentColor,
+                              fontWeight: isExpanded ? FontWeight.bold : FontWeight.w500,
+                              fontSize: 15,
+                            ),
+                            textAlign: TextAlign.end,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-        
-        // Footer (Location Coordinates)
-        const SizedBox(height: 30),
-        Text(
-          'Location Coordinates:',
-          style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface),
-        ),
-        Text(
-          'Lat: ${terminal['lat']}, Lng: ${terminal['lng']}',
-          style: TextStyle(color: cs.onSurface.withAlpha(179)),
-        ),
+                  
+                  // 2. The expandable details panel
+                  if (isExpanded)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16.0),
+                      margin: const EdgeInsets.only(top: 2),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceVariant, // Slightly different background for the detail box
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(8),
+                          bottomRight: Radius.circular(8),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildDetailLine('Vehicle Code', vehicleCode, cs),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Route Stops:',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: cs.onSurface),
+                          ),
+                          Text(
+                            routeStops,
+                            style: TextStyle(fontSize: 14, color: cs.onSurface.withAlpha(200)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                  const SizedBox(height: 10), // Space between buttons
+                ],
+              );
+            }).toList(),
+          ),
+
       ],
     );
   }
@@ -736,9 +884,8 @@ class _CommentingSectionState extends State<CommentingSection> {
     );
   }
 
-  /// Helper to render "Taga ZAPAC says..." with only "ZAPAC" bold and gradient
   /// Helper to render "Taga ZAPAC says..." with adaptive text color
-  Widget _buildZapacHeaderTitle(Color textColor) { // <--- ADDED PARAMETER
+  Widget _buildZapacHeaderTitle(Color textColor) { 
     const double fontSize = 18;
 
     return RichText(
@@ -750,7 +897,7 @@ class _CommentingSectionState extends State<CommentingSection> {
             style: TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: fontSize,
-              color: textColor, // <--- USE PARAMETER
+              color: textColor, 
             ),
           ),
           WidgetSpan(
@@ -781,7 +928,7 @@ class _CommentingSectionState extends State<CommentingSection> {
             style: TextStyle(
               fontWeight: FontWeight.normal,
               fontSize: fontSize,
-              color: textColor, // <--- USE PARAMETER
+              color: textColor, 
             ),
           ),
         ],
@@ -1057,8 +1204,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                     ),
                     border: Border.all(
                       color: isDarkMode
-                          ? Colors.white.withValues(alpha: 0.15)
-                          : Colors.black.withValues(alpha: 0.06),
+                          ? Colors.white.withAlpha(38) // was .withValues(alpha: 0.15)
+                          : Colors.black.withAlpha(15), // was .withValues(alpha: 0.06)
                       width: 1,
                     ),
                   ),
@@ -1072,7 +1219,7 @@ class _CommentingSectionState extends State<CommentingSection> {
                           height: 4,
                           decoration: BoxDecoration(
                             color: (isDarkMode ? Colors.white : Colors.black87)
-                                .withValues(alpha: 0.35),
+                                .withAlpha(89), // was .withValues(alpha: 0.35)
                             borderRadius: BorderRadius.circular(999),
                           ),
                         ),
@@ -1083,7 +1230,8 @@ class _CommentingSectionState extends State<CommentingSection> {
                           // Back button visible only if viewing a specific terminal
                           if (widget.selectedTerminalId != null)
                             IconButton(
-                              icon: const Icon(Icons.arrow_back, color: Colors.white),
+                              // UPDATED: Use dynamic headerTextColor for contrast
+                              icon: Icon(Icons.arrow_back, color: headerTextColor), 
                               onPressed: widget.onBackToTerminals,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),

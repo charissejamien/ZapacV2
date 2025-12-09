@@ -448,28 +448,25 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
     );
   }
 
-  Widget _buildActionButton(ColorScheme cs, String appName, {required Color backgroundColor}) {
-    // Note: Removed imagePath and asset usage to simplify and prevent asset errors.
-    // If you use the Image.asset code, ensure the paths are correct.
+Widget _buildActionButton(ColorScheme cs, String appName, String imagePath, {required Color backgroundColor}) {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4.0),
         child: ElevatedButton(
           onPressed: () => _launchAppOrStore(appName),
           style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6), // Use smaller padding for logo
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 2,
             minimumSize: const Size(0, 20),
             backgroundColor: backgroundColor, 
           ),
-          child: Text(
-            appName, 
-            style: TextStyle(
-              color: backgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
+          child: Image.asset( // Use Image.asset for the logo
+            imagePath,
+            height: 30,
+            fit: BoxFit.contain,
+            color: backgroundColor.computeLuminance() > 0.5 ? Colors.black : Colors.white, 
+            colorBlendMode: BlendMode.modulate, 
           ),
         ),
       ),
@@ -477,24 +474,23 @@ class _RouteDetailPageState extends State<RouteDetailPage> {
   }
 
 
-  Widget _buildMotoTaxiButtonsRow(ColorScheme cs) {
+Widget _buildMotoTaxiButtonsRow(ColorScheme cs) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildActionButton(cs, 'Angkas', backgroundColor: angkasBlue), 
-        _buildActionButton(cs, 'Maxim', backgroundColor: maximYellow), 
-        _buildActionButton(cs, 'MoveIt', backgroundColor: moveItRed), 
-        _buildActionButton(cs, 'JoyRide', backgroundColor: joyrideBlue),
+        _buildActionButton(cs, 'Angkas', 'assets/angkas.png', backgroundColor: angkasBlue), 
+        _buildActionButton(cs, 'Maxim', 'assets/maximT.png', backgroundColor: maximYellow), 
+        _buildActionButton(cs, 'MoveIt', 'assets/moveit.png', backgroundColor: moveItRed), 
+        _buildActionButton(cs, 'JoyRide', 'assets/joyride.png', backgroundColor: joyrideBlue),
       ],
     );
   }
-  
-  Widget _buildTaxiButtonsRow(ColorScheme cs) {
+Widget _buildTaxiButtonsRow(ColorScheme cs) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildActionButton(cs, 'Grab', backgroundColor: grabGreen),
-        _buildActionButton(cs, 'JoyRide', backgroundColor: joyrideBlue),
+        _buildActionButton(cs, 'Grab', 'assets/grab.png', backgroundColor: grabGreen),
+        _buildActionButton(cs, 'JoyRide', 'assets/joyride.png', backgroundColor: joyrideBlue),
       ],
     );
   }

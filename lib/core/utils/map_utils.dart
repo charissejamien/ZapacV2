@@ -221,25 +221,18 @@ class MapUtils {
   
   // REVISED: The getPredictions function 
   static Future<List<dynamic>> getPredictions(String input, String apiKey) async {
-    if (input.isEmpty) return [];
+  if (input.isEmpty) return [];
 
-    try {
-      // Approximate geographic center of Cebu Province
-      const cebuCenter = "10.35,123.90"; 
-      // Radius in meters (increased to 100km to cover the entire province area)
-      const searchRadius = "100000"; 
-      // Restricts to Philippines (required by API best practices)
-      const components = "country:ph"; 
+  try {
+    // Restricts to Philippines (KEEP this to limit to the PH)
+    const components = "country:ph"; 
 
-      final url =
-          'https://maps.googleapis.com/maps/api/place/autocomplete/json'
-          '?input=$input'
-          '&key=$apiKey'
-          '&components=$components'
-          // New parameters to enforce strict search within the Cebu area
-          '&location=$cebuCenter' 
-          '&radius=$searchRadius'
-          '&strictbounds=true'; 
+    final url =
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=$input'
+        '&key=$apiKey'
+        // Only include the components parameter
+        '&components=$components';
 
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {

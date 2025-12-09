@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "50539803991-n679ps2th8rkvk9eebudtg6etchceo0p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.zapac",
+            "certificate_hash": "f5805cc6a61788e68e2aa426aff98c85a6808fd6"
+          }
+        },
+        {
           "client_id": "50539803991-rp4pdg0od087ofdr2cv3ptqejam4lcbm.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -65,6 +73,30 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "50539803991-ibslhfqgs0cbhjjdtk2f9eusmjq3pn3b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zapacv2",
+            "certificate_hash": "22f3a7efa45cdafd29ec7b29aa188bc60dc97929"
+          }
+        },
+        {
+          "client_id": "50539803991-k9cbol69hq0ejjagmjd1dmmi2c1mh9gg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zapacv2",
+            "certificate_hash": "f5805cc6a61788e68e2aa426aff98c85a6808fd6"
+          }
+        },
+        {
+          "client_id": "50539803991-mrpdhr9bh0m1p98r1crld7grug7vcf63.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.zapacv2",
+            "certificate_hash": "2fb2ae155c32d01be04e70caece11681181ac583"
+          }
+        },
         {
           "client_id": "50539803991-okkbsamgrvued3vprkjcf95c23ok68v8.apps.googleusercontent.com",
           "client_type": 3

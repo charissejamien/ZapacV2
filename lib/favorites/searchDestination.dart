@@ -137,21 +137,14 @@ class _SearchDestinationPageState extends State<SearchDestinationPage> {
   Future<List<dynamic>> _getPredictions(String input) async {
     if (input.isEmpty) return const [];
 
-    const String cebuLatLng = '10.315700,123.885437';
-    const String radiusMeters = '30000'; // 30 km
-
     final uri = Uri.https(
       'maps.googleapis.com',
       '/maps/api/place/autocomplete/json',
       {
         'input': input,
         'key': apiKey,
-        // Restrict to Philippines and bias to Cebu City area
+        // Now only restricts to Philippines (country default)
         'components': 'country:ph',
-        'location': cebuLatLng,
-        'radius': radiusMeters,
-        // use strictbounds to prefer results inside the radius
-        'strictbounds': 'true',
         'types': 'geocode', // limit to address/results
         'language': 'en',
       },
